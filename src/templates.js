@@ -436,6 +436,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   <style>
     :root {
       --bg: #07070e;
@@ -481,9 +482,15 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     
     .btn-copy { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); color: #c084fc; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
     .btn-copy:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+    .btn-qr { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+    .btn-qr:hover { background: var(--accent); border-color: var(--accent); color: white; }
     
     .btn-sub { width: 100%; padding: 16px; background: linear-gradient(135deg, #a855f7, #ec4899); border: none; border-radius: 16px; color: white; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 12px; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.25); transition: 0.3s; }
     .btn-sub:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.4); }
+
+    .btn-sub-qr { width: 100%; padding: 14px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 16px; color: #c084fc; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 12px; transition: 0.3s; }
+    .btn-sub-qr:hover { background: rgba(168, 85, 247, 0.15); transform: translateY(-1px); }
   </style>
 </head>
 <body>
@@ -525,7 +532,21 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
         <div class="config-name">اتصال VLESS WS</div>
         <div class="config-desc">مناسب برای تمام سیستم‌عامل‌ها</div>
       </div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('کانفیگ VLESS کپی شد'))">کپی کانفیگ</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('کانفیگ VLESS کپی شد'))">کپی کانفیگ</button>
+        <button class="btn-qr" onclick="showQrModal('${vlessWS}', 'اتصال VLESS WS')" title="نمایش QR کد">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <line x1="7" y1="7" x2="7" y2="7" />
+            <line x1="17" y1="7" x2="17" y2="7" />
+            <line x1="17" y1="17" x2="17" y2="17" />
+            <line x1="7" y1="17" x2="7" y2="17" />
+          </svg>
+        </button>
+      </div>
     </div>
     
     <div class="config-card">
@@ -533,11 +554,59 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
         <div class="config-name">اتصال TROJAN WS</div>
         <div class="config-desc">سازگار با کلاینت‌های محبوب</div>
       </div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('کانفیگ Trojan کپی شد'))">کپی کانفیگ</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('کانفیگ Trojan کپی شد'))">کپی کانفیگ</button>
+        <button class="btn-qr" onclick="showQrModal('${trojanWS}', 'اتصال TROJAN WS')" title="نمایش QR کد">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <line x1="7" y1="7" x2="7" y2="7" />
+            <line x1="17" y1="7" x2="17" y2="7" />
+            <line x1="17" y1="17" x2="17" y2="17" />
+            <line x1="7" y1="17" x2="7" y2="17" />
+          </svg>
+        </button>
+      </div>
     </div>
     
     <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('لینک ساب کپی شد'))">کپی لینک ساب‌اسکرایب (Subscription Link)</button>
+    <button class="btn-sub-qr" onclick="showQrModal('${subLink}', 'لینک ساب‌اسکرایب')">نمایش QR کد ساب‌اسکرایب</button>
   </div>
+
+  <!-- QR Modal -->
+  <div id="qr-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:none; justify-content:center; align-items:center; z-index:10000; transition:0.3s;" onclick="closeQrModal()">
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:28px; padding:36px 32px; max-width:320px; width:90%; text-align:center; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s;" onclick="event.stopPropagation()">
+      <style>
+        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      </style>
+      <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
+      <div style="background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+      <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">بستن</button>
+    </div>
+  </div>
+
+  <script>
+    let qrInstance = null;
+    function showQrModal(value, title) {
+      document.getElementById('qr-modal-title').textContent = title;
+      document.getElementById('qr-modal').style.display = 'flex';
+      if (!qrInstance) {
+        qrInstance = new QRious({
+          element: document.getElementById('qr-canvas'),
+          size: 200,
+          level: 'M'
+        });
+      }
+      qrInstance.value = value;
+    }
+    function closeQrModal() {
+      document.getElementById('qr-modal').style.display = 'none';
+    }
+  </script>
 </body>
 </html>`;
 }
