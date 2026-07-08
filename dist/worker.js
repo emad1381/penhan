@@ -1047,114 +1047,133 @@ function loginPage(uuid, host) {
 </body>
 </html>`;
 }
-function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, envKeys = []) {
+function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
   const allGood = hasD1 && hasPassword && hasUUID;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</title>
+  <title>\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #07070c;
-      --card-bg: rgba(18, 18, 30, 0.6);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #8b5cf6;
-      --accent-glow: rgba(139, 92, 246, 0.3);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
+      --bg: #07070e;
+      --card-bg: rgba(18, 18, 30, 0.45);
+      --border: rgba(255, 255, 255, 0.06);
+      --accent: #a855f7;
+      --accent-glow: rgba(168, 85, 247, 0.25);
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
       --success: #10b981;
       --error: #ef4444;
       --warning: #f59e0b;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-x: hidden; position: relative; }
-    body::before, body::after { content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.15; filter: blur(50px); z-index: -1; }
-    body::before { top: -10%; left: -10%; }
-    body::after { bottom: -10%; right: -10%; }
-    .container { width: 100%; max-width: 600px; background: var(--card-bg); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 24px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-    h1 { font-size: 24px; font-weight: 800; margin-bottom: 20px; text-align: center; background: linear-gradient(135deg, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .status-box { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid var(--border); }
-    .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .item:last-child { border-bottom: none; }
-    .item-title { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 10px; }
-    .badge { padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-    .badge.ok { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge.fail { background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge.warn { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
-    .badge.info { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
-    .desc { font-size: 13px; color: var(--text-muted); margin-top: 5px; line-height: 1.6; }
-    .code { background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #f472b6; word-break: break-all; }
-    .links-box { margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); }
-    .links-box h3 { color: var(--success); margin-bottom: 10px; font-size: 16px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-x: hidden; position: relative; }
+    
+    .blob { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.12; filter: blur(80px); z-index: -1; pointer-events: none; }
+    .blob-1 { top: -10%; left: -10%; }
+    .blob-2 { bottom: -10%; right: -10%; }
+
+    .container { width: 100%; max-width: 650px; background: var(--card-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border); border-radius: 32px; padding: 48px 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05); }
+    
+    .logo-area { text-align: center; margin-bottom: 32px; }
+    .logo-icon { font-size: 40px; margin-bottom: 12px; display: inline-block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    
+    h1 { font-family: Vazirmatn, sans-serif; font-size: 26px; font-weight: 850; margin-bottom: 8px; text-align: center; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { text-align: center; font-size: 14px; color: var(--text-muted); margin-bottom: 36px; line-height: 1.6; }
+    
+    .card-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+    .variable-card { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 20px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
+    .variable-card:hover { border-color: rgba(168, 85, 247, 0.3); transform: translateY(-2px); }
+    
+    .card-details { flex: 1; padding-left: 20px; text-align: right; }
+    .card-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    
+    .code { font-family: 'Outfit', monospace; font-size: 12px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); padding: 2px 8px; border-radius: 6px; color: #e9d5ff; white-space: nowrap; direction: ltr; display: inline-block; margin: 2px 0; }
+    .value-display { font-family: 'Outfit', monospace; font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: #cbd5e1; direction: ltr; display: inline-block; word-break: break-all; margin-top: 4px; }
+    
+    .badge { padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: 0.2s; }
+    .badge.ok { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
+    .badge.fail { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+    .badge.info { background: rgba(168, 85, 247, 0.08); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.15); }
+    
+    .success-panel { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 24px; padding: 28px; text-align: center; animation: pulseGlow 2s infinite alternate; }
+    @keyframes pulseGlow { 0% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.05); } 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); } }
+    .success-title { font-size: 18px; font-weight: 800; color: #34d399; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .success-desc { font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 20px; }
+    
+    .action-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; border: none; padding: 14px; border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer; transition: all 0.3s; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.3); }
+    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.45); }
+    
+    .warning-panel { text-align: center; padding: 16px; border-radius: 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 13px; font-weight: 500; line-height: 1.6; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>\u2699\uFE0F \u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0648\u0631\u06A9\u0631</h1>
-    <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      \u0628\u0631\u0627\u06CC \u0639\u0645\u0644\u06A9\u0631\u062F \u0635\u062D\u06CC\u062D \u067E\u0631\u0648\u06A9\u0633\u06CC\u060C \u0648\u0636\u0639\u06CC\u062A \u0645\u062A\u063A\u06CC\u0631\u0647\u0627 \u0648 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u0631\u0627 \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.
-    </p>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
 
-    <div class="status-box">
-      <!-- D1 Database Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">\u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 Cloudflare D1</div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0648 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u062F\u0631 \u0628\u062E\u0634 Bindings \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u06CC\u06A9 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0627\u0636\u0627\u0641\u0647 \u06A9\u0646\u06CC\u062F \u0648 \u0646\u0627\u0645 \u0628\u0627\u06CC\u0646\u062F\u06CC\u0646\u06AF \u0622\u0646 \u0631\u0627 \u062F\u0642\u06CC\u0642\u0627\u064B <span class="code">DB</span> \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F.</div>
+  <div class="container">
+    <div class="logo-area">
+      <div class="logo-icon">\u{1F52E}</div>
+      <h1>\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</h1>
+      <div class="subtitle">\u0628\u0631\u0627\u06CC \u0634\u0631\u0648\u0639 \u0628\u0647 \u06A9\u0627\u0631 \u067E\u0631\u0648\u06A9\u0633\u06CC\u060C \u0648\u0636\u0639\u06CC\u062A \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627 \u0631\u0627 \u0628\u0631\u0631\u0633\u06CC \u0648 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F.</div>
+    </div>
+
+    <div class="card-list">
+      <!-- Database Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">\u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 Cloudflare D1</div>
+          <div class="desc">\u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0648 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u0646\u0627\u0645 \u0628\u0627\u06CC\u0646\u062F\u06CC\u0646\u06AF \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u0631\u0627 \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062F\u0642\u06CC\u0642\u0627\u064B <span class="code">DB</span> \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F.</div>
         </div>
-        <div class="badge ${hasD1 ? "ok" : "fail"}">${hasD1 ? "\u0645\u062A\u0635\u0644 \u0634\u062F \u2705" : "\u0645\u062A\u0635\u0644 \u0646\u06CC\u0633\u062A \u274C"}</div>
+        <div class="badge ${hasD1 ? "ok" : "fail"}">${hasD1 ? "\u0645\u062A\u0635\u0644 \u0634\u062F\u0647" : "\u0645\u062A\u0635\u0644 \u0646\u06CC\u0633\u062A"}</div>
       </div>
       
-      <!-- Password Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PANEL_PASSWORD</span></div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PANEL_PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F (\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0645\u06CC\u200C\u0634\u0648\u062F \u0622\u0646 \u0631\u0627 \u0631\u0645\u0632\u06AF\u0630\u0627\u0631\u06CC \u06A9\u0646\u06CC\u062F).</div>
+      <!-- Password Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PANEL_PASSWORD</span></div>
+          <div class="desc">\u062C\u0647\u062A \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0646\u0627\u0645 \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F (\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0645\u06CC\u200C\u0634\u0648\u062F \u0622\u0646 \u0631\u0627 Encrypt \u06A9\u0646\u06CC\u062F).</div>
         </div>
-        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647"}</div>
       </div>
 
-      <!-- UUID Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
-          <div class="desc">\u0634\u0645\u0627 \u0628\u0627\u06CC\u062F \u06CC\u06A9 UUID \u0645\u0639\u062A\u0628\u0631 (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">UUID</span>) \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F \u06A9\u0647 \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0622\u062F\u0631\u0633 \u067E\u0646\u0644 \u0627\u062F\u0645\u06CC\u0646 \u0634\u0645\u0627 \u0639\u0645\u0644 \u0645\u06CC\u200C\u06A9\u0646\u062F. ${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="code">${currentUUID}</span>` : ""}</div>
+      <!-- UUID Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
+          <div class="desc">\u0634\u0646\u0627\u0633\u0647 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 \u0633\u06CC\u0633\u062A\u0645. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0627 \u0646\u0627\u0645 <span class="code">UUID</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.<br>${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="value-display">${currentUUID}</span>` : ""}</div>
         </div>
-        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647"}</div>
       </div>
 
-      <!-- Proxy IP Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC <span class="code">PROXYIP</span></div>
-          <div class="desc">\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: ${currentProxyIP ? '<span class="code">' + currentProxyIP + "</span>" : "\u0646\u062F\u0627\u0631\u062F"}. \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">PROXYIP</span> \u0628\u0631\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0628\u0631\u062E\u06CC \u0633\u0627\u06CC\u062A\u200C\u0647\u0627.</div>
+      <!-- Proxy IP Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC <span class="code">PROXYIP</span></div>
+          <div class="desc">\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06CC\u0627 \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636. ${currentProxyIP ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="value-display">${currentProxyIP}</span>` : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647."}</div>
         </div>
-        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2139\uFE0F</div>
+        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC</div>
       </div>
     </div>
 
     ${allGood ? `
-    <div class="links-box">
-      <h3>\u2705 \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</h3>
-      <div class="desc" style="color:var(--text);">
-        \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0627\u0635\u0644\u06CC \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u062C\u0639\u0644\u06CC Nginx \u0631\u0627 \u062E\u0648\u0627\u0647\u06CC\u062F \u062F\u06CC\u062F \u062A\u0627 \u0627\u0633\u062A\u062A\u0627\u0631 \u062D\u0641\u0638 \u0634\u0648\u062F.<br><br>
-        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/panel</span><br><br>
-      </div>
+    <div class="success-panel">
+      <div class="success-title">\u{1F389} \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</div>
+      <div class="success-desc">\u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC\u200C\u0647\u0627 \u062A\u06A9\u0645\u06CC\u0644 \u0634\u062F. \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 Nginx \u062C\u0647\u062A \u0627\u0633\u062A\u062A\u0627\u0631 \u0646\u0634\u0627\u0646 \u062F\u0627\u062F\u0647 \u062E\u0648\u0627\u0647\u062F \u0634\u062F.</div>
+      <button class="action-btn" onclick="window.location.href='/panel'">\u{1F6AA} \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</button>
     </div>
     ` : `
-    <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0631\u0627 \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u0627\u0645\u0646\u06CC\u062A \u0648 \u0639\u0645\u0644\u06A9\u0631\u062F \u067E\u0631\u0648\u06A9\u0633\u06CC \u0634\u0645\u0627 \u06A9\u0627\u0645\u0644 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F!
+    <div class="warning-panel">
+      \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0628\u0627\u0644\u0627 \u0631\u0627 \u0628\u0647 \u062F\u0631\u0633\u062A\u06CC \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0642\u0627\u0628\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F.
     </div>
     `}
-
-    <div style="margin-top:20px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); font-size:11px; font-family:monospace; text-align:left; direction:ltr; color:var(--text-muted); word-break:break-all;">
-      DEBUG Env Keys: [${envKeys.join(", ")}]
-    </div>
   </div>
 </body>
 </html>`;
@@ -1709,31 +1728,16 @@ var src_default = {
           return await vlessOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
         }
       }
-      if (path === "/debug-env") {
-        return new Response(JSON.stringify({
-          PANEL_PASSWORD_type: typeof env.PANEL_PASSWORD,
-          PANEL_PASSWORD_length: env.PANEL_PASSWORD ? env.PANEL_PASSWORD.length : null,
-          PASSWORD_type: typeof env.PASSWORD,
-          PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
-          UUID_type: typeof env.UUID,
-          UUID_length: env.UUID ? env.UUID.length : null,
-          db_panel_pass: await getSettingD1(env, "panel_pass"),
-          db_uuid: await getSettingD1(env, "uuid")
-        }), { headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/") {
-        let showSetup = false;
-        if (!currentPanelPass || !currentAdminUUID || !env.DB)
-          showSetup = true;
-        else if (await isAuthed(request, currentPanelPass))
-          showSetup = true;
-        if (showSetup) {
-          const envKeys = Object.keys(env);
-          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP, envKeys), {
+      const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
+      if (!isSetupComplete) {
+        if (path === "/panel" || path === "/") {
+          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
             status: 200,
             headers: { "Content-Type": "text/html; charset=utf-8" }
           });
         }
+      }
+      if (path === "/") {
         return new Response(nginxPage(), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Server": "nginx/1.24.0" } });
       }
       if (path === "/panel") {
