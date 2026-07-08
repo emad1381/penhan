@@ -1,0 +1,13 @@
+{
+  "name": "penhan",
+  "version": "1.0.0",
+  "description": "Modular VLESS and Trojan WebSocket tunnel for Cloudflare Workers",
+  "main": "dist/worker.js",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --format=esm --external:cloudflare:sockets --outfile=dist/worker.js",
+    "test": "node verify_compilation.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}

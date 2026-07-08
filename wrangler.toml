@@ -1,0 +1,7 @@
+name = "penhan"
+main = "dist/worker.js"
+compatibility_date = "2023-12-01"
+
+[[kv_namespaces]]
+binding = "nahan"
+id = "YOUR_KV_NAMESPACE_ID_HERE"
