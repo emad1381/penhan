@@ -512,17 +512,18 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
   webSocket.binaryType = "arraybuffer";
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
+  let activeUserID = null;
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
-    if (onUsage) {
-      return onUsage(bytes, 0);
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, bytes, 0);
     }
     return true;
   };
   const handleDownload = (bytes) => {
     currentSessionDownload += bytes;
-    if (onUsage) {
-      return onUsage(0, bytes);
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, 0, bytes);
     }
     return true;
   };
@@ -575,6 +576,7 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         log("user auth failed or disabled");
         throw new Error("user not found or disabled");
       }
+      activeUserID = userObj.id;
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
@@ -673,17 +675,18 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
   webSocket.binaryType = "arraybuffer";
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
+  let activeUserID = null;
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
-    if (onUsage) {
-      return onUsage(bytes, 0);
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, bytes, 0);
     }
     return true;
   };
   const handleDownload = (bytes) => {
     currentSessionDownload += bytes;
-    if (onUsage) {
-      return onUsage(0, bytes);
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, 0, bytes);
     }
     return true;
   };
@@ -735,6 +738,7 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
         log("user auth failed or disabled");
         throw new Error("user not found or disabled");
       }
+      activeUserID = userObj.id;
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
@@ -1325,12 +1329,12 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
       <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF Trojan \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
     </div>
     
-    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628 \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628 (\u0628\u062F\u0648\u0646 \u0641\u06CC\u0644\u062A\u0631)</button>
+    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628 \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628 (Subscription Link)</button>
   </div>
 </body>
 </html>`;
 }
-function panelPage(hostname, adminUUID, defaultProxyIP) {
+function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken) {
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -1421,6 +1425,31 @@ function panelPage(hostname, adminUUID, defaultProxyIP) {
         <button class="btn" onclick="openAddUserModal()">+ \u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F</button>
       </div>
       
+      <div class="dashboard-stats" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">\u062A\u0639\u062F\u0627\u062F \u06A9\u0644 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
+          <div id="stat-total-users" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">\u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0641\u0639\u0627\u0644</div>
+          <div id="stat-active-users" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; color:var(--muted)">\u062F\u0631\u062E\u0648\u0627\u0633\u062A\u200C\u0647\u0627\u06CC \u0627\u0645\u0631\u0648\u0632 \u0648\u0631\u06A9\u0631</div>
+            <div id="stat-cf-reqs" style="font-size:18px; font-weight:bold; margin-top:8px;">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</div>
+          </div>
+          <!-- Circular progress chart -->
+          <div id="cf-circle-container" style="width:42px; height:42px; position:relative; display:none;">
+            <svg viewBox="0 0 36 36" style="width:100%; height:100%; transform: rotate(-90deg);">
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#27272a" stroke-width="4" />
+              <path id="cf-circle-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--primary)" stroke-width="4" stroke-dasharray="0, 100" />
+            </svg>
+            <div id="cf-circle-text" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; font-family:'Outfit', sans-serif;">0%</div>
+          </div>
+        </div>
+      </div>
+      
       <div class="table-container">
         <table>
           <thead>
@@ -1493,6 +1522,14 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <div class="form-group">
           <label>\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 (Proxy IP)</label>
           <input type="text" class="form-control" id="st-proxy" value="${defaultProxyIP || ""}" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
+        </div>
+        <div class="form-group">
+          <label>Cloudflare Account ID</label>
+          <input type="text" class="form-control" id="st-cf-account" value="${cfAccountId || ""}" placeholder="\u0645\u062B\u0627\u0644: 8e5f2...">
+        </div>
+        <div class="form-group">
+          <label>Cloudflare API Token (\u0628\u0627 \u062F\u0633\u062A\u0631\u0633\u06CC Account Analytics: Read)</label>
+          <input type="password" class="form-control" id="st-cf-token" value="${cfApiToken || ""}" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
         </div>
       </div>
     </div>
@@ -1587,6 +1624,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       try {
         const res = await fetch(basePath + '/users');
         const data = await res.json();
+        
+        const totalUsers = data.users.length;
+        const activeUsers = data.users.filter(u => u.enabled).length;
+        document.getElementById('stat-total-users').textContent = totalUsers;
+        document.getElementById('stat-active-users').textContent = activeUsers;
+        
         const tbody = document.getElementById('users-tbody');
         tbody.innerHTML = '';
         if (data.users.length === 0) {
@@ -1691,7 +1734,9 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const u = document.getElementById('st-uuid').value;
        const p = document.getElementById('st-pass').value;
        const prox = document.getElementById('st-proxy').value;
-       const payload = { uuid: u, proxyIP: prox };
+       const cfAcc = document.getElementById('st-cf-account').value;
+       const cfTok = document.getElementById('st-cf-token').value;
+       const payload = { uuid: u, proxyIP: prox, cfAccountId: cfAcc, cfApiToken: cfTok };
        if (p) payload.password = p;
        
        await fetch(basePath + '/settings', {
@@ -1700,6 +1745,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
          body: JSON.stringify(payload)
        });
        alert('\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F.');
+       loadCfMetrics();
     }
 
     function openAddUserModal() {
@@ -1730,9 +1776,38 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       openModal('user-modal');
     }
 
+    async function loadCfMetrics() {
+      try {
+        const res = await fetch('/api/cf-metrics');
+        const data = await res.json();
+        if (data.ok) {
+          const reqs = data.requestsUsed;
+          const limit = data.limit;
+          const percent = Math.min(100, Math.round((reqs / limit) * 100));
+          document.getElementById('stat-cf-reqs').innerHTML = reqs.toLocaleString() + ' <span style="font-size:10px; color:var(--muted)">/ ' + limit.toLocaleString() + '</span>';
+          document.getElementById('cf-circle-container').style.display = 'block';
+          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', percent + ', 100');
+          document.getElementById('cf-circle-text').textContent = percent + '%';
+          if (percent > 85) {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--danger)');
+          } else if (percent > 60) {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'orange');
+          } else {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--primary)');
+          }
+        } else {
+          document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 (\u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A)</span>';
+          document.getElementById('cf-circle-container').style.display = 'none';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     // Init
     loadUsers();
     loadTokens();
+    loadCfMetrics();
   <\/script>
 </body>
 </html>`;
@@ -1773,6 +1848,8 @@ var src_default = {
       let currentProxyIP = await getSettingD1(env, "proxy_ip") || env.PROXYIP || "";
       let currentPanelPass = await getSettingD1(env, "panel_pass") || env.PANEL_PASSWORD || env.PASSWORD || "";
       let currentAdminUUID = await getSettingD1(env, "uuid") || env.UUID || "";
+      let cfAccountId = await getSettingD1(env, "cf_account_id") || "";
+      let cfApiToken = await getSettingD1(env, "cf_api_token") || "";
       const upgradeHeader = request.headers.get("Upgrade");
       const url = new URL(request.url);
       const path = url.pathname;
@@ -1785,30 +1862,28 @@ var src_default = {
         }
         return null;
       };
-      const onUsage = (userID) => {
-        return (upload, download) => {
-          if (!env.DB)
-            return true;
-          let user = usersCache?.find((u) => u.id === userID);
-          if (!user)
-            return true;
-          user.used_bytes += upload + download;
-          if (upload + download > 0) {
-            ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
-          }
-          if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes)
-            return false;
-          if (user.expiry_date > 0 && Date.now() > user.expiry_date)
-            return false;
+      const onUsage = (userID, upload, download) => {
+        if (!env.DB)
           return true;
-        };
+        let user = usersCache?.find((u) => u.id === userID);
+        if (!user)
+          return true;
+        user.used_bytes += upload + download;
+        if (upload + download > 0) {
+          ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
+        }
+        if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes)
+          return false;
+        if (user.expiry_date > 0 && Date.now() > user.expiry_date)
+          return false;
+        return true;
       };
       if (upgradeHeader === "websocket") {
         const decodedPath = decodeURIComponent(path).toLowerCase();
         if (decodedPath.includes("trojan-ws") || decodedPath.includes("trojan")) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
+          return await trojanOverWSHandler(request, authenticate, currentProxyIP, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
+          return await vlessOverWSHandler(request, authenticate, currentProxyIP, onUsage);
         }
       }
       const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
@@ -1828,7 +1903,7 @@ var src_default = {
         if (currentPanelPass && !await isAuthed(request, currentPanelPass)) {
           return new Response(loginPage("/panel", host), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
         }
-        return new Response(panelPage(host, currentAdminUUID, currentProxyIP), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(panelPage(host, currentAdminUUID, currentProxyIP, cfAccountId, cfApiToken), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
       if (path === "/panel/panel-auth" && request.method === "POST") {
         const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -1932,7 +2007,69 @@ var src_default = {
             await setSettingD1(env, "panel_pass", b.password.trim());
           if (b.uuid !== void 0 && isValidUUID(b.uuid.trim()))
             await setSettingD1(env, "uuid", b.uuid.trim());
+          if (b.cfAccountId !== void 0)
+            await setSettingD1(env, "cf_account_id", b.cfAccountId.trim());
+          if (b.cfApiToken !== void 0)
+            await setSettingD1(env, "cf_api_token", b.cfApiToken.trim());
           return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/cf-metrics" && request.method === "GET") {
+          const accountId = await getSettingD1(env, "cf_account_id");
+          const apiToken = await getSettingD1(env, "cf_api_token");
+          if (!accountId || !apiToken) {
+            return new Response(JSON.stringify({ ok: false, error: "Not Configured" }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
+          const now = /* @__PURE__ */ new Date();
+          const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+          const end = now.toISOString();
+          const query = `
+            query GetRequests($accountTag: String!, $start: String!, $end: String!) {
+              viewer {
+                accounts(filter: { accountTag: $accountTag }) {
+                  workersRequestAdaptiveGroups(
+                    limit: 1,
+                    filter: {
+                      datetime_geq: $start,
+                      datetime_leq: $end
+                    }
+                  ) {
+                    sum {
+                      requests
+                    }
+                  }
+                }
+              }
+            }
+          `;
+          try {
+            const cfRes = await fetch("https://api.cloudflare.com/client/v4/graphql", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${apiToken}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                query,
+                variables: {
+                  accountTag: accountId,
+                  start,
+                  end
+                }
+              })
+            });
+            const cfData = await cfRes.json();
+            if (cfData.errors && cfData.errors.length > 0) {
+              return new Response(JSON.stringify({ ok: false, error: cfData.errors[0].message }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }
+            const accounts = cfData?.data?.viewer?.accounts;
+            let requestsUsed = 0;
+            if (accounts && accounts.length > 0 && accounts[0].workersRequestAdaptiveGroups && accounts[0].workersRequestAdaptiveGroups.length > 0) {
+              requestsUsed = accounts[0].workersRequestAdaptiveGroups[0].sum.requests || 0;
+            }
+            return new Response(JSON.stringify({ ok: true, requestsUsed, limit: 1e5 }), { status: 200, headers: { "Content-Type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
         }
         return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
       }
