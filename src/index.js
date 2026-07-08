@@ -82,7 +82,8 @@ export default {
         else if (await isAuthed(request, currentPanelPass)) showSetup = true;
         
         if (showSetup) {
-           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
+           const envKeys = Object.keys(env);
+           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP, envKeys), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
            });

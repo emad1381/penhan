@@ -258,7 +258,7 @@ function loginPage(uuid, host) {
 </html>`;
 }
 
-function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
+function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, envKeys = []) {
   const allGood = hasD1 && hasPassword && hasUUID;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -354,7 +354,7 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
       <h3>✅ سیستم کاملاً آماده است!</h3>
       <div class="desc" style="color:var(--text);">
         از این پس با باز کردن آدرس اصلی ورکر، صفحه جعلی Nginx را خواهید دید تا استتار حفظ شود.<br><br>
-        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/${currentUUID}</span><br><br>
+        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/panel</span><br><br>
       </div>
     </div>
     ` : `
@@ -362,6 +362,10 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
       ⚠️ تا زمانی که دیتابیس D1 و متغیرهای الزامی را تنظیم نکنید، امنیت و عملکرد پروکسی شما کامل نخواهد بود!
     </div>
     `}
+
+    <div style="margin-top:20px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); font-size:11px; font-family:monospace; text-align:left; direction:ltr; color:var(--text-muted); word-break:break-all;">
+      DEBUG Env Keys: [${envKeys.join(', ')}]
+    </div>
   </div>
 </body>
 </html>`;
