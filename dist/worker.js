@@ -1047,7 +1047,7 @@ function loginPage(uuid, host) {
 </body>
 </html>`;
 }
-function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
+function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, envKeys = []) {
   const allGood = hasD1 && hasPassword && hasUUID;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -1143,7 +1143,7 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
       <h3>\u2705 \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</h3>
       <div class="desc" style="color:var(--text);">
         \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0627\u0635\u0644\u06CC \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u062C\u0639\u0644\u06CC Nginx \u0631\u0627 \u062E\u0648\u0627\u0647\u06CC\u062F \u062F\u06CC\u062F \u062A\u0627 \u0627\u0633\u062A\u062A\u0627\u0631 \u062D\u0641\u0638 \u0634\u0648\u062F.<br><br>
-        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/${currentUUID}</span><br><br>
+        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/panel</span><br><br>
       </div>
     </div>
     ` : `
@@ -1151,6 +1151,10 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
       \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0631\u0627 \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u0627\u0645\u0646\u06CC\u062A \u0648 \u0639\u0645\u0644\u06A9\u0631\u062F \u067E\u0631\u0648\u06A9\u0633\u06CC \u0634\u0645\u0627 \u06A9\u0627\u0645\u0644 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F!
     </div>
     `}
+
+    <div style="margin-top:20px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); font-size:11px; font-family:monospace; text-align:left; direction:ltr; color:var(--text-muted); word-break:break-all;">
+      DEBUG Env Keys: [${envKeys.join(", ")}]
+    </div>
   </div>
 </body>
 </html>`;
@@ -1712,7 +1716,8 @@ var src_default = {
         else if (await isAuthed(request, currentPanelPass))
           showSetup = true;
         if (showSetup) {
-          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
+          const envKeys = Object.keys(env);
+          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP, envKeys), {
             status: 200,
             headers: { "Content-Type": "text/html; charset=utf-8" }
           });
