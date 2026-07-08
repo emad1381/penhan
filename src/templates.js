@@ -582,8 +582,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
         @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       </style>
       <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
-      <div style="background:#fff; padding:12px; border-radius:16px; display:inline-block; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-        <canvas id="qr-canvas"></canvas>
+      <div style="background:#fff; padding:12px; border-radius:16px; display:block; margin:0 auto 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width:fit-content;">
+        <canvas id="qr-canvas" style="display:block;"></canvas>
       </div>
       <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">بستن</button>
     </div>
