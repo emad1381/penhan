@@ -1000,10 +1000,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           const reqs = data.requestsUsed;
           const limit = data.limit;
           const percent = Math.min(100, Math.round((reqs / limit) * 100));
-          document.getElementById('stat-cf-reqs').innerHTML = `${reqs.toLocaleString()} <span style="font-size:10px; color:var(--muted)">/ ${limit.toLocaleString()}</span>`;
+          document.getElementById('stat-cf-reqs').innerHTML = reqs.toLocaleString() + ' <span style="font-size:10px; color:var(--muted)">/ ' + limit.toLocaleString() + '</span>';
           document.getElementById('cf-circle-container').style.display = 'block';
-          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', `${percent}, 100`);
-          document.getElementById('cf-circle-text').textContent = `${percent}%`;
+          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', percent + ', 100');
+          document.getElementById('cf-circle-text').textContent = percent + '%';
           if (percent > 85) {
             document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--danger)');
           } else if (percent > 60) {
