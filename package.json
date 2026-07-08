@@ -5,7 +5,7 @@
   "main": "dist/worker.js",
   "scripts": {
     "build": "esbuild src/index.js --bundle --format=esm --external:cloudflare:sockets --outfile=dist/worker.js",
-    "build:obfuscate": "node scripts/obfuscate.js",
+    "build:obfuscate": "esbuild src/index.js --bundle --format=esm --external:cloudflare:sockets --minify --outfile=dist/worker_obfuscated.js",
     "test": "node verify_compilation.js"
   },
   "devDependencies": {
