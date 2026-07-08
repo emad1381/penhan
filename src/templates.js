@@ -577,12 +577,12 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
 
   <!-- QR Modal -->
   <div id="qr-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:none; justify-content:center; align-items:center; z-index:10000; transition:0.3s;" onclick="closeQrModal()">
-    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:28px; padding:36px 32px; max-width:320px; width:90%; text-align:center; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s;" onclick="event.stopPropagation()">
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:28px; padding:28px 20px; max-width:320px; width:90%; text-align:center; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s;" onclick="event.stopPropagation()">
       <style>
         @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       </style>
       <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
-      <div style="background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <div style="background:#fff; padding:12px; border-radius:16px; display:inline-block; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
         <canvas id="qr-canvas"></canvas>
       </div>
       <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">بستن</button>
@@ -597,8 +597,9 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
       if (!qrInstance) {
         qrInstance = new QRious({
           element: document.getElementById('qr-canvas'),
-          size: 200,
-          level: 'M'
+          size: 240,
+          padding: 0,
+          level: 'L'
         });
       }
       qrInstance.value = value;
