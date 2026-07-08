@@ -219,7 +219,7 @@ export default {
             query {
               viewer {
                 accounts(filter: { accountTag: "${accountId}" }) {
-                  workersInvocationsAdaptiveGroups(
+                  workersInvocationsAdaptive(
                     limit: 1,
                     filter: {
                       datetime_geq: "${start}",
@@ -252,8 +252,8 @@ export default {
             
             const accounts = cfData?.data?.viewer?.accounts;
             let requestsUsed = 0;
-            if (accounts && accounts.length > 0 && accounts[0].workersInvocationsAdaptiveGroups && accounts[0].workersInvocationsAdaptiveGroups.length > 0) {
-              requestsUsed = accounts[0].workersInvocationsAdaptiveGroups[0].sum.requests || 0;
+            if (accounts && accounts.length > 0 && accounts[0].workersInvocationsAdaptive && accounts[0].workersInvocationsAdaptive.length > 0) {
+              requestsUsed = accounts[0].workersInvocationsAdaptive[0].sum.requests || 0;
             }
             
             return new Response(JSON.stringify({ok: true, requestsUsed, limit: 100000}), {status: 200, headers: {'Content-Type': 'application/json'}});
