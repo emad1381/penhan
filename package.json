@@ -9,7 +9,6 @@
     "test": "node verify_compilation.js"
   },
   "devDependencies": {
-    "esbuild": "^0.20.0",
-    "javascript-obfuscator": "^5.4.3"
+    "esbuild": "^0.20.0"
   }
 }
