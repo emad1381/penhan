@@ -14,6 +14,8 @@ function loginPage(uuid, host) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <style>
     :root {
       --bg: #07070c;
@@ -269,6 +271,8 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <style>
     :root {
       --bg: #07070e;
@@ -433,61 +437,110 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   <title>پروفایل نهان - ${name}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <style>
-    :root { --bg: #0f111a; --card: rgba(22, 24, 38, 0.7); --border: rgba(255, 255, 255, 0.08); --accent: #8b5cf6; --text: #f8fafc; --muted: #94a3b8; }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-    body::before { content: ""; position: absolute; width: 300px; height: 300px; background: var(--accent); filter: blur(150px); opacity: 0.2; z-index: -1; }
-    .container { width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 32px; backdrop-filter: blur(20px); text-align: center; }
-    h1 { font-size: 24px; margin-bottom: 8px; font-weight: 800; background: linear-gradient(to right, #c084fc, #f472b6); -webkit-background-clip: text; color: transparent; }
-    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(16, 185, 129, 0.1); color: #10b981; margin-bottom: 24px; }
-    .status-badge.disabled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    :root {
+      --bg: #07070e;
+      --card-bg: rgba(18, 18, 30, 0.45);
+      --border: rgba(255, 255, 255, 0.06);
+      --accent: #8b5cf6;
+      --accent-glow: rgba(139, 92, 246, 0.2);
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --success: #10b981;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Vazirmatn, system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; overflow-x: hidden; position: relative; }
     
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
-    .stat-card { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 16px; padding: 16px; text-align: center; }
-    .stat-val { font-size: 16px; font-weight: 700; color: #a5b4fc; direction: ltr; margin-top: 8px; }
+    .blob { position: absolute; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.15; filter: blur(80px); z-index: -1; pointer-events: none; }
+    .blob-1 { top: 10%; left: 10%; }
     
-    .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 12px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #d946ef); width: ${percent}%; border-radius: 10px; }
+    .container { width: 100%; max-width: 500px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 28px; padding: 40px 32px; backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); box-shadow: 0 30px 60px rgba(0,0,0,0.6); text-align: center; }
     
-    .config-box { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; text-align: left; direction: ltr; position: relative; }
-    .config-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: bold; text-transform: uppercase; text-align: right; direction: rtl; }
-    .config-val { font-family: monospace; font-size: 11px; color: #cbd5e1; word-break: break-all; opacity: 0.8; }
-    .btn-copy { position: absolute; top: 12px; right: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); color: white; padding: 6px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
-    .btn-copy:hover { background: var(--accent); }
-    .btn-sub { width: 100%; padding: 14px; background: linear-gradient(135deg, #7c3aed, #db2777); border: none; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 10px; }
+    .user-avatar { width: 64px; height: 64px; background: linear-gradient(135deg, #a855f7, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(168, 85, 247, 0.3); }
+    
+    h1 { font-size: 22px; margin-bottom: 6px; font-weight: 850; color: #fff; }
+    
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); margin-bottom: 32px; }
+    .status-badge.disabled { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+    
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 18px; text-align: center; }
+    .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+    .stat-val { font-size: 15px; font-weight: 700; color: #fff; direction: ltr; margin-top: 8px; }
+    
+    .usage-container { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-bottom: 28px; text-align: right; }
+    .usage-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+    .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 10px; margin-top: 12px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #a855f7, #ec4899); width: ${percent}%; border-radius: 10px; box-shadow: 0 0 10px rgba(168,85,247,0.5); }
+    
+    .config-card { background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 20px; padding: 18px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+    .config-card:hover { border-color: rgba(168, 85, 247, 0.3); }
+    .config-info { text-align: right; }
+    .config-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .config-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    
+    .btn-copy { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); color: #c084fc; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .btn-copy:hover { background: var(--accent); color: white; border-color: var(--accent); }
+    
+    .btn-sub { width: 100%; padding: 16px; background: linear-gradient(135deg, #a855f7, #ec4899); border: none; border-radius: 16px; color: white; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 12px; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.25); transition: 0.3s; }
+    .btn-sub:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.4); }
   </style>
 </head>
 <body>
+  <div class="blob blob-1"></div>
+  
   <div class="container">
+    <div class="user-avatar">👤</div>
     <h1>${name}</h1>
-    <div class="status-badge ${user.enabled ? '' : 'disabled'}">${user.enabled ? '🟢 فعال' : '🔴 مسدود'}</div>
+    <div class="status-badge ${user.enabled ? '' : 'disabled'}">
+      <span>●</span> ${user.enabled ? 'فعال' : 'غیرفعال / مسدود'}
+    </div>
     
     <div class="stats-grid">
       <div class="stat-card">
-        <div style="font-size: 12px; color: var(--muted)">ترافیک مصرفی</div>
-        <div class="stat-val">${usageText}</div>
-        <div class="progress-bar-bg"><div class="progress-bar-fill"></div></div>
-      </div>
-      <div class="stat-card">
-        <div style="font-size: 12px; color: var(--muted)">اعتبار زمانی</div>
+        <div class="stat-label">اعتبار زمانی</div>
         <div class="stat-val">${daysLeftText}</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">ترافیک مصرفی</div>
+        <div class="stat-val">${usageText}</div>
+      </div>
     </div>
     
-    <div class="config-box">
-      <div class="config-title">VLESS WS</div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}')">کپی</button>
-      <div class="config-val">${vlessWS.substring(0, 50)}...</div>
+    ${limit > 0 ? `
+    <div class="usage-container">
+      <div class="usage-header">
+        <span style="color:var(--text-muted)">درصد مصرف</span>
+        <span style="font-family: 'Outfit', sans-serif; font-weight:bold; color:#fff">${percent}%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill"></div>
+      </div>
     </div>
-    <div class="config-box">
-      <div class="config-title">Trojan WS</div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}')">کپی</button>
-      <div class="config-val">${trojanWS.substring(0, 50)}...</div>
+    ` : ''}
+    
+    <!-- Config Cards -->
+    <div class="config-card">
+      <div class="config-info">
+        <div class="config-name">اتصال VLESS WS</div>
+        <div class="config-desc">مناسب برای تمام سیستم‌عامل‌ها</div>
+      </div>
+      <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('کانفیگ VLESS کپی شد'))">کپی کانفیگ</button>
     </div>
     
-    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}')">کپی لینک سابسکرایب (بدون فیلتر)</button>
+    <div class="config-card">
+      <div class="config-info">
+        <div class="config-name">اتصال TROJAN WS</div>
+        <div class="config-desc">سازگار با کلاینت‌های محبوب</div>
+      </div>
+      <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('کانفیگ Trojan کپی شد'))">کپی کانفیگ</button>
+    </div>
+    
+    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('لینک ساب کپی شد'))">کپی لینک ساب‌اسکرایب (بدون فیلتر)</button>
   </div>
 </body>
 </html>`;
@@ -503,6 +556,8 @@ function panelPage(hostname, adminUUID, defaultProxyIP) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <style>
     :root { --bg: #09090b; --surface: #18181b; --surface-hover: #27272a; --border: #27272a; --primary: #a855f7; --primary-hover: #9333ea; --text: #fafafa; --muted: #a1a1aa; --danger: #ef4444; --success: #10b981; }
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
@@ -580,7 +635,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP) {
     <div id="page-users" class="page active">
       <div class="header">
         <h2 class="title">مدیریت کاربران</h2>
-        <button class="btn" onclick="openModal('user-modal')">+ افزودن کاربر جدید</button>
+        <button class="btn" onclick="openAddUserModal()">+ افزودن کاربر جدید</button>
       </div>
       
       <div class="table-container">
@@ -768,7 +823,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           let statusBadge = u.enabled ? '<span class="badge green">فعال</span>' : '<span class="badge red">مسدود</span>';
           
           tbody.innerHTML += \`<tr>
-            <td style="font-weight:600">\${u.name}</td>
+            <td style="font-weight:600">\${u.name} <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}')">✏️</span></td>
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
             <td>\${statusBadge}</td>
             <td style="direction:ltr; text-align:right">\${usage}</td>
@@ -865,6 +920,34 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
          body: JSON.stringify(payload)
        });
        alert('تنظیمات با موفقیت ذخیره شد.');
+    }
+
+    function openAddUserModal() {
+      document.getElementById('u-uuid').value = '';
+      document.getElementById('u-uuid').disabled = false;
+      document.getElementById('u-name').value = '';
+      document.getElementById('u-limit').value = 0;
+      document.getElementById('u-days').value = 0;
+      document.getElementById('u-cleanip').value = '';
+      document.getElementById('user-modal-title').textContent = 'افزودن کاربر جدید';
+      generateUUID();
+      openModal('user-modal');
+    }
+
+    function editUser(id, name, limitBytes, expiryDate, cleanIp) {
+      document.getElementById('u-uuid').value = id;
+      document.getElementById('u-uuid').disabled = true;
+      document.getElementById('u-name').value = name;
+      document.getElementById('u-limit').value = limitBytes ? (limitBytes / (1024 * 1024 * 1024)).toFixed(2) : 0;
+      
+      let days = 0;
+      if (expiryDate > 0) {
+        days = Math.max(0, Math.ceil((expiryDate - Date.now()) / 86400000));
+      }
+      document.getElementById('u-days').value = days;
+      document.getElementById('u-cleanip').value = cleanIp || '';
+      document.getElementById('user-modal-title').textContent = 'ویرایش کاربر';
+      openModal('user-modal');
     }
 
     // Init

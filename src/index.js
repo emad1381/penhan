@@ -148,8 +148,16 @@ export default {
            }
            if (request.method === 'POST') {
              const b = await request.json();
-             await env.DB.prepare('INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)')
-               .bind(b.id, b.name, b.clean_ip || '', b.proxy_ip || '', b.limit_bytes || 0, b.expiry_date || 0, b.enabled === false ? 0 : 1).run();
+             await env.DB.prepare(`
+                INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  name = excluded.name,
+                  clean_ip = excluded.clean_ip,
+                  limit_bytes = excluded.limit_bytes,
+                  expiry_date = excluded.expiry_date,
+                  enabled = excluded.enabled
+              `).bind(b.id, b.name, b.clean_ip || '', b.proxy_ip || '', b.limit_bytes || 0, b.expiry_date || 0, b.enabled === false ? 0 : 1).run();
              usersCache = null;
              return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
@@ -217,7 +225,7 @@ export default {
             const vlessObfuscatedPath = '/' + btoa(JSON.stringify(vlessPathObj));
             const trojanObfuscatedPath = '/trojan-' + btoa(JSON.stringify(trojanPathObj));
             
-            const addr = user.clean_ip || "172.64.155.209";
+            const addr = user.clean_ip || host;
             
             const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#VLESS-${user.name}`;
             const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
