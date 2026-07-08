@@ -1113,8 +1113,8 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, env
       <!-- Password Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PASSWORD</span></div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F (\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0645\u06CC\u200C\u0634\u0648\u062F \u0622\u0646 \u0631\u0627 \u0631\u0645\u0632\u06AF\u0630\u0627\u0631\u06CC \u06A9\u0646\u06CC\u062F).</div>
+          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PANEL_PASSWORD</span></div>
+          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PANEL_PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F (\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0645\u06CC\u200C\u0634\u0648\u062F \u0622\u0646 \u0631\u0627 \u0631\u0645\u0632\u06AF\u0630\u0627\u0631\u06CC \u06A9\u0646\u06CC\u062F).</div>
         </div>
         <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
@@ -1669,7 +1669,7 @@ var src_default = {
     try {
       await setupD1Schema(env);
       let currentProxyIP = await getSettingD1(env, "proxy_ip") || env.PROXYIP || "";
-      let currentPanelPass = await getSettingD1(env, "panel_pass") || env.PASSWORD || "";
+      let currentPanelPass = await getSettingD1(env, "panel_pass") || env.PANEL_PASSWORD || env.PASSWORD || "";
       let currentAdminUUID = await getSettingD1(env, "uuid") || env.UUID || "";
       const upgradeHeader = request.headers.get("Upgrade");
       const url = new URL(request.url);
@@ -1711,6 +1711,8 @@ var src_default = {
       }
       if (path === "/debug-env") {
         return new Response(JSON.stringify({
+          PANEL_PASSWORD_type: typeof env.PANEL_PASSWORD,
+          PANEL_PASSWORD_length: env.PANEL_PASSWORD ? env.PANEL_PASSWORD.length : null,
           PASSWORD_type: typeof env.PASSWORD,
           PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
           UUID_type: typeof env.UUID,
