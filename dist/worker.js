@@ -210,25 +210,65 @@ async function isAuthed(request, pass) {
   const hashedPass = await hashPassword(pass);
   return timingSafeEqual(match[1], hashedPass);
 }
-function isApiAuthed(request, currentPanelPass, currentUserID) {
-  const authHeader = request.headers.get("Authorization");
-  let token = "";
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.substring(7).trim();
-  } else {
-    const url = new URL(request.url);
-    token = url.searchParams.get("token") || "";
+async function setupD1Schema(env) {
+  if (!env.DB)
+    return;
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      clean_ip TEXT,
+      proxy_ip TEXT,
+      limit_bytes INTEGER DEFAULT 0,
+      used_bytes INTEGER DEFAULT 0,
+      expiry_date INTEGER,
+      enabled BOOLEAN DEFAULT 1
+    );`,
+    `CREATE TABLE IF NOT EXISTS api_keys (
+      key TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at INTEGER
+    );`,
+    `CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );`
+  ];
+  for (const q of queries) {
+    try {
+      await env.DB.prepare(q).run();
+    } catch (e) {
+      console.error("D1 Schema setup error:", e);
+    }
   }
-  if (currentPanelPass && timingSafeEqual(token, currentPanelPass)) {
-    return true;
+}
+async function getSettingD1(env, key) {
+  if (!env.DB)
+    return null;
+  try {
+    const { results } = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(key).all();
+    return results.length > 0 ? results[0].value : null;
+  } catch (e) {
+    return null;
   }
-  if (timingSafeEqual(token, currentUserID)) {
-    return true;
+}
+async function setSettingD1(env, key, value) {
+  if (!env.DB)
+    return;
+  try {
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, value).run();
+  } catch (e) {
+    console.error("Setting save error", e);
   }
-  if (!currentPanelPass && !token) {
-    return true;
+}
+async function updateUsageD1(env, uuid, bytes) {
+  if (!env.DB || bytes === 0)
+    return;
+  try {
+    await env.DB.prepare("UPDATE users SET used_bytes = used_bytes + ? WHERE id = ?").bind(bytes, uuid).run();
+  } catch (e) {
+    console.error("Usage update error", e);
   }
-  return false;
 }
 
 // src/vless.js
@@ -274,13 +314,21 @@ async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
     writer.write(chunk);
   } };
 }
-function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
+function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log, onUpload) {
   let readableStreamCancel = false;
   const stream = new ReadableStream({
     start(controller) {
       webSocketServer.addEventListener("message", (event) => {
         if (readableStreamCancel)
           return;
+        if (onUpload) {
+          const uploadOk = onUpload(event.data.byteLength || event.data.size || 0);
+          if (!uploadOk) {
+            controller.error(new Error("User limit exceeded during upload"));
+            safeCloseWebSocket(webSocketServer);
+            return;
+          }
+        }
         controller.enqueue(event.data);
       });
       webSocketServer.addEventListener("close", () => {
@@ -312,7 +360,7 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
   });
   return stream;
 }
-async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log) {
+async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
   async function connectAndWrite(address, port) {
     const tcpSocket = connect({ hostname: address, port });
     remoteSocketWrapper.value = tcpSocket;
@@ -336,7 +384,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
     log("retrying with proxy IP: " + proxyIP);
     try {
       const tcpSocket = await connectAndWrite(proxyIP, portRemote);
-      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
     } catch (err) {
       log("retry connect failed: " + err);
       webSocket.close(1011, "Retry failed: " + err);
@@ -344,7 +392,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
   }
   try {
     const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
+    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log, onDownload);
   } catch (error) {
     log("first connection attempt failed: " + error);
     if (proxyIP) {
@@ -354,7 +402,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
     }
   }
 }
-async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log) {
+async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log, onDownload) {
   let vlessHeader = vlessResponseHeader;
   let hasIncomingData = false;
   try {
@@ -365,6 +413,14 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
           if (webSocket.readyState !== WS_READY_STATE_OPEN) {
             controller.error("webSocket.readyState is not open, maybe close");
             return;
+          }
+          if (onDownload) {
+            const downloadOk = onDownload(chunk.byteLength || chunk.size || 0);
+            if (!downloadOk) {
+              controller.error(new Error("User limit exceeded during download"));
+              safeCloseWebSocket(webSocket);
+              return;
+            }
           }
           if (vlessHeader && vlessHeader.byteLength > 0) {
             webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
@@ -389,19 +445,13 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
     retry();
   }
 }
-function processVlessHeader(vlessBuffer, userID) {
+function processVlessHeader(vlessBuffer) {
   if (vlessBuffer.byteLength < 24) {
     return { hasError: true, message: "invalid data" };
   }
   const version = new Uint8Array(vlessBuffer.slice(0, 1));
-  let isValidUser = false;
   let isUDP = false;
-  if (stringify2(new Uint8Array(vlessBuffer.slice(1, 17))) === userID) {
-    isValidUser = true;
-  }
-  if (!isValidUser) {
-    return { hasError: true, message: "invalid user" };
-  }
+  const userID = stringify2(new Uint8Array(vlessBuffer.slice(1, 17)));
   const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
   const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
   if (command === 1) {
@@ -451,21 +501,38 @@ function processVlessHeader(vlessBuffer, userID) {
     portRemote,
     rawDataIndex: addressValueIndex + addressLength,
     vlessVersion: version,
-    isUDP
+    isUDP,
+    userID
   };
 }
-async function vlessOverWSHandler(request, userID, proxyIP) {
+async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage) {
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
   webSocket.accept();
   webSocket.binaryType = "arraybuffer";
+  let currentSessionUpload = 0;
+  let currentSessionDownload = 0;
+  const handleUpload = (bytes) => {
+    currentSessionUpload += bytes;
+    if (onUsage) {
+      return onUsage(bytes, 0);
+    }
+    return true;
+  };
+  const handleDownload = (bytes) => {
+    currentSessionDownload += bytes;
+    if (onUsage) {
+      return onUsage(0, bytes);
+    }
+    return true;
+  };
   let address = "";
   let portWithRandomLog = "";
   const log = (info, event) => {
     console.log("[VLESS WS " + address + ":" + portWithRandomLog + "] " + info, event || "");
   };
   const earlyDataHeader = request.headers.get("sec-websocket-protocol") || "";
-  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log, handleUpload);
   let remoteSocketWrapper = { value: null };
   let udpStreamWrite = null;
   let isDns = false;
@@ -500,8 +567,15 @@ async function vlessOverWSHandler(request, userID, proxyIP) {
         addressRemote = "",
         rawDataIndex,
         vlessVersion = new Uint8Array([0, 0]),
-        isUDP
-      } = processVlessHeader(chunk, userID);
+        isUDP,
+        userID
+      } = processVlessHeader(chunk);
+      const userObj = await authenticate(userID);
+      if (!userObj || !userObj.enabled) {
+        log("user auth failed or disabled");
+        throw new Error("user not found or disabled");
+      }
+      const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
       if (hasError) {
@@ -520,7 +594,7 @@ async function vlessOverWSHandler(request, userID, proxyIP) {
         udpStreamWrite(rawClientData);
         return;
       }
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log);
+      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
     },
     close() {
       log("readableWebSocketStream closed");
@@ -592,18 +666,34 @@ function processTrojanHeader(buffer, trojanPasswordHash) {
     isUDP
   };
 }
-async function trojanOverWSHandler(request, trojanPass, proxyIP) {
+async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsage) {
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
   webSocket.accept();
   webSocket.binaryType = "arraybuffer";
+  let currentSessionUpload = 0;
+  let currentSessionDownload = 0;
+  const handleUpload = (bytes) => {
+    currentSessionUpload += bytes;
+    if (onUsage) {
+      return onUsage(bytes, 0);
+    }
+    return true;
+  };
+  const handleDownload = (bytes) => {
+    currentSessionDownload += bytes;
+    if (onUsage) {
+      return onUsage(0, bytes);
+    }
+    return true;
+  };
   let address = "";
   let portWithRandomLog = "";
   const log = (info, event) => {
     console.log("[Trojan WS " + address + ":" + portWithRandomLog + "] " + info, event || "");
   };
   const earlyDataHeader = request.headers.get("sec-websocket-protocol") || "";
-  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log, handleUpload);
   let remoteSocketWrapper = { value: null };
   let udpStreamWrite = null;
   let isDns = false;
@@ -631,7 +721,7 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
           return;
         }
       }
-      const trojanPasswordHash = sha224_and_224(trojanPass, true);
+      const clientHash = new TextDecoder().decode(chunk.slice(0, 56));
       const {
         hasError,
         message,
@@ -639,7 +729,13 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
         addressRemote = "",
         rawDataIndex,
         isUDP
-      } = processTrojanHeader(chunk, trojanPasswordHash);
+      } = processTrojanHeader(chunk, clientHash);
+      const userObj = await authenticate(clientHash);
+      if (!userObj || !userObj.enabled) {
+        log("user auth failed or disabled");
+        throw new Error("user not found or disabled");
+      }
+      const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
       if (hasError) {
@@ -657,7 +753,7 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
         udpStreamWrite(rawClientData);
         return;
       }
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log);
+      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
     },
     close() {
       log("readableWebSocketStream closed");
@@ -704,7 +800,7 @@ function loginPage(uuid, host) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</title>
+  <title>\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
 
@@ -882,14 +978,14 @@ function loginPage(uuid, host) {
   <div class="toast" id="toast"></div>
 
   <div class="login-container">
-    <div class="icon-wrapper">\u{1F512}</div>
-    <h1>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</h1>
-    <p class="subtitle">\u0628\u0631\u0627\u06CC \u0648\u0631\u0648\u062F \u0628\u0647 \u0628\u062E\u0634 \u0645\u062F\u06CC\u0631\u06CC\u062A\u060C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F</p>
+    <div class="icon-wrapper">\u2261\u0192\xF6\xC6</div>
+    <h1>\u2518\u255B\u2518\xE5\u2518\xE4 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC \u2518\xE5\u2518\xE7\u256A\xBA\u2518\xE5</h1>
+    <p class="subtitle">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u256A\xBF\u256A\xAB\u256A\u2524 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC\u256A\xEE \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\u2592\u256A\xBA \u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB</p>
     
-    <input type="password" class="input-field" id="passInput" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autofocus autocomplete="current-password">
+    <input type="password" class="input-field" id="passInput" placeholder="\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3" autofocus autocomplete="current-password">
     <div class="error-msg" id="error"></div>
 
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644</button>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4</button>
   </div>
 
   <script>
@@ -903,13 +999,13 @@ function loginPage(uuid, host) {
       const err = document.getElementById('error');
 
       if (!p) {
-        err.textContent = '\u274C \u0644\u0637\u0641\u0627\u064B \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F';
+        err.textContent = '\u0393\xA5\xEE \u2518\xE4\u256A\u2556\u2518\xFC\u256A\xBA\u2518\xEF \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\u2592\u256A\xBA \u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB';
         err.classList.add('visible');
         return;
       }
 
       err.classList.remove('visible');
-      btn.textContent = '\u062F\u0631 \u062D\u0627\u0644 \u0628\u0631\u0631\u0633\u06CC...';
+      btn.textContent = '\u256A\xBB\u256A\u2592 \u256A\xA1\u256A\xBA\u2518\xE4 \u256A\xBF\u256A\u2592\u256A\u2592\u256A\u2502\u2588\xEE...';
       btn.disabled = true;
 
       try {
@@ -921,15 +1017,15 @@ function loginPage(uuid, host) {
         if (d.ok) {
           window.location.href = bp;
         } else {
-          err.textContent = '\u274C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0634\u062A\u0628\u0627\u0647 \u0627\u0633\u062A';
+          err.textContent = '\u0393\xA5\xEE \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xBA\u256A\u2524\u256A\xAC\u256A\xBF\u256A\xBA\u2518\xE7 \u256A\xBA\u256A\u2502\u256A\xAC';
           err.classList.add('visible');
           input.value = '';
           input.focus();
         }
       } catch (e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631');
+        showToast('\u0393\xA5\xEE \u256A\xAB\u256A\u2556\u256A\xBA \u256A\xBB\u256A\u2592 \u256A\xBF\u256A\u2592\u2518\xE9\u256A\u2592\u256A\xBA\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2592\u256A\xAC\u256A\xBF\u256A\xBA\u256A\u2556 \u256A\xBF\u256A\xBA \u256A\u2502\u256A\u2592\u2518\xEA\u256A\u2592');
       } finally {
-        btn.textContent = '\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644';
+        btn.textContent = '\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4';
         btn.disabled = false;
       }
     }
@@ -950,1607 +1046,6 @@ function loginPage(uuid, host) {
 </body>
 </html>`;
 }
-function subscriptionPage(hostname, uuid, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath) {
-  const addr = currentCleanIP || hostname;
-  const vlessPath = currentVlessPath || "/?ed=2048";
-  const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
-  const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
-  const subLink = `https://${hostname}/${uuid}/sub`;
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u0627\u062A\u0635\u0627\u0644 \u0646\u0647\u0627\u0646</title>
-  <style>
-@import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
-
-    :root {
-      --bg: #07070c;
-      --card-bg: rgba(18, 18, 35, 0.55);
-      --border: rgba(255, 255, 255, 0.05);
-      --border-focus: rgba(139, 92, 246, 0.4);
-      --accent: #8b5cf6;
-      --accent-gradient: linear-gradient(135deg, #7c3aed, #d946ef);
-      --text: #f3f4f6;
-      --text-muted: #8e939e;
-      --bg-darker: rgba(0, 0, 0, 0.25);
-      --success: #10b981;
-      --error: #ef4444;
-    }
-    
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: Vazirmatn, Tahoma, sans-serif;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 20px;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    body::before, body::after {
-      content: "";
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      border-radius: 50%;
-      background: var(--accent);
-      filter: blur(130px);
-      opacity: 0.15;
-      z-index: 0;
-      pointer-events: none;
-    }
-    body::before { top: 10%; right: 10%; }
-    body::after { bottom: 10%; left: 10%; }
-
-    .sub-container {
-      width: 100%;
-      max-width: 520px;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 30px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-      z-index: 1;
-      position: relative;
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 25px;
-    }
-
-    .header-logo {
-      font-size: 32px;
-      margin-bottom: 8px;
-    }
-
-    .header-title {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #a78bfa, #f472b6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 50px;
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--success);
-      font-size: 11px;
-      font-weight: 700;
-      border: 1px solid rgba(16, 185, 129, 0.2);
-      margin-top: 10px;
-    }
-
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(0.9); opacity: 0.6; }
-      50% { transform: scale(1.2); opacity: 1; }
-      100% { transform: scale(0.9); opacity: 0.6; }
-    }
-
-    .sub-link-card {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 25px;
-      text-align: center;
-    }
-
-    .sub-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-
-    .sub-input-group {
-      display: flex;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 12px;
-      padding: 4px;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .sub-url {
-      flex: 1;
-      font-family: Vazirmatn, Tahoma, sans-serif;
-      font-size: 11px;
-      color: #a5b4fc;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding: 0 10px;
-      direction: ltr;
-      text-align: left;
-    }
-
-    .btn-action {
-      background: var(--accent-gradient);
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-action:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .config-card {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 15px;
-      position: relative;
-    }
-
-    .config-tag {
-      position: absolute;
-      top: 15px;
-      left: 16px;
-      font-size: 9px;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: rgba(139, 92, 246, 0.1);
-      color: #a78bfa;
-      border: 1px solid rgba(139, 92, 246, 0.2);
-      font-family: Vazirmatn, Tahoma, sans-serif;
-    }
-
-    .config-title {
-      font-size: 13px;
-      font-weight: 800;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .config-link-container {
-      font-family: Vazirmatn, Tahoma, sans-serif;
-      font-size: 10px;
-      color: #a5b4fc;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      border-radius: 10px;
-      padding: 8px;
-      word-break: break-all;
-      direction: ltr;
-      text-align: left;
-      margin-bottom: 12px;
-      max-height: 50px;
-      overflow-y: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .config-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn-config {
-      flex: 1;
-      padding: 8px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      color: white;
-    }
-
-    .btn-copy-link {
-      background: var(--accent-gradient);
-    }
-
-    .btn-qr {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .btn-qr:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .config-obfuscation-box {
-      margin-top: 12px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px dashed rgba(139, 92, 246, 0.15);
-      font-size: 10px;
-    }
-
-    .obf-header {
-      font-weight: 700;
-      color: #c084fc;
-      margin-bottom: 6px;
-      text-align: right;
-      direction: rtl;
-    }
-
-    .obf-item {
-      margin-bottom: 3px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      direction: ltr;
-    }
-
-    .obf-val {
-      font-family: Vazirmatn, Tahoma, sans-serif;
-      color: #a5b4fc;
-      word-break: break-all;
-    }
-
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(5, 5, 10, 0.85);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s;
-      z-index: 1000;
-      padding: 20px;
-    }
-
-    .modal.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-content {
-      background: #111122;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 25px;
-      width: 100%;
-      max-width: 320px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-      transform: scale(0.9);
-      transition: transform 0.3s;
-    }
-
-    .modal.show .modal-content {
-      transform: scale(1);
-    }
-
-    .modal-title {
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 15px;
-    }
-
-    .qr-img {
-      width: 200px;
-      height: 200px;
-      background: white;
-      border-radius: 12px;
-      padding: 10px;
-      margin: 0 auto 15px;
-    }
-
-    .btn-close {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 10px;
-      font-size: 12px;
-      cursor: pointer;
-      width: 100%;
-      transition: background 0.2s;
-    }
-
-    .btn-close:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 25px;
-      left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      background: rgba(139, 92, 246, 0.9);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 50px;
-      font-size: 12px;
-      font-weight: 700;
-      z-index: 2000;
-      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
-    }
-
-    .toast.show {
-      transform: translateX(-50%) translateY(0);
-    }
-
-    .toast.err {
-      background: rgba(239, 68, 68, 0.9);
-      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
-    }
-
-    .footer {
-      text-align: center;
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 25px;
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-</head>
-<body>
-  <div class="sub-container">
-    <div class="header">
-      <div class="header-logo">\u{1F6F0}\uFE0F</div>
-      <div class="header-title">\u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u0627\u062A\u0635\u0627\u0644 \u0646\u0647\u0627\u0646 (Nahan)</div>
-      <div>
-        <span class="status-badge">
-          <span class="status-dot"></span>
-          \u0627\u0634\u062A\u0631\u0627\u06A9 \u0634\u0645\u0627 \u0641\u0639\u0627\u0644 \u0627\u0633\u062A
-        </span>
-      </div>
-    </div>
-
-    <div class="sub-link-card">
-      <div class="sub-label">\u{1F517} \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u0633\u06A9\u0631\u0627\u06CC\u0628 \u0645\u0633\u062A\u0642\u06CC\u0645 (\u062C\u0647\u062A \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u062F\u0631 \u0646\u0631\u0645\u200C\u0627\u0641\u0632\u0627\u0631):</div>
-      <div class="sub-input-group">
-        <div class="sub-url" id="subUrl">${subLink}</div>
-        <button class="btn-action" onclick="copyText('subUrl', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-      </div>
-    </div>
-
-    <div class="section-title">\u{1F680} \u06A9\u0627\u0646\u0641\u06CC\u06AF\u200C\u0647\u0627\u06CC \u0641\u0639\u0627\u0644 \u0634\u0645\u0627 (Configs):</div>
-
-    <div class="config-card">
-      <span class="config-tag">VLESS WS</span>
-      <div class="config-title">\u{1F680} VLESS over Custom WebSocket</div>
-      <div class="config-link-container" id="link-vlessWS">${vlessWS}</div>
-      <div class="config-actions">
-        <button class="btn-config btn-copy-link" onclick="copyText('link-vlessWS', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-        <button class="btn-config btn-qr" onclick="showQR('${vlessWS}', 'VLESS WS')">\u{1F50D} \u0646\u0645\u0627\u06CC\u0634 QR</button>
-      </div>
-      <div class="config-obfuscation-box">
-        <div class="obf-header">\u{1F4A1} \u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF \u06A9\u0644\u0627\u06CC\u0646\u062A (Custom WS Headers):</div>
-        <div class="obf-item"><strong>Host:</strong> <span class="obf-val">${hostname}</span></div>
-        <div class="obf-item"><strong>Path:</strong> <span class="obf-val">${vlessPath}</span></div>
-        <div class="obf-item"><strong>User-Agent:</strong> <span class="obf-val">Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36</span></div>
-      </div>
-    </div>
-
-    <div class="config-card">
-      <span class="config-tag">Trojan WS</span>
-      <div class="config-title">\u{1F511} Trojan over Custom WebSocket</div>
-      <div class="config-link-container" id="link-trojanWS">${trojanWS}</div>
-      <div class="config-actions">
-        <button class="btn-config btn-copy-link" onclick="copyText('link-trojanWS', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-        <button class="btn-config btn-qr" onclick="showQR('${trojanWS}', 'Trojan WS')">\u{1F50D} \u0646\u0645\u0627\u06CC\u0634 QR</button>
-      </div>
-      <div class="config-obfuscation-box">
-        <div class="obf-header">\u{1F4A1} \u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF \u06A9\u0644\u0627\u06CC\u0646\u062A (Custom WS Headers):</div>
-        <div class="obf-item"><strong>Host:</strong> <span class="obf-val">${hostname}</span></div>
-        <div class="obf-item"><strong>Path:</strong> <span class="obf-val">${trojanPath}</span></div>
-        <div class="obf-item"><strong>User-Agent:</strong> <span class="obf-val">Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36</span></div>
-      </div>
-    </div>
-
-    <div class="footer">
-      \u0637\u0631\u0627\u062D\u06CC \u0634\u062F\u0647 \u0628\u0631\u0627\u06CC \u0639\u0628\u0648\u0631 \u0627\u0632 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A\u200C\u0647\u0627 \u0648 \u062D\u0641\u0638 \u0622\u0632\u0627\u062F\u06CC \u0627\u06CC\u0646\u062A\u0631\u0646\u062A \u2764\uFE0F
-    </div>
-  </div>
-
-  <div class="modal" id="qrModal">
-    <div class="modal-content">
-      <div class="modal-title" id="modalTitle">\u06A9\u062F QR \u0627\u062A\u0635\u0627\u0644</div>
-      <div id="qrContainer" class="qr-img" style="background:white; padding:10px; border-radius:10px; display:inline-block;"></div>
-      <button class="btn-close" onclick="closeModal()">\u0628\u0633\u062A\u0646 \u067E\u0646\u062C\u0631\u0647</button>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script>
-    function copyText(elementId, btn) {
-      const text = document.getElementById(elementId).textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        showToast('\u{1F4CB} \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u06A9\u067E\u06CC \u0634\u062F!');
-        const prev = btn.textContent;
-        btn.textContent = '\u2705 \u06A9\u067E\u06CC \u0634\u062F!';
-        setTimeout(() => { btn.textContent = prev; }, 2000);
-      }).catch(() => {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u06A9\u067E\u06CC \u06A9\u0631\u062F\u0646', true);
-      });
-    }
-
-    function showQR(link, title) {
-      const modal = document.getElementById('qrModal');
-      const modalTitle = document.getElementById('modalTitle');
-      const qrImage = document.getElementById('qrImage');
-      
-      modalTitle.textContent = '\u06A9\u062F QR \u0628\u0631\u0627\u06CC: ' + title;
-      qrImage.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(link);
-      modal.classList.add('show');
-    }
-
-    function closeModal() {
-      document.getElementById('qrModal').classList.remove('show');
-    }
-
-    function showToast(msg, isErr) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.className = 'toast' + (isErr ? ' err' : '') + ' show';
-      setTimeout(() => { t.classList.remove('show'); }, 3000);
-    }
-  <\/script>
-</body>
-</html>`;
-}
-function panelPage(hostname, uuid, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, hasPass, cfColo = "N/A", tlsVersion = "N/A") {
-  const addr = currentCleanIP || hostname;
-  const vlessPath = currentVlessPath || "/?ed=2048";
-  const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
-  const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u062F\u0627\u0634\u0628\u0648\u0631\u062F \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</title>
-  <style>
-@import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
-
-    :root {
-      --bg: #07070c;
-      --card-bg: rgba(18, 18, 35, 0.55);
-      --border: rgba(255, 255, 255, 0.05);
-      --border-focus: rgba(139, 92, 246, 0.4);
-      --accent: #8b5cf6;
-      --accent-gradient: linear-gradient(135deg, #7c3aed, #d946ef);
-      --text: #f3f4f6;
-      --text-muted: #8e939e;
-      --bg-darker: rgba(0, 0, 0, 0.25);
-      --success: #10b981;
-      --success-glow: rgba(16, 185, 129, 0.1);
-      --error: #ef4444;
-    }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: Vazirmatn, Tahoma, sans-serif;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    body::before, body::after {
-      content: '';
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-      opacity: 0.08;
-      filter: blur(80px);
-      z-index: -1;
-    }
-    body::before { top: 10%; left: 5%; }
-    body::after { bottom: 10%; right: 5%; }
-
-    .container {
-      width: 100%;
-      max-width: 680px;
-      background: var(--card-bg);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border: 1px solid var(--border);
-      border-radius: 28px;
-      padding: 30px;
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.02);
-      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Header */
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 20px;
-    }
-
-    .badge-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--success-glow);
-      color: var(--success);
-      border: 1px solid rgba(16, 185, 129, 0.15);
-      padding: 4px 12px;
-      border-radius: 50px;
-      font-size: 11px;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    .badge-status::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.3); opacity: 0.5; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    .header h1 {
-      font-size: 22px;
-      font-weight: 900;
-      background: linear-gradient(135deg, #a78bfa, #f472b6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 6px;
-    }
-
-    .header p {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    /* Tabs */
-    .tabs-nav {
-      display: flex;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 4px;
-      border-radius: 14px;
-      margin-bottom: 25px;
-      border: 1px solid var(--border);
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      border-radius: 10px;
-      transition: all 0.25s;
-      text-align: center;
-    }
-
-    .tab-btn:hover {
-      color: var(--text);
-    }
-
-    .tab-btn.active {
-      background: var(--accent-gradient);
-      color: white;
-      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2);
-    }
-
-    .tab-content {
-      display: none;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(5px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Dashboard Cards */
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    @media (max-width: 500px) {
-      .grid-2 { grid-template-columns: 1fr; }
-    }
-
-    .stat-card {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .stat-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    .stat-val {
-      font-size: 16px;
-      font-weight: 800;
-      color: #c8c8ff;
-      word-break: break-all;
-    }
-
-    /* Latency Checker */
-    .ping-box {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 18px;
-      text-align: center;
-      margin-top: 15px;
-    }
-
-    .ping-results {
-      margin-top: 12px;
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      font-size: 12px;
-      font-family: Vazirmatn, Tahoma, sans-serif;
-    }
-
-    .ping-tag {
-      background: rgba(255, 255, 255, 0.03);
-      padding: 4px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-    }
-
-    /* Config Card list */
-    .config-card {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
-      margin-bottom: 15px;
-      position: relative;
-    }
-
-    .config-tag {
-      position: absolute;
-      top: 18px;
-      left: 20px;
-      font-size: 9px;
-      font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: rgba(139, 92, 246, 0.1);
-      color: #a78bfa;
-      border: 1px solid rgba(139, 92, 246, 0.2);
-      font-family: Vazirmatn, Tahoma, sans-serif;
-    }
-
-    .config-title {
-      font-size: 14px;
-      font-weight: 800;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .config-link-container {
-      font-family: Vazirmatn, Tahoma, sans-serif;
-      font-size: 11px;
-      color: #a5b4fc;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      border-radius: 10px;
-      padding: 10px;
-      word-break: break-all;
-      direction: ltr;
-      max-height: 54px;
-      overflow-y: hidden;
-      margin-bottom: 12px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .config-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .config-obfuscation-box {
-      margin-top: 15px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px dashed rgba(139, 92, 246, 0.2);
-      font-size: 11px;
-    }
-    .obf-header {
-      font-weight: 700;
-      color: #c084fc;
-      margin-bottom: 8px;
-      text-align: right;
-      direction: rtl;
-    }
-    .obf-item {
-      margin-bottom: 4px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      direction: ltr;
-    }
-    .obf-val {
-      font-family: Vazirmatn, Tahoma, sans-serif;
-      color: #a5b4fc;
-      word-break: break-all;
-    }
-
-    .btn-config {
-      flex: 1;
-      padding: 10px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.25s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .btn-copy-link {
-      background: var(--accent-gradient);
-      color: white;
-      box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);
-    }
-
-    .btn-copy-link:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35);
-    }
-
-    .btn-qr {
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    .btn-qr:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    /* Modal for QR Code */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(8px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s ease;
-    }
-
-    .modal.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-content {
-      background: #111122;
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 30px;
-      max-width: 340px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-      transform: translateY(10px);
-      transition: transform 0.3s ease;
-    }
-
-    .modal.show .modal-content {
-      transform: translateY(0);
-    }
-
-    .modal-title {
-      font-size: 15px;
-      font-weight: 800;
-      margin-bottom: 15px;
-    }
-
-    .qr-container {
-      background: white;
-      padding: 15px;
-      border-radius: 16px;
-      display: inline-block;
-      margin-bottom: 20px;
-    }
-
-    .qr-image {
-      display: block;
-      width: 200px;
-      height: 200px;
-    }
-
-    .btn-modal-close {
-      width: 100%;
-      padding: 10px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      border-radius: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.25s;
-    }
-
-    .btn-modal-close:hover {
-      background: rgba(239, 68, 68, 0.1);
-      border-color: rgba(239, 68, 68, 0.2);
-      color: #ef4444;
-    }
-
-    /* Form Styles */
-    .field-card {
-      background: var(--bg-darker);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-
-    .field-label {
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .field-desc {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      line-height: 1.6;
-    }
-
-    .field-input-group {
-      display: flex;
-      gap: 10px;
-    }
-
-    .field-input {
-      flex: 1;
-      padding: 12px 14px;
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text);
-      font-size: 13px;
-      outline: none;
-      transition: all 0.25s;
-      direction: ltr;
-    }
-
-    .field-input:focus {
-      border-color: var(--accent);
-      background: rgba(139, 92, 246, 0.03);
-    }
-
-    .btn-save {
-      padding: 12px 20px;
-      background: var(--accent-gradient);
-      border: none;
-      border-radius: 12px;
-      color: white;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.25s;
-    }
-
-    .btn-save:hover {
-      transform: translateY(-1px);
-    }
-
-    .field-status {
-      font-size: 11px;
-      margin-top: 8px;
-      color: var(--text-muted);
-    }
-
-    /* Toast */
-    .toast {
-      position: fixed;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-20px);
-      background: rgba(16, 185, 129, 0.95);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      color: white;
-      padding: 12px 28px;
-      border-radius: 14px;
-      font-size: 14px;
-      font-weight: 600;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 3000;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    .toast.err { background: rgba(239, 68, 68, 0.95); }
-
-    .btn-logout {
-      width: 100%;
-      padding: 12px;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.15);
-      border-radius: 12px;
-      color: #f87171;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: all 0.25s;
-    }
-
-    .btn-logout:hover {
-      background: rgba(239, 68, 68, 0.2);
-      color: white;
-    }
-
-    .footer {
-      text-align: center;
-      margin-top: 25px;
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.8;
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-</head>
-<body>
-  <div class="toast" id="toast"></div>
-
-  <!-- QR Code Modal -->
-  <div class="modal" id="qrModal">
-    <div class="modal-content">
-      <div class="modal-title" id="modalTitle">\u06A9\u062F QR \u06A9\u0627\u0646\u0641\u06CC\u06AF</div>
-      <div class="qr-container">
-        <div id="qrContainer" class="qr-image" style="background:white; padding:10px; border-radius:10px; display:inline-block; margin: 0 auto;"></div>
-      </div>
-      <button class="btn-modal-close" onclick="closeModal()">\u0628\u0633\u062A\u0646 \u067E\u0646\u062C\u0631\u0647</button>
-    </div>
-  </div>
-
-  <div class="container">
-    <div class="header">
-      <div class="badge-status">\u0648\u0631\u06A9\u0631 \u0641\u0639\u0627\u0644</div>
-      <h1>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</h1>
-      <p>\u0645\u062F\u06CC\u0631\u06CC\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627\u060C \u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u0648 \u0631\u0648\u062A\u06CC\u0646\u06AF \u062A\u0631\u0627\u0641\u06CC\u06A9</p>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="tabs-nav">
-      <button class="tab-btn active" onclick="switchTab('dashboard')">\u{1F4CA} \u067E\u06CC\u0634\u062E\u0648\u0627\u0646</button>
-      <button class="tab-btn" onclick="switchTab('configs')">\u{1F517} \u06A9\u0627\u0646\u0641\u06CC\u06AF\u200C\u0647\u0627</button>
-      <button class="tab-btn" onclick="switchTab('settings')">\u2699\uFE0F \u062A\u0646\u0638\u06CC\u0645\u0627\u062A</button>
-      <button class="tab-btn" onclick="switchTab('system')">\u{1F5A5}\uFE0F \u0633\u06CC\u0633\u062A\u0645</button>
-    </div>
-
-    <!-- Tab 1: Dashboard -->
-    <div class="tab-content active" id="tab-dashboard">
-      <div class="grid-2">
-        <div class="stat-card">
-          <div class="stat-title">\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u0641\u0639\u0627\u0644</div>
-          <div class="stat-val" id="statCleanIP">${currentCleanIP || "\u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631"}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-title">\u0648\u0636\u0639\u06CC\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC \u0622\u06CC\u200C\u067E\u06CC</div>
-          <div class="stat-val" id="statProxyIP">${currentProxyIP || "\u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645 (\u0628\u062F\u0648\u0646 \u067E\u0631\u0648\u06A9\u0633\u06CC)"}</div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="stat-card">
-          <div class="stat-title">\u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 (Colo)</div>
-          <div class="stat-val">${cfColo}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-title">\u0646\u0633\u062E\u0647 TLS \u0645\u0631\u0648\u0631\u06AF\u0631</div>
-          <div class="stat-val">${tlsVersion}</div>
-        </div>
-      </div>
-
-      <!-- Subscription Link Card -->
-      <div class="stat-card" style="margin-bottom: 20px; border: 1px solid rgba(139, 92, 246, 0.2);">
-        <div class="stat-title" style="color: #c084fc; font-weight: 800; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-          <span>\u{1F310}</span> \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u0633\u06A9\u0631\u0627\u06CC\u0628 \u0645\u0633\u062A\u0642\u06CC\u0645 (Subscription URL)
-        </div>
-        <div class="stat-desc" style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; text-align: right; direction: rtl;">
-          \u0627\u06CC\u0646 \u0644\u06CC\u0646\u06A9 \u0631\u0627 \u06A9\u067E\u06CC \u06A9\u0631\u062F\u0647 \u0648 \u062F\u0631 \u06A9\u0644\u0627\u06CC\u0646\u062A \u062E\u0648\u062F (v2rayNG, Hiddify, Shadowrocket) \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F \u062A\u0627 \u0647\u0645\u0647\u200C\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF\u200C\u0647\u0627 \u0628\u0647 \u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0636\u0627\u0641\u0647 \u0648 \u0622\u067E\u062F\u06CC\u062A \u0634\u0648\u0646\u062F.
-        </div>
-        <div class="sub-input-group" style="display: flex; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 6px; align-items: center; gap: 6px;">
-          <div id="lblSubLink" style="flex: 1; font-family: Vazirmatn, Tahoma, sans-serif; font-size: 11px; color: #a5b4fc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 10px; direction: ltr; text-align: left;">https://${hostname}/${uuid}/sub</div>
-          <button class="btn-save" style="margin: 0; padding: 8px 16px; font-size: 11px; border-radius: 8px;" onclick="copyLink('lblSubLink', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-        </div>
-      </div>
-
-      <div class="ping-box">
-        <div class="stat-title" style="margin-bottom: 8px;">\u062A\u0633\u062A \u0633\u0631\u0639\u062A \u067E\u0627\u0633\u062E\u06AF\u0648\u06CC\u06CC (Latency Checker)</div>
-        <button class="btn-save" onclick="checkLatency(this)">\u0634\u0631\u0648\u0639 \u062A\u0633\u062A \u067E\u06CC\u0646\u06AF</button>
-        <div class="ping-results" id="pingResults" style="display: none;">
-          <div class="ping-tag">\u06AF\u0648\u06AF\u0644: <span id="ping-google">--</span></div>
-          <div class="ping-tag">\u06A9\u0644\u0627\u062F\u0641\u0644\u0631: <span id="ping-cf">--</span></div>
-          <div class="ping-tag">\u0648\u0631\u06A9\u0631 \u0634\u0645\u0627: <span id="ping-worker">--</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 2: Configs -->
-    <div class="tab-content" id="tab-configs">
-      <!-- VLESS WS -->
-      <div class="config-card">
-        <span class="config-tag">VLESS WS</span>
-        <div class="config-title">\u{1F680} VLESS over Custom WebSocket</div>
-        <div class="config-link-container" id="link-vlessWS">${vlessWS}</div>
-        <div class="config-actions">
-          <button class="btn-config btn-copy-link" onclick="copyLink('link-vlessWS', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-          <button class="btn-config btn-qr" onclick="showQR('${vlessWS}', 'VLESS WS')">\u{1F50D} \u0646\u0645\u0627\u06CC\u0634 QR</button>
-        </div>
-        <div class="config-obfuscation-box">
-          <div class="obf-header">\u{1F4A1} \u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF \u06A9\u0644\u0627\u06CC\u0646\u062A (Custom WS Headers):</div>
-          <div class="obf-item"><strong>Host:</strong> <span class="obf-val">${hostname}</span></div>
-          <div class="obf-item"><strong>Path:</strong> <span class="obf-val" id="lblVlessPath">${vlessPath}</span></div>
-          <div class="obf-item"><strong>User-Agent:</strong> <span class="obf-val">Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36</span></div>
-        </div>
-      </div>
-
-      <!-- Trojan WS -->
-      <div class="config-card">
-        <span class="config-tag">Trojan WS</span>
-        <div class="config-title">\u{1F511} Trojan over Custom WebSocket</div>
-        <div class="config-link-container" id="link-trojanWS">${trojanWS}</div>
-        <div class="config-actions">
-          <button class="btn-config btn-copy-link" onclick="copyLink('link-trojanWS', this)">\u{1F4CB} \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9</button>
-          <button class="btn-config btn-qr" onclick="showQR('${trojanWS}', 'Trojan WS')">\u{1F50D} \u0646\u0645\u0627\u06CC\u0634 QR</button>
-        </div>
-        <div class="config-obfuscation-box">
-          <div class="obf-header">\u{1F4A1} \u067E\u0627\u0631\u0627\u0645\u062A\u0631\u0647\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF \u06A9\u0644\u0627\u06CC\u0646\u062A (Custom WS Headers):</div>
-          <div class="obf-item"><strong>Host:</strong> <span class="obf-val">${hostname}</span></div>
-          <div class="obf-item"><strong>Path:</strong> <span class="obf-val" id="lblTrojanPath">${trojanPath}</span></div>
-          <div class="obf-item"><strong>User-Agent:</strong> <span class="obf-val">Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 3: Settings -->
-    <div class="tab-content" id="tab-settings">
-      <!-- Clean IP Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F6E1}\uFE0F \u062F\u0627\u0645\u0646\u0647/\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 (Clean IP / Domain)</div>
-        <div class="field-desc">\u0627\u06CC\u0646 \u0622\u062F\u0631\u0633 \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0622\u062F\u0631\u0633 \u0627\u0635\u0644\u06CC (Address) \u062F\u0631 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u06A9\u0644\u0627\u06CC\u0646\u062A \u0642\u0631\u0627\u0631 \u0645\u06CC\u200C\u06AF\u06CC\u0631\u062F. \u062F\u0631 \u0635\u0648\u0631\u062A \u062E\u0627\u0644\u06CC \u0628\u0648\u062F\u0646\u060C \u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F.</div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputCleanIP" placeholder="\u0645\u062B\u0627\u0644: clean.domain.com" value="${currentCleanIP}">
-          <button class="btn-save" id="btnCleanIP" onclick="saveCleanIP()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-        <div class="field-status" id="statusCleanIP">${currentCleanIP ? "\u2705 \u0641\u0639\u0627\u0644: " + currentCleanIP : "\u26AA \u062E\u0627\u0644\u06CC \u2014 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 \u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631"}</div>
-      </div>
-
-      <!-- Proxy IP Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F501} \u067E\u0631\u0648\u06A9\u0633\u06CC \u0622\u06CC\u200C\u067E\u06CC \u067E\u0634\u062A \u067E\u0631\u062F\u0647 (Proxy IP)</div>
-        <div class="field-desc">\u067E\u0631\u0648\u06A9\u0633\u06CC \u0622\u06CC\u200C\u067E\u06CC \u0641\u0642\u0637 \u0628\u0631\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF \u062F\u0631 \u0628\u06A9\u200C\u0627\u0646\u062F \u0648\u0631\u06A9\u0631 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u0648 \u0646\u0628\u0627\u06CC\u062F \u062F\u0631 \u0644\u06CC\u0646\u06A9 \u06A9\u0644\u0627\u06CC\u0646\u062A\u200C\u0647\u0627 \u0646\u0645\u0627\u06CC\u0634 \u062F\u0627\u062F\u0647 \u0634\u0648\u062F.</div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputProxyIP" placeholder="\u0645\u062B\u0627\u0644: 1.1.1.1:443" value="${currentProxyIP}">
-          <button class="btn-save" id="btnProxyIP" onclick="saveProxyIP()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-        <div class="field-status" id="statusProxyIP">${currentProxyIP ? "\u2705 \u0641\u0639\u0627\u0644: " + currentProxyIP : "\u26AA \u062E\u0627\u0644\u06CC \u2014 \u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645"}</div>
-      </div>
-
-      <!-- Password Protection -->
-      <div class="field-card">
-        <div class="field-label">\u{1F511} \u0645\u062D\u0627\u0641\u0638\u062A \u0627\u0632 \u067E\u0646\u0644</div>
-        <div class="field-desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644, \u0631\u0645\u0632 \u0639\u0628\u0648\u0631\u06CC \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F. \u062E\u0627\u0644\u06CC \u06AF\u0630\u0627\u0634\u062A\u0646 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631\u060C \u0642\u0641\u0644 \u067E\u0646\u0644 \u0631\u0627 \u0628\u0631\u0645\u06CC\u062F\u0627\u0631\u062F.</div>
-        <div class="field-input-group">
-          <input type="password" class="field-input" id="inputPassword" placeholder="\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062C\u062F\u06CC\u062F">
-          <button class="btn-save" id="btnPass" onclick="savePassword()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-        <div class="field-status" id="statusPass">${hasPass ? "\u{1F512} \u067E\u0646\u0644 \u062F\u0627\u0631\u0627\u06CC \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0633\u062A" : "\u{1F513} \u067E\u0646\u0644 \u0628\u062F\u0648\u0646 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631"}</div>
-      </div>
-
-      <!-- UUID Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F511} \u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 (UUID)</div>
-        <div class="field-desc">\u0634\u0646\u0627\u0633\u0647 \u06CC\u06A9\u062A\u0627\u06CC \u0627\u062A\u0635\u0627\u0644 \u0628\u0631\u0627\u06CC \u06A9\u0627\u0631\u0628\u0631. \u062F\u0642\u062A \u06A9\u0646\u06CC\u062F \u0628\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u0627\u06CC\u0646 \u0634\u0646\u0627\u0633\u0647\u060C \u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u0645\u06CC\u200C\u06A9\u0646\u062F.</div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputUUID" placeholder="\u0645\u062B\u0627\u0644: 86c50e3a-..." value="${uuid}">
-          <button class="btn-save" id="btnUUID" onclick="saveUUID()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-      </div>
-
-      <!-- Trojan Pass Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F510} \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062A\u0631\u0648\u062C\u0627\u0646 (TR_PASS)</div>
-        <div class="field-desc">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0645\u0648\u0631\u062F \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0628\u0631\u0627\u06CC \u0627\u062A\u0635\u0627\u0644 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u067E\u0631\u0648\u062A\u06A9\u0644 \u062A\u0631\u0648\u062C\u0627\u0646.</div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputTrPass" placeholder="\u0631\u0645\u0632 \u062C\u062F\u06CC\u062F \u062A\u0631\u0648\u062C\u0627\u0646" value="${currentTrPass}">
-          <button class="btn-save" id="btnTrPass" onclick="saveTrPass()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-      </div>
-
-      <!-- VLESS WS Path Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F6E4}\uFE0F \u0645\u0633\u06CC\u0631 \u0627\u062E\u062A\u0635\u0627\u0635\u06CC VLESS WebSocket (Obfuscated Path)</div>
-        <div class="field-desc">\u062A\u063A\u06CC\u06CC\u0631 \u0645\u0633\u06CC\u0631 \u0648\u0628\u200C\u0633\u0648\u06A9\u062A \u0628\u0631\u0627\u06CC \u0641\u0631\u06CC\u0628 \u0641\u06CC\u0644\u062A\u0631\u06CC\u0646\u06AF. \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: <code>/?ed=2048</code></div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputVlessPath" placeholder="\u0645\u062B\u0627\u0644: /api/v3/telemetry" value="${currentVlessPath}">
-          <button class="btn-save" id="btnVlessPath" onclick="saveVlessPath()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-        <div class="field-status" id="statusVlessPath" style="font-family: Vazirmatn, Tahoma, sans-serif;">${currentVlessPath ? "\u2705 \u0645\u0633\u06CC\u0631 \u0633\u0641\u0627\u0631\u0634\u06CC: " + currentVlessPath : "\u26AA \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: /?ed=2048"}</div>
-      </div>
-
-      <!-- Trojan WS Path Config -->
-      <div class="field-card">
-        <div class="field-label">\u{1F6E4}\uFE0F \u0645\u0633\u06CC\u0631 \u0627\u062E\u062A\u0635\u0627\u0635\u06CC Trojan WebSocket (Obfuscated Path)</div>
-        <div class="field-desc">\u062A\u063A\u06CC\u06CC\u0631 \u0645\u0633\u06CC\u0631 \u0648\u0628\u200C\u0633\u0648\u06A9\u062A \u062A\u0631\u0648\u062C\u0627\u0646 \u0628\u0631\u0627\u06CC \u0634\u0628\u06CC\u0647\u200C\u0633\u0627\u0632\u06CC \u062A\u0631\u0627\u0641\u06CC\u06A9 \u0641\u0627\u06CC\u0644. \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: <code>/${uuid}/trojan-ws</code></div>
-        <div class="field-input-group">
-          <input type="text" class="field-input" id="inputTrojanPath" placeholder="\u0645\u062B\u0627\u0644: /assets/js/jquery.min.js" value="${currentTrojanPath}">
-          <button class="btn-save" id="btnTrojanPath" onclick="saveTrojanPath()">\u0630\u062E\u06CC\u0631\u0647</button>
-        </div>
-        <div class="field-status" id="statusTrojanPath" style="font-family: Vazirmatn, Tahoma, sans-serif;">${currentTrojanPath ? "\u2705 \u0645\u0633\u06CC\u0631 \u0633\u0641\u0627\u0631\u0634\u06CC: " + currentTrojanPath : "\u26AA \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: /" + uuid + "/trojan-ws"}</div>
-      </div>
-    </div>
-
-    <!-- Tab 4: System -->
-    <div class="tab-content" id="tab-system">
-      <div class="stat-card" style="margin-bottom: 12px;">
-        <div class="stat-title">\u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631 (Worker Host)</div>
-        <div class="stat-val" id="valHost">${hostname}</div>
-      </div>
-      <div class="stat-card" style="margin-bottom: 12px;">
-        <div class="stat-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 (UUID)</div>
-        <div class="stat-val" id="valUuid">${uuid}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-title">\u062D\u0627\u0644\u062A \u062A\u0648\u0633\u0639\u0647</div>
-        <div class="stat-val" style="color: var(--success);">\u0631\u0648\u0634\u0646 (Active)</div>
-      </div>
-
-      <button class="btn-logout" onclick="logout()">\u{1F6AA} \u062E\u0631\u0648\u062C \u0627\u0632 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</button>
-    </div>
-
-    <div class="footer">
-      \u0637\u0631\u0627\u062D\u06CC \u0634\u062F\u0647 \u0628\u0631\u0627\u06CC \u0639\u0628\u0648\u0631 \u0627\u0632 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A\u200C\u0647\u0627 \u0648 \u062D\u0641\u0638 \u0622\u0632\u0627\u062F\u06CC \u0627\u06CC\u0646\u062A\u0631\u0646\u062A \u2764\uFE0F
-    </div>
-  </div>
-
-  <script>
-    const path = window.location.pathname;
-    const bp = path.endsWith('/save-cleanip') || path.endsWith('/save-proxy') || path.endsWith('/save-password')
-      ? path.slice(0, path.lastIndexOf('/'))
-      : (path.endsWith('/') ? path.slice(0, -1) : path);
-
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      
-      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
-      if (activeBtn) activeBtn.classList.add('active');
-      
-      const activeContent = document.getElementById('tab-' + tabId);
-      if (activeContent) activeContent.classList.add('active');
-    }
-
-    async function saveCleanIP() {
-      const val = document.getElementById('inputCleanIP').value.trim();
-      const btn = document.getElementById('btnCleanIP');
-      const status = document.getElementById('statusCleanIP');
-      const statDash = document.getElementById('statCleanIP');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-cleanip', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u062F\u0627\u0645\u0646\u0647/\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F');
-          status.textContent = data.cleanIP ? '\u2705 \u0641\u0639\u0627\u0644: ' + data.cleanIP : '\u26AA \u062E\u0627\u0644\u06CC \u2014 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 \u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631';
-          statDash.textContent = data.cleanIP || '\u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u062F\u0627\u0645\u0646\u0647 \u0648\u0631\u06A9\u0631';
-          updateLinks();
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function saveProxyIP() {
-      const val = document.getElementById('inputProxyIP').value.trim();
-      const btn = document.getElementById('btnProxyIP');
-      const status = document.getElementById('statusProxyIP');
-      const statDash = document.getElementById('statProxyIP');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-proxy', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u067E\u0631\u0648\u06A9\u0633\u06CC \u0622\u06CC\u200C\u067E\u06CC \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F');
-          status.textContent = data.proxyIP ? '\u2705 \u0641\u0639\u0627\u0644: ' + data.proxyIP : '\u26AA \u062E\u0627\u0644\u06CC \u2014 \u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645';
-          statDash.textContent = data.proxyIP || '\u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645 (\u0628\u062F\u0648\u0646 \u067E\u0631\u0648\u06A9\u0633\u06CC)';
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function savePassword() {
-      const val = document.getElementById('inputPassword').value.trim();
-      const btn = document.getElementById('btnPass');
-      const status = document.getElementById('statusPass');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-password', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast(data.enabled ? '\u2705 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F' : '\u{1F513} \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062D\u0630\u0641 \u0634\u062F');
-          status.textContent = data.enabled ? '\u{1F512} \u067E\u0646\u0644 \u062F\u0627\u0631\u0627\u06CC \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0633\u062A' : '\u{1F513} \u067E\u0646\u0644 \u0628\u062F\u0648\u0646 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631';
-          document.getElementById('inputPassword').value = '';
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function saveVlessPath() {
-      const val = document.getElementById('inputVlessPath').value.trim();
-      const btn = document.getElementById('btnVlessPath');
-      const status = document.getElementById('statusVlessPath');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-vlesspath', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u0645\u0633\u06CC\u0631 VLESS \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F');
-          status.textContent = data.path ? '\u2705 \u0645\u0633\u06CC\u0631 \u0633\u0641\u0627\u0631\u0634\u06CC: ' + data.path : '\u26AA \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: /?ed=2048';
-          updateLinks();
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function saveUUID() {
-      const val = document.getElementById('inputUUID').value.trim();
-      const btn = document.getElementById('btnUUID');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-uuid', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F\u060C \u062F\u0631 \u062D\u0627\u0644 \u0627\u0646\u062A\u0642\u0627\u0644...');
-          setTimeout(() => {
-            window.location.href = '/' + val;
-          }, 1500);
-        } else {
-          showToast('\u274C UUID \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function saveTrPass() {
-      const val = document.getElementById('inputTrPass').value.trim();
-      const btn = document.getElementById('btnTrPass');
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-trpass', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u0631\u0645\u0632 \u062A\u0631\u0648\u062C\u0627\u0646 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F');
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000);
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    async function saveTrojanPath() {
-      const val = document.getElementById('inputTrojanPath').value.trim();
-      const btn = document.getElementById('btnTrojanPath');
-      const status = document.getElementById('statusTrojanPath');
-      const uu = document.getElementById('valUuid').textContent.trim();
-      
-      btn.textContent = '...';
-      btn.disabled = true;
-      try {
-        const res = await fetch(bp + '/save-trojanpath', { method: 'POST', body: val });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u0645\u0633\u06CC\u0631 Trojan \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F');
-          status.textContent = data.path ? '\u2705 \u0645\u0633\u06CC\u0631 \u0633\u0641\u0627\u0631\u0634\u06CC: ' + data.path : '\u26AA \u067E\u06CC\u0634\u200C\u0641\u0631\u0636: /' + uu + '/trojan-ws';
-          updateLinks();
-        } else {
-          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
-        }
-      } catch(e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
-      } finally {
-        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
-        btn.disabled = false;
-      }
-    }
-
-    function updateLinks() {
-      const host = document.getElementById('valHost').textContent.trim();
-      const uu = document.getElementById('valUuid').textContent.trim();
-      const cleanVal = document.getElementById('inputCleanIP').value.trim();
-      const addr = cleanVal || host;
-      
-      let vlessPathInput = document.getElementById('inputVlessPath').value.trim() || '/?ed=2048';
-      let trojanPathInput = document.getElementById('inputTrojanPath').value.trim() || ('/' + uu + '/trojan-ws');
-      
-      if (vlessPathInput && !vlessPathInput.startsWith('/')) vlessPathInput = '/' + vlessPathInput;
-      if (trojanPathInput && !trojanPathInput.startsWith('/')) trojanPathInput = '/' + trojanPathInput;
-
-      const vlessWS = 'vless://' + uu + '@' + addr + ':443?encryption=none&security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(vlessPathInput) + '#VLESS-WS-' + host;
-      const trojanWS = 'trojan://${currentTrPass}@' + addr + ':443?security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(trojanPathInput) + '#Trojan-WS-' + host;
-
-      document.getElementById('link-vlessWS').textContent = vlessWS;
-      document.getElementById('link-trojanWS').textContent = trojanWS;
-      
-      document.getElementById('lblVlessPath').textContent = vlessPathInput;
-      document.getElementById('lblTrojanPath').textContent = trojanPathInput;
-      
-      const subWS = 'https://' + host + '/' + uu + '/sub';
-      const lblSub = document.getElementById('lblSubLink');
-      if (lblSub) lblSub.textContent = subWS;
-    }
-
-    function copyLink(elementId, btn) {
-      const linkText = document.getElementById(elementId).textContent;
-      navigator.clipboard.writeText(linkText).then(() => {
-        showToast('\u{1F4CB} \u06A9\u0627\u0646\u0641\u06CC\u06AF \u06A9\u067E\u06CC \u0634\u062F!');
-        const prevText = btn.textContent;
-        btn.textContent = '\u2705 \u06A9\u067E\u06CC \u0634\u062F!';
-        btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-        setTimeout(() => {
-          btn.textContent = prevText;
-          btn.style.background = 'var(--accent-gradient)';
-        }, 2000);
-      }).catch(() => {
-        showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u062F\u0631 \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0631\u062E \u062F\u0627\u062F', true);
-      });
-    }
-
-    function showQR(link, title) {
-      const modal = document.getElementById('qrModal');
-      const modalTitle = document.getElementById('modalTitle');
-      const qrImage = document.getElementById('qrImage');
-      
-      modalTitle.textContent = '\u06A9\u062F QR \u0628\u0631\u0627\u06CC: ' + title;
-      qrImage.src = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(link);
-      modal.classList.add('show');
-    }
-
-    function closeModal() {
-      document.getElementById('qrModal').classList.remove('show');
-    }
-
-    async function checkLatency(btn) {
-      btn.disabled = true;
-      btn.textContent = '\u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A \u067E\u06CC\u0646\u06AF...';
-      const results = document.getElementById('pingResults');
-      results.style.display = 'flex';
-      
-      const targets = [
-        { id: 'ping-google', url: 'https://www.google.com/generate_204' },
-        { id: 'ping-cf', url: 'https://1.1.1.1/generate_204' },
-        { id: 'ping-worker', url: bp + '/panel-auth' }
-      ];
-
-      for (const target of targets) {
-        const span = document.getElementById(target.id);
-        span.textContent = '...';
-        const start = Date.now();
-        try {
-          await fetch(target.url, { mode: 'no-cors', cache: 'no-store' });
-          const latency = Date.now() - start;
-          span.textContent = latency + 'ms';
-          span.style.color = latency < 150 ? '#34d399' : (latency < 300 ? '#fbbf24' : '#f87171');
-        } catch(e) {
-          span.textContent = '\u062E\u0637\u0627';
-          span.style.color = '#ef4444';
-        }
-      }
-      btn.disabled = false;
-      btn.textContent = '\u0634\u0631\u0648\u0639 \u0645\u062C\u062F\u062F \u062A\u0633\u062A \u067E\u06CC\u0646\u06AF';
-    }
-
-    function logout() {
-      document.cookie = 'panel_auth=; Path=/; Max-Age=0; SameSite=Lax';
-      window.location.href = bp;
-    }
-
-    function showToast(msg, isErr) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.className = 'toast' + (isErr ? ' err' : '') + ' show';
-      setTimeout(() => { t.classList.remove('show'); }, 3000);
-    }
-  <\/script>
-</body>
-</html>`;
-}
 function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentProxyIP) {
   const allGood = hasKV && hasPassword && hasUUID && hasTrPass;
   return `<!DOCTYPE html>
@@ -2558,7 +1053,7 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</title>
+  <title>\u2518\xE5\u256A\u2561\u256A\xBF \u2518\xEA \u256A\u2592\u256A\xBA\u2518\xE7\u0393\xC7\xEE\u256A\xBA\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2593\u2588\xEE \u2518\u255B\u2518\xE5\u2518\xE4 \u2518\u255B\u2518\xE5\u2518\xE7\u256A\xBA\u2518\xE5</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
     :root {
@@ -2597,314 +1092,644 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 </head>
 <body>
   <div class="container">
-    <h1>\u2699\uFE0F \u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0648\u0631\u06A9\u0631</h1>
+    <h1>\u0393\xDC\xD6\u2229\u2555\xC5 \u2518\xE5\u256A\u2561\u256A\xBF \u2518\xEA \u256A\u2592\u256A\xBA\u2518\xE7\u0393\xC7\xEE\u256A\xBA\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2593\u2588\xEE \u2518\xEA\u256A\u2592\u250C\u2310\u256A\u2592</h1>
     <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      \u0628\u0631\u0627\u06CC \u0639\u0645\u0644\u06A9\u0631\u062F \u0635\u062D\u06CC\u062D \u067E\u0631\u0648\u06A9\u0633\u06CC\u060C \u0648\u0636\u0639\u06CC\u062A \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0632\u06CC\u0631 \u0631\u0627 \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.
+      \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\u2563\u2518\xE0\u2518\xE4\u250C\u2310\u256A\u2592\u256A\xBB \u256A\u2561\u256A\xA1\u2588\xEE\u256A\xA1 \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE\u256A\xEE \u2518\xEA\u256A\u2562\u256A\u2563\u2588\xEE\u256A\xAC \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592\u2518\xE7\u256A\xBA\u2588\xEE \u256A\u2593\u2588\xEE\u256A\u2592 \u256A\u2592\u256A\xBA \u256A\xBB\u256A\u2592 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0\u256A\xBA\u256A\xAC \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\u2592\u256A\u2592\u256A\u2502\u2588\xEE \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB.
     </p>
 
     <div class="status-box">
       <!-- KV Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0641\u0636\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC KV <span class="code">nahan</span></div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u062F\u0631 \u0628\u062E\u0634 Bindings \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u06CC\u06A9 KV \u0628\u0633\u0627\u0632\u06CC\u062F \u0648 \u0646\u0627\u0645 \u0622\u0646 \u0631\u0627 \u062F\u0642\u06CC\u0642\u0627\u064B <span class="code">nahan</span> \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F.</div>
+          <div class="item-title">\u2518\xFC\u256A\u2562\u256A\xBA\u2588\xEE \u256A\u2591\u256A\xAB\u2588\xEE\u256A\u2592\u2518\xE7\u0393\xC7\xEE\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE KV <span class="code">nahan</span></div>
+          <div class="desc">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\u2591\u256A\xAB\u2588\xEE\u256A\u2592\u2518\xE7 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0\u256A\xBA\u256A\xAC \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC. \u256A\xBB\u256A\u2592 \u256A\xBF\u256A\xAB\u256A\u2524 Bindings \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u2588\xEE\u250C\u2310 KV \u256A\xBF\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE\u256A\xBB \u2518\xEA \u2518\xE5\u256A\xBA\u2518\xE0 \u256A\xF3\u2518\xE5 \u256A\u2592\u256A\xBA \u256A\xBB\u2518\xE9\u2588\xEE\u2518\xE9\u256A\xBA\u2518\xEF <span class="code">nahan</span> \u256A\xBF\u250C\xBB\u256A\u2591\u256A\xBA\u256A\u2592\u2588\xEE\u256A\xBB.</div>
         </div>
-        <div class="badge ${hasKV ? "ok" : "fail"}">${hasKV ? "\u0645\u062A\u0635\u0644 \u0634\u062F \u2705" : "\u0645\u062A\u0635\u0644 \u0646\u06CC\u0633\u062A \u274C"}</div>
+        <div class="badge ${hasKV ? "ok" : "fail"}">${hasKV ? "\u2518\xE0\u256A\xAC\u256A\u2561\u2518\xE4 \u256A\u2524\u256A\xBB \u0393\xA3\xE0" : "\u2518\xE0\u256A\xAC\u256A\u2561\u2518\xE4 \u2518\xE5\u2588\xEE\u256A\u2502\u256A\xAC \u0393\xA5\xEE"}</div>
       </div>
       
       <!-- Password Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PASSWORD</span></div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.</div>
+          <div class="item-title">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xBA\u256A\xBB\u2518\xE0\u2588\xEE\u2518\xE5 <span class="code">PASSWORD</span></div>
+          <div class="desc">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBA\u2518\xE0\u2518\xE5\u2588\xEE\u256A\xAC \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC. \u2588\xEE\u250C\u2310 \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE \u256A\xBF\u2518\xE7 \u2518\xE5\u256A\xBA\u2518\xE0 <span class="code">PASSWORD</span> \u256A\xBB\u256A\u2592 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE\u256A\xBB.</div>
         </div>
-        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
       </div>
 
       <!-- UUID Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
-          <div class="desc">\u0634\u0645\u0627 \u0628\u0627\u06CC\u062F \u06CC\u06A9 UUID \u0645\u0639\u062A\u0628\u0631 (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">UUID</span>) \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F. ${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="code">${currentUUID}</span>` : ""}</div>
+          <div class="item-title">\u256A\u2524\u2518\xE5\u256A\xBA\u256A\u2502\u2518\xE7 \u250C\u2310\u256A\xBA\u256A\u2592\u256A\xBF\u256A\u2592 <span class="code">UUID</span></div>
+          <div class="desc">\u256A\u2524\u2518\xE0\u256A\xBA \u256A\xBF\u256A\xBA\u2588\xEE\u256A\xBB \u2588\xEE\u250C\u2310 UUID \u2518\xE0\u256A\u2563\u256A\xAC\u256A\xBF\u256A\u2592 (\u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">UUID</span>) \u256A\xBB\u256A\u2592 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB. ${currentUUID ? `\u2518\xE0\u2518\xE9\u256A\xBB\u256A\xBA\u256A\u2592 \u2518\xFC\u256A\u2563\u2518\xE4\u2588\xEE: <span class="code">${currentUUID}</span>` : ""}</div>
         </div>
-        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
       </div>
 
       <!-- Trojan Pass Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062A\u0631\u0648\u062C\u0627\u0646 <span class="code">TR_PASS</span></div>
-          <div class="desc">\u0631\u0645\u0632 \u062A\u0631\u0648\u062C\u0627\u0646 \u0627\u062C\u0628\u0627\u0631\u06CC \u0627\u0633\u062A (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">TR_PASS</span>). \u0628\u0631\u0627\u06CC \u062C\u0644\u0648\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u0634\u0646\u0627\u0633\u0627\u06CC\u06CC \u0634\u062F\u0646 \u062A\u0648\u0633\u0637 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0627\u06CC\u062F \u0628\u0627 UUID \u0645\u062A\u0641\u0627\u0648\u062A \u0628\u0627\u0634\u062F.</div>
+          <div class="item-title">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xAC\u256A\u2592\u2518\xEA\u256A\xBC\u256A\xBA\u2518\xE5 <span class="code">TR_PASS</span></div>
+          <div class="desc">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\xAC\u256A\u2592\u2518\xEA\u256A\xBC\u256A\xBA\u2518\xE5 \u256A\xBA\u256A\xBC\u256A\xBF\u256A\xBA\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC (\u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">TR_PASS</span>). \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBC\u2518\xE4\u2518\xEA\u250C\xBB\u2588\xEE\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2593 \u256A\u2524\u2518\xE5\u256A\xBA\u256A\u2502\u256A\xBA\u2588\xEE\u2588\xEE \u256A\u2524\u256A\xBB\u2518\xE5 \u256A\xAC\u2518\xEA\u256A\u2502\u256A\u2556 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\xBA\u2588\xEE\u256A\xBB \u256A\xBF\u256A\xBA UUID \u2518\xE0\u256A\xAC\u2518\xFC\u256A\xBA\u2518\xEA\u256A\xAC \u256A\xBF\u256A\xBA\u256A\u2524\u256A\xBB.</div>
         </div>
-        <div class="badge ${hasTrPass ? "ok" : "fail"}">${hasTrPass ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+        <div class="badge ${hasTrPass ? "ok" : "fail"}">${hasTrPass ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
       </div>
 
       <!-- Proxy IP Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC <span class="code">PROXYIP</span></div>
-          <div class="desc">\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: ${currentProxyIP ? '<span class="code">' + currentProxyIP + "</span>" : "\u0646\u062F\u0627\u0631\u062F"}. \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">PROXYIP</span> \u0628\u0631\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0628\u0631\u062E\u06CC \u0633\u0627\u06CC\u062A\u200C\u0647\u0627.</div>
+          <div class="item-title">\u256A\xF3\u2588\xEE\u0393\xC7\xEE\u2518\u255B\u2588\xEE \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE <span class="code">PROXYIP</span></div>
+          <div class="desc">\u2518\xE0\u2518\xE9\u256A\xBB\u256A\xBA\u256A\u2592 \u2518\xFC\u256A\u2563\u2518\xE4\u2588\xEE: ${currentProxyIP ? '<span class="code">' + currentProxyIP + "</span>" : "\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2592\u256A\xBB"}. \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">PROXYIP</span> \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBB\u2518\xEA\u256A\u2592 \u256A\u2593\u256A\xBB\u2518\xE5 \u2518\xE0\u256A\xA1\u256A\xBB\u2518\xEA\u256A\xBB\u2588\xEE\u256A\xAC \u256A\xBF\u256A\u2592\u256A\xAB\u2588\xEE \u256A\u2502\u256A\xBA\u2588\xEE\u256A\xAC\u0393\xC7\xEE\u2518\xE7\u256A\xBA.</div>
         </div>
-        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2139\uFE0F</div>
+        <div class="badge info">\u256A\xBA\u256A\xAB\u256A\xAC\u2588\xEE\u256A\xBA\u256A\u2592\u2588\xEE \u0393\xE4\u2563\u2229\u2555\xC5</div>
       </div>
     </div>
 
     ${allGood ? `
     <div class="links-box">
-      <h3>\u2705 \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</h3>
+      <h3>\u0393\xA3\xE0 \u256A\u2502\u2588\xEE\u256A\u2502\u256A\xAC\u2518\xE0 \u250C\u2310\u256A\xBA\u2518\xE0\u2518\xE4\u256A\xBA\u2518\xEF \u256A\xF3\u2518\xE0\u256A\xBA\u256A\xBB\u2518\xE7 \u256A\xBA\u256A\u2502\u256A\xAC!</h3>
       <div class="desc" style="color:var(--text);">
-        \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0627\u0635\u0644\u06CC \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u062C\u0639\u0644\u06CC Nginx \u0631\u0627 \u062E\u0648\u0627\u0647\u06CC\u062F \u062F\u06CC\u062F \u062A\u0627 \u0627\u0633\u062A\u062A\u0627\u0631 \u062D\u0641\u0638 \u0634\u0648\u062F.<br><br>
-        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}</span><br><br>
-        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u0633\u06A9\u0631\u0627\u06CC\u067E \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}/sub</span><br>
+        \u256A\xBA\u256A\u2593 \u256A\xBA\u2588\xEE\u2518\xE5 \u2518\u255B\u256A\u2502 \u256A\xBF\u256A\xBA \u256A\xBF\u256A\xBA\u256A\u2593 \u250C\u2310\u256A\u2592\u256A\xBB\u2518\xE5 \u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u256A\xBA\u256A\u2561\u2518\xE4\u2588\xEE \u2518\xEA\u256A\u2592\u250C\u2310\u256A\u2592\u256A\xEE \u256A\u2561\u2518\xFC\u256A\xA1\u2518\xE7 \u256A\xBC\u256A\u2563\u2518\xE4\u2588\xEE Nginx \u256A\u2592\u256A\xBA \u256A\xAB\u2518\xEA\u256A\xBA\u2518\xE7\u2588\xEE\u256A\xBB \u256A\xBB\u2588\xEE\u256A\xBB \u256A\xAC\u256A\xBA \u256A\xBA\u256A\u2502\u256A\xAC\u256A\xAC\u256A\xBA\u256A\u2592 \u256A\xA1\u2518\xFC\u256A\u2555 \u256A\u2524\u2518\xEA\u256A\xBB.<br><br>
+        \u2261\u0192\xF6\xF9 <strong>\u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\u2524\u2518\xE0\u256A\xBA:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}</span><br><br>
+        \u2261\u0192\xF6\xF9 <strong>\u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u2518\xE4\u2588\xEE\u2518\xE5\u250C\u2310 \u256A\u2502\u256A\xBA\u256A\xBF\u256A\u2502\u250C\u2310\u256A\u2592\u256A\xBA\u2588\xEE\u2518\u255B \u256A\u2524\u2518\xE0\u256A\xBA:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}/sub</span><br>
       </div>
     </div>
     ` : `
     <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0632\u0627\u0645\u06CC (KV \u0648 Password) \u0631\u0627 \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u0627\u0645\u0646\u06CC\u062A \u0648 \u0639\u0645\u0644\u06A9\u0631\u062F \u067E\u0631\u0648\u06A9\u0633\u06CC \u0634\u0645\u0627 \u06A9\u0627\u0645\u0644 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F!
+      \u0393\xDC\xE1\u2229\u2555\xC5 \u256A\xAC\u256A\xBA \u256A\u2593\u2518\xE0\u256A\xBA\u2518\xE5\u2588\xEE \u250C\u2310\u2518\xE7 \u2518\xE0\u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE (KV \u2518\xEA Password) \u256A\u2592\u256A\xBA \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB\u256A\xEE \u256A\xBA\u2518\xE0\u2518\xE5\u2588\xEE\u256A\xAC \u2518\xEA \u256A\u2563\u2518\xE0\u2518\xE4\u250C\u2310\u256A\u2592\u256A\xBB \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE \u256A\u2524\u2518\xE0\u256A\xBA \u250C\u2310\u256A\xBA\u2518\xE0\u2518\xE4 \u2518\xE5\u256A\xAB\u2518\xEA\u256A\xBA\u2518\xE7\u256A\xBB \u256A\xBF\u2518\xEA\u256A\xBB!
     </div>
     `}
   </div>
 </body>
 </html>`;
 }
+function subscriptionPage(hostname, user, vlessWS, trojanWS) {
+  const subLink = `https://${hostname}/${user.id}/sub`;
+  const name = user.name || "\u06A9\u0627\u0631\u0628\u0631 \u0628\u062F\u0648\u0646 \u0646\u0627\u0645";
+  const limit = user.limit_bytes || 0;
+  const used = user.used_bytes || 0;
+  let percent = 0;
+  let usageText = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  const formatBytes = (b) => {
+    if (b < 1024)
+      return b + " B";
+    if (b < 1024 * 1024)
+      return (b / 1024).toFixed(1) + " KB";
+    if (b < 1024 * 1024 * 1024)
+      return (b / (1024 * 1024)).toFixed(1) + " MB";
+    return (b / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  };
+  if (limit > 0) {
+    percent = Math.min(100, Math.round(used / limit * 100));
+    usageText = `${formatBytes(used)} / ${formatBytes(limit)}`;
+  } else {
+    usageText = `${formatBytes(used)} (\u0628\u062F\u0648\u0646 \u0633\u0642\u0641)`;
+  }
+  let daysLeftText = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  if (user.expiry_date > 0) {
+    const diff = user.expiry_date - Date.now();
+    if (diff < 0) {
+      daysLeftText = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
+    } else {
+      const days = Math.ceil(diff / (1e3 * 60 * 60 * 24));
+      daysLeftText = days + " \u0631\u0648\u0632";
+    }
+  }
+  return `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>\u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u0646\u0647\u0627\u0646 - ${name}</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
+    :root { --bg: #0f111a; --card: rgba(22, 24, 38, 0.7); --border: rgba(255, 255, 255, 0.08); --accent: #8b5cf6; --text: #f8fafc; --muted: #94a3b8; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Vazirmatn, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    body::before { content: ""; position: absolute; width: 300px; height: 300px; background: var(--accent); filter: blur(150px); opacity: 0.2; z-index: -1; }
+    .container { width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 32px; backdrop-filter: blur(20px); text-align: center; }
+    h1 { font-size: 24px; margin-bottom: 8px; font-weight: 800; background: linear-gradient(to right, #c084fc, #f472b6); -webkit-background-clip: text; color: transparent; }
+    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(16, 185, 129, 0.1); color: #10b981; margin-bottom: 24px; }
+    .status-badge.disabled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 16px; padding: 16px; text-align: center; }
+    .stat-val { font-size: 16px; font-weight: 700; color: #a5b4fc; direction: ltr; margin-top: 8px; }
+    
+    .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; margin-top: 12px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #d946ef); width: ${percent}%; border-radius: 10px; }
+    
+    .config-box { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; text-align: left; direction: ltr; position: relative; }
+    .config-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; font-weight: bold; text-transform: uppercase; text-align: right; direction: rtl; }
+    .config-val { font-family: monospace; font-size: 11px; color: #cbd5e1; word-break: break-all; opacity: 0.8; }
+    .btn-copy { position: absolute; top: 12px; right: 12px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); color: white; padding: 6px 12px; border-radius: 8px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
+    .btn-copy:hover { background: var(--accent); }
+    .btn-sub { width: 100%; padding: 14px; background: linear-gradient(135deg, #7c3aed, #db2777); border: none; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; font-size: 15px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${name}</h1>
+    <div class="status-badge ${user.enabled ? "" : "disabled"}">${user.enabled ? "\u{1F7E2} \u0641\u0639\u0627\u0644" : "\u{1F534} \u0645\u0633\u062F\u0648\u062F"}</div>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div style="font-size: 12px; color: var(--muted)">\u062A\u0631\u0627\u0641\u06CC\u06A9 \u0645\u0635\u0631\u0641\u06CC</div>
+        <div class="stat-val">${usageText}</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill"></div></div>
+      </div>
+      <div class="stat-card">
+        <div style="font-size: 12px; color: var(--muted)">\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC</div>
+        <div class="stat-val">${daysLeftText}</div>
+      </div>
+    </div>
+    
+    <div class="config-box">
+      <div class="config-title">VLESS WS</div>
+      <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}')">\u06A9\u067E\u06CC</button>
+      <div class="config-val">${vlessWS.substring(0, 50)}...</div>
+    </div>
+    <div class="config-box">
+      <div class="config-title">Trojan WS</div>
+      <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}')">\u06A9\u067E\u06CC</button>
+      <div class="config-val">${trojanWS.substring(0, 50)}...</div>
+    </div>
+    
+    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}')">\u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u0633\u06A9\u0631\u0627\u06CC\u0628 (\u0628\u062F\u0648\u0646 \u0641\u06CC\u0644\u062A\u0631)</button>
+  </div>
+</body>
+</html>`;
+}
+function panelPage(hostname, adminUUID) {
+  return `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
+    :root { --bg: #09090b; --surface: #18181b; --surface-hover: #27272a; --border: #27272a; --primary: #a855f7; --primary-hover: #9333ea; --text: #fafafa; --muted: #a1a1aa; --danger: #ef4444; --success: #10b981; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+    
+    /* Sidebar */
+    .sidebar { width: 260px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; }
+    .brand { padding: 0 24px 20px; font-size: 24px; font-weight: 800; border-bottom: 1px solid var(--border); margin-bottom: 20px; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-item { padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; font-weight: 500; }
+    .nav-item:hover, .nav-item.active { background: var(--surface-hover); color: var(--primary); border-right: 3px solid var(--primary); }
+    .nav-icon { font-size: 18px; }
+    
+    /* Main Content */
+    .main { flex: 1; overflow-y: auto; padding: 32px; background: radial-gradient(circle at top right, rgba(168, 85, 247, 0.05), transparent 50%); }
+    .page { display: none; animation: fadeIn 0.3s; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+    .title { font-size: 24px; font-weight: bold; }
+    
+    .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--surface-hover); }
+    .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+    
+    /* Tables */
+    .table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 16px; text-align: right; border-bottom: 1px solid var(--border); }
+    th { background: rgba(255,255,255,0.02); color: var(--muted); font-size: 13px; font-weight: 600; }
+    tr:hover { background: rgba(255,255,255,0.02); }
+    tr:last-child td { border-bottom: none; }
+    
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .badge.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    .badge.red { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+    
+    /* Forms & Modals */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 50; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 480px; padding: 24px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .modal-close { cursor: pointer; color: var(--muted); font-size: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
+    .form-control { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
+    .form-control:focus { border-color: var(--primary); }
+    
+    /* Utils */
+    .code-span { font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #a5b4fc; direction: ltr; display: inline-block; }
+    .flex-gap { display: flex; gap: 8px; }
+    .docs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 32px; }
+    pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; font-size: 13px; color: #e2e8f0; margin-top: 10px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="brand">\u0646\u0647\u0627\u0646</div>
+    <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">\u{1F465}</span> \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
+    <div class="nav-item" onclick="nav('api')"><span class="nav-icon">\u{1F511}</span> \u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</div>
+    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">\u2699\uFE0F</span> \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</div>
+    <div style="flex:1"></div>
+    <div class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">\u{1F6AA}</span> \u062E\u0631\u0648\u062C</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+  
+    <!-- Users Page -->
+    <div id="page-users" class="page active">
+      <div class="header">
+        <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</h2>
+        <button class="btn" onclick="openModal('user-modal')">+ \u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F</button>
+      </div>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>\u0646\u0627\u0645</th>
+              <th>UUID</th>
+              <th>\u0648\u0636\u0639\u06CC\u062A</th>
+              <th>\u0645\u0635\u0631\u0641</th>
+              <th>\u0645\u0647\u0644\u062A</th>
+              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--muted)">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- API Page -->
+    <div id="page-api" class="page">
+      <div class="header">
+        <h2 class="title">\u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</h2>
+        <button class="btn" onclick="openModal('token-modal')">+ \u0633\u0627\u062E\u062A \u062A\u0648\u06A9\u0646 \u062C\u062F\u06CC\u062F</button>
+      </div>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>\u0646\u0627\u0645 \u0631\u0628\u0627\u062A/\u062A\u0648\u06A9\u0646</th>
+              <th>\u06A9\u0644\u06CC\u062F (Key)</th>
+              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+            </tr>
+          </thead>
+          <tbody id="tokens-tbody">
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="docs-box">
+        <h3>\u062F\u0627\u06A9\u06CC\u0648\u0645\u0646\u062A \u0627\u062A\u0635\u0627\u0644 API</h3>
+        <p style="color:var(--muted); margin-top:8px; font-size:14px;">\u0628\u0627 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u06A9\u0644\u06CC\u062F\u0647\u0627\u06CC \u0628\u0627\u0644\u0627 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0631\u0628\u0627\u062A \u062A\u0644\u06AF\u0631\u0627\u0645 \u06CC\u0627 \u0647\u0631 \u0646\u0631\u0645\u200C\u0627\u0641\u0632\u0627\u0631 \u062F\u06CC\u06AF\u0631\u06CC\u060C \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0631\u0627 \u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0646\u06CC\u062F.</p>
+        <pre>
+# \u0633\u0627\u062E\u062A \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F
+curl -X POST https://${hostname}/api/users   -H "Authorization: Bearer YOUR_TOKEN"   -H "Content-Type: application/json"   -d '{"id":"UUID", "name":"User1", "limit_bytes": 10737418240, "expiry_date": 1712...}'
+
+# \u06AF\u0631\u0641\u062A\u0646 \u0644\u06CC\u0633\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646
+curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
+        </pre>
+      </div>
+    </div>
+    
+    <!-- Settings Page -->
+    <div id="page-settings" class="page">
+      <div class="header">
+        <h2 class="title">\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u06A9\u0644\u06CC</h2>
+        <button class="btn" onclick="saveSettings()">\u0630\u062E\u06CC\u0631\u0647 \u062A\u063A\u06CC\u06CC\u0631\u0627\u062A</button>
+      </div>
+      
+      <div style="background:var(--surface); border:1px solid var(--border); padding:24px; border-radius:12px; max-width: 600px;">
+        <div class="form-group">
+          <label>UUID \u0627\u062F\u0645\u06CC\u0646 (\u0628\u0631\u0627\u06CC \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644)</label>
+          <input type="text" class="form-control" id="st-uuid" value="${adminUUID}">
+        </div>
+        <div class="form-group">
+          <label>\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u067E\u0646\u0644</label>
+          <input type="password" class="form-control" id="st-pass" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
+        </div>
+        <div class="form-group">
+          <label>\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 (Proxy IP)</label>
+          <input type="text" class="form-control" id="st-proxy" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="user-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="user-modal-title">\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631</h3>
+        <div class="modal-close" onclick="closeModal('user-modal')">&times;</div>
+      </div>
+      <div class="form-group">
+        <label>\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631</label>
+        <input type="text" id="u-name" class="form-control" placeholder="\u0645\u062B\u0627\u0644: Ali iPhone">
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:1">
+          <label>UUID (\u0634\u0646\u0627\u0633\u0647 \u06CC\u06A9\u062A\u0627)</label>
+          <input type="text" id="u-uuid" class="form-control" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        </div>
+        <div style="align-self: flex-end;">
+          <button class="btn btn-outline" onclick="generateUUID()">\u062A\u0648\u0644\u06CC\u062F</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u062D\u062C\u0645 (GB) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
+        <input type="number" id="u-limit" class="form-control" value="0">
+      </div>
+      <div class="form-group">
+        <label>\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC (\u0631\u0648\u0632) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
+        <input type="number" id="u-days" class="form-control" value="0">
+      </div>
+      <div class="form-group">
+        <label>Clean IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
+        <input type="text" id="u-cleanip" class="form-control" placeholder="\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631">
+      </div>
+      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveUser()">\u0630\u062E\u06CC\u0631\u0647 \u06A9\u0627\u0631\u0628\u0631</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="token-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>\u0627\u0641\u0632\u0648\u062F\u0646 \u062A\u0648\u06A9\u0646 API</h3>
+        <div class="modal-close" onclick="closeModal('token-modal')">&times;</div>
+      </div>
+      <div class="form-group">
+        <label>\u0646\u0627\u0645 \u0631\u0628\u0627\u062A \u06CC\u0627 \u062A\u0648\u06A9\u0646</label>
+        <input type="text" id="t-name" class="form-control" placeholder="\u0645\u062B\u0627\u0644: Telegram Bot">
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:1">
+          <label>\u062A\u0648\u06A9\u0646</label>
+          <input type="text" id="t-key" class="form-control">
+        </div>
+        <div style="align-self: flex-end;">
+          <button class="btn btn-outline" onclick="document.getElementById('t-key').value = crypto.randomUUID().replace(/-/g, '')">\u062A\u0648\u0644\u06CC\u062F</button>
+        </div>
+      </div>
+      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveToken()">\u0627\u06CC\u062C\u0627\u062F \u062A\u0648\u06A9\u0646</button>
+    </div>
+  </div>
+
+  <script>
+    const basePath = '/api';
+
+    function nav(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function generateUUID() {
+      document.getElementById('u-uuid').value = crypto.randomUUID();
+    }
+    
+    function formatBytes(b) {
+      if (!b) return "0 B";
+      if (b < 1024) return b + " B";
+      if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
+      if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + " MB";
+      return (b / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+    }
+
+    async function loadUsers() {
+      try {
+        const res = await fetch(basePath + '/users');
+        const data = await res.json();
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = '';
+        if (data.users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#a1a1aa">\u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+          return;
+        }
+        data.users.forEach(u => {
+          let usage = u.limit_bytes ? \`\${formatBytes(u.used_bytes)} / \${formatBytes(u.limit_bytes)}\` : \`\${formatBytes(u.used_bytes)} (\u221E)\`;
+          let days = '\u221E';
+          if (u.expiry_date) {
+            let left = Math.ceil((u.expiry_date - Date.now()) / 86400000);
+            days = left < 0 ? '\u0645\u0646\u0642\u0636\u06CC' : left + ' \u0631\u0648\u0632';
+          }
+          let statusBadge = u.enabled ? '<span class="badge green">\u0641\u0639\u0627\u0644</span>' : '<span class="badge red">\u0645\u0633\u062F\u0648\u062F</span>';
+          
+          tbody.innerHTML += \`<tr>
+            <td style="font-weight:600">\${u.name}</td>
+            <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
+            <td>\${statusBadge}</td>
+            <td style="direction:ltr; text-align:right">\${usage}</td>
+            <td>\${days}</td>
+            <td>
+              <div class="flex-gap">
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? '\u0645\u0633\u062F\u0648\u062F' : '\u0622\u0632\u0627\u062F\u0633\u0627\u0632\u06CC'}</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">\u{1F5D1}\uFE0F</button>
+              </div>
+            </td>
+          </tr>\`;
+        });
+      } catch(e) { console.error(e); }
+    }
+    
+    async function saveUser() {
+       const id = document.getElementById('u-uuid').value;
+       const name = document.getElementById('u-name').value;
+       let gb = parseFloat(document.getElementById('u-limit').value) || 0;
+       let days = parseInt(document.getElementById('u-days').value) || 0;
+       const clean = document.getElementById('u-cleanip').value;
+       
+       if (!id || !name) { alert("\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0646\u0627\u0645 \u0648 UUID \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A!"); return; }
+       
+       const limit_bytes = gb * 1024 * 1024 * 1024;
+       const expiry_date = days > 0 ? Date.now() + (days * 86400000) : 0;
+       
+       await fetch(basePath + '/users', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({ id, name, limit_bytes, expiry_date, clean_ip: clean })
+       });
+       closeModal('user-modal');
+       loadUsers();
+    }
+    
+    async function toggleUser(id) {
+       await fetch(basePath + '/users/' + id + '/toggle', {method: 'POST'});
+       loadUsers();
+    }
+    
+    async function deleteUser(id) {
+       if(confirm('\u0622\u06CC\u0627 \u0645\u0637\u0645\u0626\u0646 \u0647\u0633\u062A\u06CC\u062F\u061F')) {
+          await fetch(basePath + '/users/' + id, {method: 'DELETE'});
+          loadUsers();
+       }
+    }
+    
+    async function loadTokens() {
+      try {
+        const res = await fetch(basePath + '/tokens');
+        const data = await res.json();
+        const tbody = document.getElementById('tokens-tbody');
+        tbody.innerHTML = '';
+        data.tokens.forEach(t => {
+          tbody.innerHTML += \`<tr>
+            <td>\${t.name}</td>
+            <td><span class="code-span">\${t.key}</span></td>
+            <td><button class="btn btn-danger" style="padding:4px 8px" onclick="deleteToken('\${t.key}')">\u062D\u0630\u0641</button></td>
+          </tr>\`;
+        });
+      } catch(e) { console.error(e); }
+    }
+    
+    async function saveToken() {
+       const key = document.getElementById('t-key').value;
+       const name = document.getElementById('t-name').value;
+       if (!key || !name) return;
+       await fetch(basePath + '/tokens', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({ key, name })
+       });
+       closeModal('token-modal');
+       loadTokens();
+    }
+    
+    async function deleteToken(key) {
+       await fetch(basePath + '/tokens/' + key, {method: 'DELETE'});
+       loadTokens();
+    }
+
+    async function saveSettings() {
+       const u = document.getElementById('st-uuid').value;
+       const p = document.getElementById('st-pass').value;
+       const prox = document.getElementById('st-proxy').value;
+       const payload = { uuid: u, proxyIP: prox };
+       if (p) payload.password = p;
+       
+       await fetch(basePath + '/settings', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify(payload)
+       });
+       alert('\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F.');
+    }
+
+    // Init
+    loadUsers();
+    loadTokens();
+  <\/script>
+</body>
+</html>`;
+}
 
 // src/index.js
 var rateLimitMap = /* @__PURE__ */ new Map();
+var usersCache = null;
+var usersCacheTime = 0;
+async function getAllUsers(env) {
+  if (usersCache && Date.now() - usersCacheTime < 1e4)
+    return usersCache;
+  if (!env.DB)
+    return [];
+  try {
+    const { results } = await env.DB.prepare("SELECT * FROM users").all();
+    usersCache = results;
+    usersCacheTime = Date.now();
+    return results;
+  } catch (e) {
+    return [];
+  }
+}
+async function getAllTokens(env) {
+  if (!env.DB)
+    return [];
+  try {
+    const { results } = await env.DB.prepare("SELECT * FROM api_keys").all();
+    return results;
+  } catch (e) {
+    return [];
+  }
+}
 var src_default = {
   async fetch(request, env, ctx) {
     try {
-      let savedProxyIP = "";
-      let savedCleanIP = "";
-      let savedPass = "";
-      let savedVlessPath = "";
-      let savedTrojanPath = "";
-      let savedUUID = "";
-      let savedTrPass = "";
-      if (env.nahan) {
-        savedProxyIP = await env.nahan.get("proxy_ip") || "";
-        savedCleanIP = await env.nahan.get("clean_ip") || "";
-        savedPass = await env.nahan.get("panel_pass") || "";
-        savedVlessPath = await env.nahan.get("vless_ws_path") || "";
-        savedTrojanPath = await env.nahan.get("trojan_ws_path") || "";
-        savedUUID = await env.nahan.get("uuid") || "";
-        savedTrPass = await env.nahan.get("tr_pass") || "";
-      }
-      let currentProxyIP = savedProxyIP || env.PROXYIP || "";
-      let currentCleanIP = savedCleanIP || "";
-      let currentPanelPass = savedPass || env.PASSWORD || "";
-      let currentVlessPath = savedVlessPath || "";
-      let currentTrojanPath = savedTrojanPath || "";
-      let currentUserID = savedUUID || env.UUID || "";
-      let currentTrPass = savedTrPass || env.TR_PASS || "";
+      await setupD1Schema(env);
+      let currentProxyIP = await getSettingD1(env, "proxy_ip") || env.PROXYIP || "";
+      let currentPanelPass = await getSettingD1(env, "panel_pass") || env.PASSWORD || "";
+      let currentAdminUUID = await getSettingD1(env, "uuid") || env.UUID || "";
       const upgradeHeader = request.headers.get("Upgrade");
       const url = new URL(request.url);
       const path = url.pathname;
+      const authenticate = async (identifier) => {
+        const users = await getAllUsers(env);
+        for (const user of users) {
+          if (user.id === identifier || sha224_and_224(user.id, true) === identifier) {
+            return user;
+          }
+        }
+        return null;
+      };
+      const onUsage = (userID) => {
+        return (upload, download) => {
+          if (!env.DB)
+            return true;
+          let user = usersCache?.find((u) => u.id === userID);
+          if (!user)
+            return true;
+          user.used_bytes += upload + download;
+          if (upload + download > 0) {
+            ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
+          }
+          if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes)
+            return false;
+          if (user.expiry_date > 0 && Date.now() > user.expiry_date)
+            return false;
+          return true;
+        };
+      };
       if (upgradeHeader === "websocket") {
         const decodedPath = decodeURIComponent(path).toLowerCase();
-        const isTrojan = currentTrojanPath ? decodedPath.includes(decodeURIComponent(currentTrojanPath).toLowerCase()) : decodedPath.includes("trojan-ws") || decodedPath.includes("trojan");
-        if (isTrojan) {
-          return await trojanOverWSHandler(request, currentTrPass, currentProxyIP);
+        if (decodedPath.includes("trojan-ws") || decodedPath.includes("trojan")) {
+          return await trojanOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
         } else {
-          return await vlessOverWSHandler(request, currentUserID, currentProxyIP);
+          return await vlessOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
         }
       }
       if (path === "/") {
-        const hasKV = !!env.nahan;
-        const hasPassword = !!currentPanelPass;
-        const hasUUID = !!currentUserID && isValidUUID(currentUserID);
-        const hasTrPass = !!currentTrPass;
         let showSetup = false;
-        if (!hasKV || !hasPassword || !hasUUID || !hasTrPass) {
+        if (!currentPanelPass || !currentAdminUUID || !env.DB)
           showSetup = true;
-        } else if (hasPassword && await isAuthed(request, currentPanelPass)) {
+        else if (await isAuthed(request, currentPanelPass))
           showSetup = true;
-        }
         if (showSetup) {
-          return new Response(setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUserID, currentProxyIP), {
+          return new Response(setupPage(true, !!currentPanelPass, !!currentAdminUUID, true, currentAdminUUID, currentProxyIP), {
             status: 200,
             headers: { "Content-Type": "text/html; charset=utf-8" }
           });
         }
-        return new Response(nginxPage(), {
-          status: 200,
-          headers: { "Content-Type": "text/html; charset=utf-8", "Server": "nginx/1.24.0" }
-        });
+        return new Response(nginxPage(), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Server": "nginx/1.24.0" } });
       }
-      if (path === "/" + currentUserID) {
+      if (path === "/" + currentAdminUUID) {
         const host = request.headers.get("Host");
         if (currentPanelPass && !await isAuthed(request, currentPanelPass)) {
-          return new Response(loginPage(currentUserID, host), {
-            status: 200,
-            headers: { "Content-Type": "text/html; charset=utf-8" }
-          });
+          return new Response(loginPage(currentAdminUUID, host), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
         }
-        const cfColo = request.cf ? request.cf.colo : "N/A";
-        const tlsVersion = request.cf ? request.cf.tlsVersion : "N/A";
-        return new Response(panelPage(host, currentUserID, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, !!currentPanelPass, cfColo, tlsVersion), {
-          status: 200,
-          headers: { "Content-Type": "text/html; charset=utf-8" }
-        });
+        return new Response(panelPage(host, currentAdminUUID, currentProxyIP), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
-      if (path === "/" + currentUserID + "/sub" || path === "/sub/" + currentUserID) {
-        const host = request.headers.get("Host");
-        const userAgent = (request.headers.get("User-Agent") || "").toLowerCase();
-        const isProxyClient = userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box") || userAgent.includes("shadowrocket") || userAgent.includes("streisand") || userAgent.includes("quantumult") || userAgent.includes("surge") || userAgent.includes("foxray") || userAgent.includes("stash") || userAgent.includes("v2fly") || userAgent.includes("xray");
-        if (isProxyClient) {
-          const addr = currentCleanIP || host;
-          const vlessPath = currentVlessPath || "/?ed=2048";
-          const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
-          const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-          const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
-          const plainConfigs = `${vlessWS}
-${trojanWS}
-`;
-          const base64Configs = btoa(unescape(encodeURIComponent(plainConfigs)));
-          return new Response(base64Configs, {
-            status: 200,
-            headers: {
-              "Content-Type": "text/plain; charset=utf-8",
-              "Cache-Control": "no-store"
-            }
-          });
-        } else {
-          return new Response(subscriptionPage(host, currentUserID, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath), {
-            status: 200,
-            headers: {
-              "Content-Type": "text/html; charset=utf-8",
-              "Cache-Control": "no-store"
-            }
-          });
-        }
-      }
-      if (path === "/api/info" || path === "/" + currentUserID + "/api/info") {
-        if (!isApiAuthed(request, currentPanelPass, currentUserID)) {
-          return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        const host = request.headers.get("Host");
-        const addr = currentCleanIP || host;
-        const vlessPath = currentVlessPath || "/?ed=2048";
-        const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
-        const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-        const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
-        const subWS = `https://${host}/${currentUserID}/sub`;
-        return new Response(JSON.stringify({
-          ok: true,
-          uuid: currentUserID,
-          host,
-          cleanIP: currentCleanIP || null,
-          proxyIP: currentProxyIP || null,
-          vlessPath,
-          trojanPath,
-          links: {
-            vless: vlessWS,
-            trojan: trojanWS,
-            subscription: subWS
-          },
-          system: {
-            cfColo: request.cf ? request.cf.colo : "N/A",
-            tlsVersion: request.cf ? request.cf.tlsVersion : "N/A"
-          }
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      if (path === "/api/settings" || path === "/" + currentUserID + "/api/settings") {
-        if (request.method !== "POST") {
-          return new Response(JSON.stringify({ ok: false, error: "Method Not Allowed" }), {
-            status: 405,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        if (!isApiAuthed(request, currentPanelPass, currentUserID)) {
-          return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        let body = {};
-        try {
-          body = await request.json();
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: "Invalid JSON" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-        if (body.cleanIP !== void 0) {
-          const val = body.cleanIP.trim();
-          currentCleanIP = val;
-          if (env.nahan)
-            await env.nahan.put("clean_ip", val, { expirationTtl: 31536e3 });
-        }
-        if (body.proxyIP !== void 0) {
-          const val = body.proxyIP.trim();
-          currentProxyIP = val;
-          if (env.nahan)
-            await env.nahan.put("proxy_ip", val, { expirationTtl: 31536e3 });
-        }
-        if (body.vlessPath !== void 0) {
-          let val = body.vlessPath.trim() || "/?ed=2048";
-          if (val && !val.startsWith("/"))
-            val = "/" + val;
-          currentVlessPath = val;
-          if (env.nahan)
-            await env.nahan.put("vless_ws_path", val, { expirationTtl: 31536e3 });
-        }
-        if (body.trojanPath !== void 0) {
-          let val = body.trojanPath.trim() || `/${currentUserID}/trojan-ws`;
-          if (val && !val.startsWith("/"))
-            val = "/" + val;
-          currentTrojanPath = val;
-          if (env.nahan)
-            await env.nahan.put("trojan_ws_path", val, { expirationTtl: 31536e3 });
-        }
-        if (body.password !== void 0) {
-          const val = body.password.trim();
-          currentPanelPass = val;
-          if (env.nahan)
-            await env.nahan.put("panel_pass", val, { expirationTtl: 31536e3 });
-        }
-        if (body.uuid !== void 0) {
-          const val = body.uuid.trim();
-          if (isValidUUID(val)) {
-            currentUserID = val;
-            if (env.nahan)
-              await env.nahan.put("uuid", val, { expirationTtl: 31536e3 });
-          }
-        }
-        if (body.tr_pass !== void 0) {
-          const val = body.tr_pass.trim();
-          if (val) {
-            currentTrPass = val;
-            if (env.nahan)
-              await env.nahan.put("tr_pass", val, { expirationTtl: 31536e3 });
-          }
-        }
-        return new Response(JSON.stringify({
-          ok: true,
-          message: "Settings updated successfully",
-          settings: {
-            cleanIP: currentCleanIP || null,
-            proxyIP: currentProxyIP || null,
-            vlessPath: currentVlessPath || "/?ed=2048",
-            trojanPath: currentTrojanPath || `/${currentUserID}/trojan-ws`,
-            hasPassword: !!currentPanelPass,
-            uuid: currentUserID,
-            tr_pass: currentTrPass
-          }
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      if (path === "/" + currentUserID + "/panel-auth") {
-        if (request.method !== "POST") {
-          return new Response("Method Not Allowed", { status: 405 });
-        }
+      if (path === "/" + currentAdminUUID + "/panel-auth" && request.method === "POST") {
         const ip = request.headers.get("CF-Connecting-IP") || "unknown";
         const now = Date.now();
         const rl = rateLimitMap.get(ip) || { count: 0, time: now };
@@ -2914,9 +1739,8 @@ ${trojanWS}
         }
         rl.count++;
         rateLimitMap.set(ip, rl);
-        if (rl.count > 10) {
-          return new Response(JSON.stringify({ ok: false, error: "Too Many Requests" }), { status: 429, headers: { "Content-Type": "application/json" } });
-        }
+        if (rl.count > 10)
+          return new Response(JSON.stringify({ ok: false, error: "Too Many Requests" }), { status: 429 });
         const body = (await request.text()).trim();
         if (body === currentPanelPass) {
           const hashedToken = await hashPassword(currentPanelPass);
@@ -2928,133 +1752,108 @@ ${trojanWS}
             }
           });
         }
-        return new Response(JSON.stringify({ ok: false }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
-      if (path === "/" + currentUserID + "/save-password") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
+      const checkApiAuth = async (req) => {
+        if (currentPanelPass && await isAuthed(req, currentPanelPass))
+          return true;
+        const authHeader = req.headers.get("Authorization");
+        let token = "";
+        if (authHeader && authHeader.startsWith("Bearer "))
+          token = authHeader.substring(7).trim();
+        else
+          token = new URL(req.url).searchParams.get("token") || "";
+        if (token) {
+          const tokens = await getAllTokens(env);
+          if (tokens.some((t) => t.key === token))
+            return true;
+        }
+        return false;
+      };
+      if (path.startsWith("/api/")) {
+        if (!await checkApiAuth(request)) {
+          return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/users") {
+          if (request.method === "GET") {
+            const users = await getAllUsers(env);
+            return new Response(JSON.stringify({ ok: true, users }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
+          if (request.method === "POST") {
+            const b = await request.json();
+            await env.DB.prepare("INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(b.id, b.name, b.clean_ip || "", b.proxy_ip || "", b.limit_bytes || 0, b.expiry_date || 0, b.enabled === false ? 0 : 1).run();
+            usersCache = null;
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
+        }
+        if (path.startsWith("/api/users/") && request.method === "DELETE") {
+          const id = path.split("/").pop();
+          await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+          usersCache = null;
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path.startsWith("/api/users/") && path.endsWith("/toggle") && request.method === "POST") {
+          const id = path.split("/")[3];
+          await env.DB.prepare("UPDATE users SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END WHERE id = ?").bind(id).run();
+          usersCache = null;
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/tokens") {
+          if (request.method === "GET") {
+            const tokens = await getAllTokens(env);
+            return new Response(JSON.stringify({ ok: true, tokens }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
+          if (request.method === "POST") {
+            const b = await request.json();
+            await env.DB.prepare("INSERT INTO api_keys (key, name, created_at) VALUES (?, ?, ?)").bind(b.key, b.name, Date.now()).run();
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+          }
+        }
+        if (path.startsWith("/api/tokens/") && request.method === "DELETE") {
+          const key = path.split("/").pop();
+          await env.DB.prepare("DELETE FROM api_keys WHERE key = ?").bind(key).run();
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/settings" && request.method === "POST") {
+          const b = await request.json();
+          if (b.proxyIP !== void 0)
+            await setSettingD1(env, "proxy_ip", b.proxyIP.trim());
+          if (b.password !== void 0)
+            await setSettingD1(env, "panel_pass", b.password.trim());
+          if (b.uuid !== void 0 && isValidUUID(b.uuid.trim()))
+            await setSettingD1(env, "uuid", b.uuid.trim());
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+      if (path.endsWith("/sub")) {
+        const parts = path.split("/");
+        const subId = parts[1] === "sub" ? parts[2] : parts[1];
+        const users = await getAllUsers(env);
+        const user = users.find((u) => u.id === subId);
+        if (user) {
+          const host = request.headers.get("Host");
+          const userAgent = (request.headers.get("User-Agent") || "").toLowerCase();
+          const isProxyClient = userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box");
+          const addr = user.clean_ip || currentProxyIP || host;
+          const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=/?ed=2048#VLESS-${user.name}`;
+          const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=/trojan-ws#Trojan-${user.name}`;
+          if (isProxyClient) {
+            return new Response(btoa(unescape(encodeURIComponent(vlessWS + "\n" + trojanWS + "\n"))), { status: 200, headers: { "Content-Type": "text/plain" } });
+          }
+          return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+        }
+      }
+      if (path === "/" + currentAdminUUID + "/save-uuid" && request.method === "POST") {
         const body = (await request.text()).trim();
-        const savedPassNew = body || "";
-        const panelPassNew = savedPassNew || env.PASSWORD || "";
-        if (env.nahan) {
-          await env.nahan.put("panel_pass", savedPassNew, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, enabled: !!panelPassNew }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
+        if (isValidUUID(body))
+          await setSettingD1(env, "uuid", body);
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
-      if (path === "/" + currentUserID + "/save-cleanip") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
-        const body = await request.text();
-        const savedCleanIPNew = body.trim();
-        if (env.nahan) {
-          await env.nahan.put("clean_ip", savedCleanIPNew, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, cleanIP: savedCleanIPNew }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/" + currentUserID + "/save-proxy") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
-        const body = await request.text();
-        const savedProxyIPNew = body.trim();
-        const proxyIPNew = savedProxyIPNew || env.PROXYIP || "";
-        if (env.nahan) {
-          await env.nahan.put("proxy_ip", savedProxyIPNew, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, proxyIP: proxyIPNew }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/" + currentUserID + "/save-vlesspath") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
+      if (path === "/" + currentAdminUUID + "/save-password" && request.method === "POST") {
         const body = (await request.text()).trim();
-        let newPath = body;
-        if (newPath && !newPath.startsWith("/")) {
-          newPath = "/" + newPath;
-        }
-        if (env.nahan) {
-          await env.nahan.put("vless_ws_path", newPath, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, path: newPath }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/" + currentUserID + "/save-trojanpath") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
-        const body = (await request.text()).trim();
-        let newPath = body;
-        if (newPath && !newPath.startsWith("/")) {
-          newPath = "/" + newPath;
-        }
-        if (env.nahan) {
-          await env.nahan.put("trojan_ws_path", newPath, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, path: newPath }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/" + currentUserID + "/save-uuid") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
-        const body = (await request.text()).trim();
-        if (!isValidUUID(body)) {
-          return new Response(JSON.stringify({ ok: false, error: "Invalid UUID" }), { status: 400 });
-        }
-        if (env.nahan) {
-          await env.nahan.put("uuid", body, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true, uuid: body }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/" + currentUserID + "/save-trpass") {
-        if (request.method !== "POST")
-          return new Response("Method Not Allowed", { status: 405 });
-        if (!isApiAuthed(request, currentPanelPass, currentUserID))
-          return new Response("Unauthorized", { status: 401 });
-        const body = (await request.text()).trim();
-        if (!body) {
-          return new Response(JSON.stringify({ ok: false, error: "Password required" }), { status: 400 });
-        }
-        if (env.nahan) {
-          await env.nahan.put("tr_pass", body, { expirationTtl: 31536e3 });
-        }
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
-      }
-      if (path === "/api/ping") {
-        return new Response(JSON.stringify({ ok: true, pong: Date.now() }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
+        await setSettingD1(env, "panel_pass", body);
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
       return new Response(nginxPage(), {
         status: 404,
