@@ -200,6 +200,10 @@ async function setupD1Schema(env) {
       key TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       created_at INTEGER
+    );`,
+    `CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
     );`
   ];
   for (const q of queries) {
@@ -209,6 +213,21 @@ async function setupD1Schema(env) {
       console.error("D1 Schema setup error:", e);
     }
   }
+}
+
+async function getSettingD1(env, key) {
+  if (!env.DB) return null;
+  try {
+    const { results } = await env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(key).all();
+    return results.length > 0 ? results[0].value : null;
+  } catch (e) { return null; }
+}
+
+async function setSettingD1(env, key, value) {
+  if (!env.DB) return;
+  try {
+    await env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key, value).run();
+  } catch (e) { console.error("Setting save error", e); }
 }
 
 async function getUserFromD1(env, uuid) {
@@ -229,5 +248,5 @@ async function updateUsageD1(env, uuid, bytes) {
 export { 
   sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify, 
   safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed, isApiAuthed,
-  setupD1Schema, getUserFromD1, updateUsageD1
+  setupD1Schema, getUserFromD1, updateUsageD1, getSettingD1, setSettingD1
 };

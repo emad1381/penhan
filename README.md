@@ -13,7 +13,7 @@
 - 🎨 **پنل مدیریت فارسی** — رابط کاربری شیشه‌ای (Glassmorphic) با تم تاریک
 - 🌐 **صفحه سابسکرایب** — قابل استفاده در مرورگر و کلاینت‌های پروکسی
 - 📡 **API یکپارچه** — مدیریت از طریق ربات تلگرام یا اسکریپت
-- ⚙️ **ذخیره تنظیمات در KV** — Clean IP، Proxy IP، مسیرهای سفارشی
+- ⚙️ **ذخیره تنظیمات در D1** — Clean IP، Proxy IP، و اطلاعات ادمین
 - 🔐 **احراز هویت** — رمز عبور پنل + توکن API
 
 ## 📁 ساختار پروژه
@@ -72,7 +72,6 @@ npx wrangler deploy
 |------------|---------|
 | `CF_ACCOUNT_ID` | شناسه اکانت کلادفلر شما (Account ID) |
 | `CF_API_TOKEN` | توکن کلادفلر با دسترسی `Edit Cloudflare Workers` |
-| `CF_KV_ID` | شناسه (ID) مربوط به دیتابیس KV که با اسم nahan ساخته‌اید |
 | `CF_D1_ID` | شناسه (ID) مربوط به دیتابیس D1 که با اسم penhan_db ساخته‌اید |
 | `CF_WORKER_NAME` | *(اختیاری)* اسم دلخواه ورکر شما (در صورت خالی بودن، به صورت پیش‌فرض `penhan` قرار می‌گیرد) |
 
@@ -87,9 +86,10 @@ name = "penhan"
 main = "dist/worker.js"
 compatibility_date = "2023-12-01"
 
-[[kv_namespaces]]
-binding = "nahan"
-id = "YOUR_KV_NAMESPACE_ID_HERE"
+[[d1_databases]]
+binding = "DB"
+database_name = "penhan_db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
 ```
 
 ### متغیرهای محیطی (Environment Variables)

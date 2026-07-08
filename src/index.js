@@ -1,4 +1,4 @@
-import { isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224 } from './helpers.js';
+import { isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224, getSettingD1, setSettingD1 } from './helpers.js';
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';
@@ -32,9 +32,9 @@ export default {
     try {
       await setupD1Schema(env);
 
-      let currentProxyIP = (env.nahan ? await env.nahan.get('proxy_ip') : '') || env.PROXYIP || '';
-      let currentPanelPass = (env.nahan ? await env.nahan.get('panel_pass') : '') || env.PASSWORD || '';
-      let currentAdminUUID = (env.nahan ? await env.nahan.get('uuid') : '') || env.UUID || ''; 
+      let currentProxyIP = (await getSettingD1(env, 'proxy_ip')) || env.PROXYIP || '';
+      let currentPanelPass = (await getSettingD1(env, 'panel_pass')) || env.PASSWORD || '';
+      let currentAdminUUID = (await getSettingD1(env, 'uuid')) || env.UUID || ''; 
       
       const upgradeHeader = request.headers.get('Upgrade');
       const url = new URL(request.url);
@@ -82,7 +82,7 @@ export default {
         else if (await isAuthed(request, currentPanelPass)) showSetup = true;
         
         if (showSetup) {
-           return new Response(setupPage(!!env.nahan, !!currentPanelPass, !!currentAdminUUID, true, currentAdminUUID, currentProxyIP), {
+           return new Response(setupPage(true, !!currentPanelPass, !!currentAdminUUID, true, currentAdminUUID, currentProxyIP), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
            });
@@ -187,9 +187,9 @@ export default {
         // Global settings
         if (path === '/api/settings' && request.method === 'POST') {
           const b = await request.json();
-          if (b.proxyIP !== undefined && env.nahan) await env.nahan.put('proxy_ip', b.proxyIP.trim());
-          if (b.password !== undefined && env.nahan) await env.nahan.put('panel_pass', b.password.trim());
-          if (b.uuid !== undefined && isValidUUID(b.uuid.trim()) && env.nahan) await env.nahan.put('uuid', b.uuid.trim());
+          if (b.proxyIP !== undefined) await setSettingD1(env, 'proxy_ip', b.proxyIP.trim());
+          if (b.password !== undefined) await setSettingD1(env, 'panel_pass', b.password.trim());
+          if (b.uuid !== undefined && isValidUUID(b.uuid.trim())) await setSettingD1(env, 'uuid', b.uuid.trim());
           return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
         
@@ -220,12 +220,12 @@ export default {
       // 8. Other Setup Routes
       if (path === '/' + currentAdminUUID + '/save-uuid' && request.method === 'POST') {
         const body = (await request.text()).trim();
-        if (isValidUUID(body) && env.nahan) await env.nahan.put('uuid', body);
+        if (isValidUUID(body)) await setSettingD1(env, 'uuid', body);
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
       if (path === '/' + currentAdminUUID + '/save-password' && request.method === 'POST') {
         const body = (await request.text()).trim();
-        if (env.nahan) await env.nahan.put('panel_pass', body);
+        await setSettingD1(env, 'panel_pass', body);
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
 
