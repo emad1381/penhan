@@ -800,7 +800,7 @@ function loginPage(uuid, host) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC</title>
+  <title>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
 
@@ -978,14 +978,14 @@ function loginPage(uuid, host) {
   <div class="toast" id="toast"></div>
 
   <div class="login-container">
-    <div class="icon-wrapper">\u2261\u0192\xF6\xC6</div>
-    <h1>\u2518\u255B\u2518\xE5\u2518\xE4 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC \u2518\xE5\u2518\xE7\u256A\xBA\u2518\xE5</h1>
-    <p class="subtitle">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u256A\xBF\u256A\xAB\u256A\u2524 \u2518\xE0\u256A\xBB\u2588\xEE\u256A\u2592\u2588\xEE\u256A\xAC\u256A\xEE \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\u2592\u256A\xBA \u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB</p>
+    <div class="icon-wrapper">\u{1F512}</div>
+    <h1>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</h1>
+    <p class="subtitle">\u0628\u0631\u0627\u06CC \u0648\u0631\u0648\u062F \u0628\u0647 \u0628\u062E\u0634 \u0645\u062F\u06CC\u0631\u06CC\u062A\u060C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F</p>
     
-    <input type="password" class="input-field" id="passInput" placeholder="\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3\u0393\xC7\xF3" autofocus autocomplete="current-password">
+    <input type="password" class="input-field" id="passInput" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autofocus autocomplete="current-password">
     <div class="error-msg" id="error"></div>
 
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4</button>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644</button>
   </div>
 
   <script>
@@ -999,13 +999,13 @@ function loginPage(uuid, host) {
       const err = document.getElementById('error');
 
       if (!p) {
-        err.textContent = '\u0393\xA5\xEE \u2518\xE4\u256A\u2556\u2518\xFC\u256A\xBA\u2518\xEF \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\u2592\u256A\xBA \u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB';
+        err.textContent = '\u274C \u0644\u0637\u0641\u0627\u064B \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F';
         err.classList.add('visible');
         return;
       }
 
       err.classList.remove('visible');
-      btn.textContent = '\u256A\xBB\u256A\u2592 \u256A\xA1\u256A\xBA\u2518\xE4 \u256A\xBF\u256A\u2592\u256A\u2592\u256A\u2502\u2588\xEE...';
+      btn.textContent = '\u062F\u0631 \u062D\u0627\u0644 \u0628\u0631\u0631\u0633\u06CC...';
       btn.disabled = true;
 
       try {
@@ -1017,15 +1017,15 @@ function loginPage(uuid, host) {
         if (d.ok) {
           window.location.href = bp;
         } else {
-          err.textContent = '\u0393\xA5\xEE \u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xBA\u256A\u2524\u256A\xAC\u256A\xBF\u256A\xBA\u2518\xE7 \u256A\xBA\u256A\u2502\u256A\xAC';
+          err.textContent = '\u274C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0634\u062A\u0628\u0627\u0647 \u0627\u0633\u062A';
           err.classList.add('visible');
           input.value = '';
           input.focus();
         }
       } catch (e) {
-        showToast('\u0393\xA5\xEE \u256A\xAB\u256A\u2556\u256A\xBA \u256A\xBB\u256A\u2592 \u256A\xBF\u256A\u2592\u2518\xE9\u256A\u2592\u256A\xBA\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2592\u256A\xAC\u256A\xBF\u256A\xBA\u256A\u2556 \u256A\xBF\u256A\xBA \u256A\u2502\u256A\u2592\u2518\xEA\u256A\u2592');
+        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631');
       } finally {
-        btn.textContent = '\u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4';
+        btn.textContent = '\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644';
         btn.disabled = false;
       }
     }
@@ -1053,7 +1053,7 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u2518\xE5\u256A\u2561\u256A\xBF \u2518\xEA \u256A\u2592\u256A\xBA\u2518\xE7\u0393\xC7\xEE\u256A\xBA\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2593\u2588\xEE \u2518\u255B\u2518\xE5\u2518\xE4 \u2518\u255B\u2518\xE5\u2518\xE7\u256A\xBA\u2518\xE5</title>
+  <title>\u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
     :root {
@@ -1092,70 +1092,70 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 </head>
 <body>
   <div class="container">
-    <h1>\u0393\xDC\xD6\u2229\u2555\xC5 \u2518\xE5\u256A\u2561\u256A\xBF \u2518\xEA \u256A\u2592\u256A\xBA\u2518\xE7\u0393\xC7\xEE\u256A\xBA\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2593\u2588\xEE \u2518\xEA\u256A\u2592\u250C\u2310\u256A\u2592</h1>
+    <h1>\u2699\uFE0F \u0646\u0635\u0628 \u0648 \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0648\u0631\u06A9\u0631</h1>
     <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\u2563\u2518\xE0\u2518\xE4\u250C\u2310\u256A\u2592\u256A\xBB \u256A\u2561\u256A\xA1\u2588\xEE\u256A\xA1 \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE\u256A\xEE \u2518\xEA\u256A\u2562\u256A\u2563\u2588\xEE\u256A\xAC \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592\u2518\xE7\u256A\xBA\u2588\xEE \u256A\u2593\u2588\xEE\u256A\u2592 \u256A\u2592\u256A\xBA \u256A\xBB\u256A\u2592 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0\u256A\xBA\u256A\xAC \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\u2592\u256A\u2592\u256A\u2502\u2588\xEE \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB.
+      \u0628\u0631\u0627\u06CC \u0639\u0645\u0644\u06A9\u0631\u062F \u0635\u062D\u06CC\u062D \u067E\u0631\u0648\u06A9\u0633\u06CC\u060C \u0648\u0636\u0639\u06CC\u062A \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0632\u06CC\u0631 \u0631\u0627 \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0631\u0631\u0633\u06CC \u06A9\u0646\u06CC\u062F.
     </p>
 
     <div class="status-box">
       <!-- KV Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u2518\xFC\u256A\u2562\u256A\xBA\u2588\xEE \u256A\u2591\u256A\xAB\u2588\xEE\u256A\u2592\u2518\xE7\u0393\xC7\xEE\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE KV <span class="code">nahan</span></div>
-          <div class="desc">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\u2591\u256A\xAB\u2588\xEE\u256A\u2592\u2518\xE7 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0\u256A\xBA\u256A\xAC \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC. \u256A\xBB\u256A\u2592 \u256A\xBF\u256A\xAB\u256A\u2524 Bindings \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u2588\xEE\u250C\u2310 KV \u256A\xBF\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE\u256A\xBB \u2518\xEA \u2518\xE5\u256A\xBA\u2518\xE0 \u256A\xF3\u2518\xE5 \u256A\u2592\u256A\xBA \u256A\xBB\u2518\xE9\u2588\xEE\u2518\xE9\u256A\xBA\u2518\xEF <span class="code">nahan</span> \u256A\xBF\u250C\xBB\u256A\u2591\u256A\xBA\u256A\u2592\u2588\xEE\u256A\xBB.</div>
+          <div class="item-title">\u0641\u0636\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC KV <span class="code">nahan</span></div>
+          <div class="desc">\u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u062F\u0631 \u0628\u062E\u0634 Bindings \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u06CC\u06A9 KV \u0628\u0633\u0627\u0632\u06CC\u062F \u0648 \u0646\u0627\u0645 \u0622\u0646 \u0631\u0627 \u062F\u0642\u06CC\u0642\u0627\u064B <span class="code">nahan</span> \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F.</div>
         </div>
-        <div class="badge ${hasKV ? "ok" : "fail"}">${hasKV ? "\u2518\xE0\u256A\xAC\u256A\u2561\u2518\xE4 \u256A\u2524\u256A\xBB \u0393\xA3\xE0" : "\u2518\xE0\u256A\xAC\u256A\u2561\u2518\xE4 \u2518\xE5\u2588\xEE\u256A\u2502\u256A\xAC \u0393\xA5\xEE"}</div>
+        <div class="badge ${hasKV ? "ok" : "fail"}">${hasKV ? "\u0645\u062A\u0635\u0644 \u0634\u062F \u2705" : "\u0645\u062A\u0635\u0644 \u0646\u06CC\u0633\u062A \u274C"}</div>
       </div>
       
       <!-- Password Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xBA\u256A\xBB\u2518\xE0\u2588\xEE\u2518\xE5 <span class="code">PASSWORD</span></div>
-          <div class="desc">\u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBA\u2518\xE0\u2518\xE5\u2588\xEE\u256A\xAC \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC. \u2588\xEE\u250C\u2310 \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE \u256A\xBF\u2518\xE7 \u2518\xE5\u256A\xBA\u2518\xE0 <span class="code">PASSWORD</span> \u256A\xBB\u256A\u2592 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\u2502\u256A\xBA\u256A\u2593\u2588\xEE\u256A\xBB.</div>
+          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PASSWORD</span></div>
+          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.</div>
         </div>
-        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
+        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
 
       <!-- UUID Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u256A\u2524\u2518\xE5\u256A\xBA\u256A\u2502\u2518\xE7 \u250C\u2310\u256A\xBA\u256A\u2592\u256A\xBF\u256A\u2592 <span class="code">UUID</span></div>
-          <div class="desc">\u256A\u2524\u2518\xE0\u256A\xBA \u256A\xBF\u256A\xBA\u2588\xEE\u256A\xBB \u2588\xEE\u250C\u2310 UUID \u2518\xE0\u256A\u2563\u256A\xAC\u256A\xBF\u256A\u2592 (\u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">UUID</span>) \u256A\xBB\u256A\u2592 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB. ${currentUUID ? `\u2518\xE0\u2518\xE9\u256A\xBB\u256A\xBA\u256A\u2592 \u2518\xFC\u256A\u2563\u2518\xE4\u2588\xEE: <span class="code">${currentUUID}</span>` : ""}</div>
+          <div class="item-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
+          <div class="desc">\u0634\u0645\u0627 \u0628\u0627\u06CC\u062F \u06CC\u06A9 UUID \u0645\u0639\u062A\u0628\u0631 (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">UUID</span>) \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F. ${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="code">${currentUUID}</span>` : ""}</div>
         </div>
-        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
+        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
 
       <!-- Trojan Pass Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\u2563\u256A\xBF\u2518\xEA\u256A\u2592 \u256A\xAC\u256A\u2592\u2518\xEA\u256A\xBC\u256A\xBA\u2518\xE5 <span class="code">TR_PASS</span></div>
-          <div class="desc">\u256A\u2592\u2518\xE0\u256A\u2593 \u256A\xAC\u256A\u2592\u2518\xEA\u256A\xBC\u256A\xBA\u2518\xE5 \u256A\xBA\u256A\xBC\u256A\xBF\u256A\xBA\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2502\u256A\xAC (\u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">TR_PASS</span>). \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBC\u2518\xE4\u2518\xEA\u250C\xBB\u2588\xEE\u256A\u2592\u2588\xEE \u256A\xBA\u256A\u2593 \u256A\u2524\u2518\xE5\u256A\xBA\u256A\u2502\u256A\xBA\u2588\xEE\u2588\xEE \u256A\u2524\u256A\xBB\u2518\xE5 \u256A\xAC\u2518\xEA\u256A\u2502\u256A\u2556 \u250C\u2310\u2518\xE4\u256A\xBA\u256A\xBB\u2518\xFC\u2518\xE4\u256A\u2592 \u256A\xBF\u256A\xBA\u2588\xEE\u256A\xBB \u256A\xBF\u256A\xBA UUID \u2518\xE0\u256A\xAC\u2518\xFC\u256A\xBA\u2518\xEA\u256A\xAC \u256A\xBF\u256A\xBA\u256A\u2524\u256A\xBB.</div>
+          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062A\u0631\u0648\u062C\u0627\u0646 <span class="code">TR_PASS</span></div>
+          <div class="desc">\u0631\u0645\u0632 \u062A\u0631\u0648\u062C\u0627\u0646 \u0627\u062C\u0628\u0627\u0631\u06CC \u0627\u0633\u062A (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">TR_PASS</span>). \u0628\u0631\u0627\u06CC \u062C\u0644\u0648\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u0634\u0646\u0627\u0633\u0627\u06CC\u06CC \u0634\u062F\u0646 \u062A\u0648\u0633\u0637 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0627\u06CC\u062F \u0628\u0627 UUID \u0645\u062A\u0641\u0627\u0648\u062A \u0628\u0627\u0634\u062F.</div>
         </div>
-        <div class="badge ${hasTrPass ? "ok" : "fail"}">${hasTrPass ? "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA3\xE0" : "\u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u256A\u2524\u256A\xBB\u2518\xE7 \u0393\xA5\xEE"}</div>
+        <div class="badge ${hasTrPass ? "ok" : "fail"}">${hasTrPass ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
 
       <!-- Proxy IP Check -->
       <div class="item">
         <div>
-          <div class="item-title">\u256A\xF3\u2588\xEE\u0393\xC7\xEE\u2518\u255B\u2588\xEE \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE <span class="code">PROXYIP</span></div>
-          <div class="desc">\u2518\xE0\u2518\xE9\u256A\xBB\u256A\xBA\u256A\u2592 \u2518\xFC\u256A\u2563\u2518\xE4\u2588\xEE: ${currentProxyIP ? '<span class="code">' + currentProxyIP + "</span>" : "\u2518\xE5\u256A\xBB\u256A\xBA\u256A\u2592\u256A\xBB"}. \u2518\xE0\u256A\xAC\u256A\u2551\u2588\xEE\u256A\u2592 \u2518\xE0\u256A\xA1\u2588\xEE\u256A\u2556\u2588\xEE <span class="code">PROXYIP</span> \u256A\xBF\u256A\u2592\u256A\xBA\u2588\xEE \u256A\xBB\u2518\xEA\u256A\u2592 \u256A\u2593\u256A\xBB\u2518\xE5 \u2518\xE0\u256A\xA1\u256A\xBB\u2518\xEA\u256A\xBB\u2588\xEE\u256A\xAC \u256A\xBF\u256A\u2592\u256A\xAB\u2588\xEE \u256A\u2502\u256A\xBA\u2588\xEE\u256A\xAC\u0393\xC7\xEE\u2518\xE7\u256A\xBA.</div>
+          <div class="item-title">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC <span class="code">PROXYIP</span></div>
+          <div class="desc">\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: ${currentProxyIP ? '<span class="code">' + currentProxyIP + "</span>" : "\u0646\u062F\u0627\u0631\u062F"}. \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">PROXYIP</span> \u0628\u0631\u0627\u06CC \u062F\u0648\u0631 \u0632\u062F\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0628\u0631\u062E\u06CC \u0633\u0627\u06CC\u062A\u200C\u0647\u0627.</div>
         </div>
-        <div class="badge info">\u256A\xBA\u256A\xAB\u256A\xAC\u2588\xEE\u256A\xBA\u256A\u2592\u2588\xEE \u0393\xE4\u2563\u2229\u2555\xC5</div>
+        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2139\uFE0F</div>
       </div>
     </div>
 
     ${allGood ? `
     <div class="links-box">
-      <h3>\u0393\xA3\xE0 \u256A\u2502\u2588\xEE\u256A\u2502\u256A\xAC\u2518\xE0 \u250C\u2310\u256A\xBA\u2518\xE0\u2518\xE4\u256A\xBA\u2518\xEF \u256A\xF3\u2518\xE0\u256A\xBA\u256A\xBB\u2518\xE7 \u256A\xBA\u256A\u2502\u256A\xAC!</h3>
+      <h3>\u2705 \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</h3>
       <div class="desc" style="color:var(--text);">
-        \u256A\xBA\u256A\u2593 \u256A\xBA\u2588\xEE\u2518\xE5 \u2518\u255B\u256A\u2502 \u256A\xBF\u256A\xBA \u256A\xBF\u256A\xBA\u256A\u2593 \u250C\u2310\u256A\u2592\u256A\xBB\u2518\xE5 \u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u256A\xBA\u256A\u2561\u2518\xE4\u2588\xEE \u2518\xEA\u256A\u2592\u250C\u2310\u256A\u2592\u256A\xEE \u256A\u2561\u2518\xFC\u256A\xA1\u2518\xE7 \u256A\xBC\u256A\u2563\u2518\xE4\u2588\xEE Nginx \u256A\u2592\u256A\xBA \u256A\xAB\u2518\xEA\u256A\xBA\u2518\xE7\u2588\xEE\u256A\xBB \u256A\xBB\u2588\xEE\u256A\xBB \u256A\xAC\u256A\xBA \u256A\xBA\u256A\u2502\u256A\xAC\u256A\xAC\u256A\xBA\u256A\u2592 \u256A\xA1\u2518\xFC\u256A\u2555 \u256A\u2524\u2518\xEA\u256A\xBB.<br><br>
-        \u2261\u0192\xF6\xF9 <strong>\u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u2518\xEA\u256A\u2592\u2518\xEA\u256A\xBB \u256A\xBF\u2518\xE7 \u2518\u255B\u2518\xE5\u2518\xE4 \u256A\u2524\u2518\xE0\u256A\xBA:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}</span><br><br>
-        \u2261\u0192\xF6\xF9 <strong>\u256A\xF3\u256A\xBB\u256A\u2592\u256A\u2502 \u2518\xE4\u2588\xEE\u2518\xE5\u250C\u2310 \u256A\u2502\u256A\xBA\u256A\xBF\u256A\u2502\u250C\u2310\u256A\u2592\u256A\xBA\u2588\xEE\u2518\u255B \u256A\u2524\u2518\xE0\u256A\xBA:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}/sub</span><br>
+        \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0627\u0635\u0644\u06CC \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u062C\u0639\u0644\u06CC Nginx \u0631\u0627 \u062E\u0648\u0627\u0647\u06CC\u062F \u062F\u06CC\u062F \u062A\u0627 \u0627\u0633\u062A\u062A\u0627\u0631 \u062D\u0641\u0638 \u0634\u0648\u062F.<br><br>
+        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}</span><br><br>
+        \u{1F517} <strong>\u0622\u062F\u0631\u0633 \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u0633\u06A9\u0631\u0627\u06CC\u067E \u0634\u0645\u0627:</strong><br><span class="code" style="color:#a78bfa;">/\${currentUUID}/sub</span><br>
       </div>
     </div>
     ` : `
     <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      \u0393\xDC\xE1\u2229\u2555\xC5 \u256A\xAC\u256A\xBA \u256A\u2593\u2518\xE0\u256A\xBA\u2518\xE5\u2588\xEE \u250C\u2310\u2518\xE7 \u2518\xE0\u2518\xEA\u256A\xBA\u256A\u2592\u256A\xBB \u256A\xBA\u2518\xE4\u256A\u2593\u256A\xBA\u2518\xE0\u2588\xEE (KV \u2518\xEA Password) \u256A\u2592\u256A\xBA \u256A\xAC\u2518\xE5\u256A\u2555\u2588\xEE\u2518\xE0 \u2518\xE5\u250C\u2310\u2518\xE5\u2588\xEE\u256A\xBB\u256A\xEE \u256A\xBA\u2518\xE0\u2518\xE5\u2588\xEE\u256A\xAC \u2518\xEA \u256A\u2563\u2518\xE0\u2518\xE4\u250C\u2310\u256A\u2592\u256A\xBB \u2518\u255B\u256A\u2592\u2518\xEA\u250C\u2310\u256A\u2502\u2588\xEE \u256A\u2524\u2518\xE0\u256A\xBA \u250C\u2310\u256A\xBA\u2518\xE0\u2518\xE4 \u2518\xE5\u256A\xAB\u2518\xEA\u256A\xBA\u2518\xE7\u256A\xBB \u256A\xBF\u2518\xEA\u256A\xBB!
+      \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u0645\u0648\u0627\u0631\u062F \u0627\u0644\u0632\u0627\u0645\u06CC (KV \u0648 Password) \u0631\u0627 \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u0627\u0645\u0646\u06CC\u062A \u0648 \u0639\u0645\u0644\u06A9\u0631\u062F \u067E\u0631\u0648\u06A9\u0633\u06CC \u0634\u0645\u0627 \u06A9\u0627\u0645\u0644 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F!
     </div>
     `}
   </div>
