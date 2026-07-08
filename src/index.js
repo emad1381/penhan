@@ -90,16 +90,16 @@ export default {
         return new Response(nginxPage(), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Server': 'nginx/1.24.0' } });
       }
 
-      if (path === '/' + currentAdminUUID) {
+      if (path === '/panel') {
         const host = request.headers.get('Host');
         if (currentPanelPass && !(await isAuthed(request, currentPanelPass))) {
-          return new Response(loginPage(currentAdminUUID, host), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+          return new Response(loginPage('/panel', host), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
         return new Response(panelPage(host, currentAdminUUID, currentProxyIP), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
 
       // panel-auth
-      if (path === '/' + currentAdminUUID + '/panel-auth' && request.method === 'POST') {
+      if (path === '/panel/panel-auth' && request.method === 'POST') {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         const now = Date.now();
         const rl = rateLimitMap.get(ip) || { count: 0, time: now };
@@ -218,12 +218,12 @@ export default {
       }
 
       // 8. Other Setup Routes
-      if (path === '/' + currentAdminUUID + '/save-uuid' && request.method === 'POST') {
+      if (path === '/panel/save-uuid' && request.method === 'POST') {
         const body = (await request.text()).trim();
         if (isValidUUID(body)) await setSettingD1(env, 'uuid', body);
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
-      if (path === '/' + currentAdminUUID + '/save-password' && request.method === 'POST') {
+      if (path === '/panel/save-password' && request.method === 'POST') {
         const body = (await request.text()).trim();
         await setSettingD1(env, 'panel_pass', body);
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
