@@ -66,3 +66,10 @@ jobs:
             dist/worker.js
             dist/worker_obfuscated.js
           make_latest: true
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy

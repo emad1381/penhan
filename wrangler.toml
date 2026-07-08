@@ -1,5 +1,5 @@
 name = "penhan"
-main = "dist/worker.js"
+main = "dist/worker_obfuscated.js"
 compatibility_date = "2023-12-01"
 
 [[kv_namespaces]]
