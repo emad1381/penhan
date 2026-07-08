@@ -540,14 +540,14 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
       <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('کانفیگ Trojan کپی شد'))">کپی کانفیگ</button>
     </div>
     
-    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('لینک ساب کپی شد'))">کپی لینک ساب‌اسکرایب (بدون فیلتر)</button>
+    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('لینک ساب کپی شد'))">کپی لینک ساب‌اسکرایب (Subscription Link)</button>
   </div>
 </body>
 </html>`;
 }
 
 
-function panelPage(hostname, adminUUID, defaultProxyIP) {
+function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken) {
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -638,6 +638,31 @@ function panelPage(hostname, adminUUID, defaultProxyIP) {
         <button class="btn" onclick="openAddUserModal()">+ افزودن کاربر جدید</button>
       </div>
       
+      <div class="dashboard-stats" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">تعداد کل کاربران</div>
+          <div id="stat-total-users" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">کاربران فعال</div>
+          <div id="stat-active-users" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; color:var(--muted)">درخواست‌های امروز ورکر</div>
+            <div id="stat-cf-reqs" style="font-size:18px; font-weight:bold; margin-top:8px;">در حال دریافت...</div>
+          </div>
+          <!-- Circular progress chart -->
+          <div id="cf-circle-container" style="width:42px; height:42px; position:relative; display:none;">
+            <svg viewBox="0 0 36 36" style="width:100%; height:100%; transform: rotate(-90deg);">
+              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#27272a" stroke-width="4" />
+              <path id="cf-circle-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--primary)" stroke-width="4" stroke-dasharray="0, 100" />
+            </svg>
+            <div id="cf-circle-text" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; font-family:'Outfit', sans-serif;">0%</div>
+          </div>
+        </div>
+      </div>
+      
       <div class="table-container">
         <table>
           <thead>
@@ -713,6 +738,14 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <div class="form-group">
           <label>آی‌پی پروکسی پیش‌فرض (Proxy IP)</label>
           <input type="text" class="form-control" id="st-proxy" value="${defaultProxyIP || ''}" placeholder="مثال: 1.2.3.4">
+        </div>
+        <div class="form-group">
+          <label>Cloudflare Account ID</label>
+          <input type="text" class="form-control" id="st-cf-account" value="${cfAccountId || ''}" placeholder="مثال: 8e5f2...">
+        </div>
+        <div class="form-group">
+          <label>Cloudflare API Token (با دسترسی Account Analytics: Read)</label>
+          <input type="password" class="form-control" id="st-cf-token" value="${cfApiToken || ''}" placeholder="برای عدم تغییر خالی بگذارید">
         </div>
       </div>
     </div>
@@ -807,6 +840,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       try {
         const res = await fetch(basePath + '/users');
         const data = await res.json();
+        
+        const totalUsers = data.users.length;
+        const activeUsers = data.users.filter(u => u.enabled).length;
+        document.getElementById('stat-total-users').textContent = totalUsers;
+        document.getElementById('stat-active-users').textContent = activeUsers;
+        
         const tbody = document.getElementById('users-tbody');
         tbody.innerHTML = '';
         if (data.users.length === 0) {
@@ -911,7 +950,9 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const u = document.getElementById('st-uuid').value;
        const p = document.getElementById('st-pass').value;
        const prox = document.getElementById('st-proxy').value;
-       const payload = { uuid: u, proxyIP: prox };
+       const cfAcc = document.getElementById('st-cf-account').value;
+       const cfTok = document.getElementById('st-cf-token').value;
+       const payload = { uuid: u, proxyIP: prox, cfAccountId: cfAcc, cfApiToken: cfTok };
        if (p) payload.password = p;
        
        await fetch(basePath + '/settings', {
@@ -920,6 +961,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
          body: JSON.stringify(payload)
        });
        alert('تنظیمات با موفقیت ذخیره شد.');
+       loadCfMetrics();
     }
 
     function openAddUserModal() {
@@ -950,9 +992,38 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       openModal('user-modal');
     }
 
+    async function loadCfMetrics() {
+      try {
+        const res = await fetch('/api/cf-metrics');
+        const data = await res.json();
+        if (data.ok) {
+          const reqs = data.requestsUsed;
+          const limit = data.limit;
+          const percent = Math.min(100, Math.round((reqs / limit) * 100));
+          document.getElementById('stat-cf-reqs').innerHTML = `${reqs.toLocaleString()} <span style="font-size:10px; color:var(--muted)">/ ${limit.toLocaleString()}</span>`;
+          document.getElementById('cf-circle-container').style.display = 'block';
+          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', `${percent}, 100`);
+          document.getElementById('cf-circle-text').textContent = `${percent}%`;
+          if (percent > 85) {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--danger)');
+          } else if (percent > 60) {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'orange');
+          } else {
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--primary)');
+          }
+        } else {
+          document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">تنظیم نشده (در تنظیمات)</span>';
+          document.getElementById('cf-circle-container').style.display = 'none';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     // Init
     loadUsers();
     loadTokens();
+    loadCfMetrics();
   </script>
 </body>
 </html>`;

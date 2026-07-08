@@ -35,6 +35,8 @@ export default {
       let currentProxyIP = (await getSettingD1(env, 'proxy_ip')) || env.PROXYIP || '';
       let currentPanelPass = (await getSettingD1(env, 'panel_pass')) || env.PANEL_PASSWORD || env.PASSWORD || '';
       let currentAdminUUID = (await getSettingD1(env, 'uuid')) || env.UUID || ''; 
+      let cfAccountId = await getSettingD1(env, 'cf_account_id') || '';
+      let cfApiToken = await getSettingD1(env, 'cf_api_token') || '';
       
       const upgradeHeader = request.headers.get('Upgrade');
       const url = new URL(request.url);
@@ -50,29 +52,27 @@ export default {
         return null;
       };
 
-      const onUsage = (userID) => {
-        return (upload, download) => {
-          if (!env.DB) return true;
-          let user = usersCache?.find(u => u.id === userID);
-          if (!user) return true;
-          user.used_bytes += (upload + download);
-          
-          if (upload + download > 0) {
-            ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
-          }
-          
-          if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes) return false;
-          if (user.expiry_date > 0 && Date.now() > user.expiry_date) return false;
-          return true;
-        };
+      const onUsage = (userID, upload, download) => {
+        if (!env.DB) return true;
+        let user = usersCache?.find(u => u.id === userID);
+        if (!user) return true;
+        user.used_bytes += (upload + download);
+        
+        if (upload + download > 0) {
+          ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
+        }
+        
+        if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes) return false;
+        if (user.expiry_date > 0 && Date.now() > user.expiry_date) return false;
+        return true;
       };
 
       if (upgradeHeader === 'websocket') {
         const decodedPath = decodeURIComponent(path).toLowerCase();
         if (decodedPath.includes('trojan-ws') || decodedPath.includes('trojan')) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true); // Will wrap inside handler
+          return await trojanOverWSHandler(request, authenticate, currentProxyIP, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIP, (up, down) => true);
+          return await vlessOverWSHandler(request, authenticate, currentProxyIP, onUsage);
         }
       }
 
@@ -96,7 +96,7 @@ export default {
         if (currentPanelPass && !(await isAuthed(request, currentPanelPass))) {
           return new Response(loginPage('/panel', host), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
-        return new Response(panelPage(host, currentAdminUUID, currentProxyIP), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        return new Response(panelPage(host, currentAdminUUID, currentProxyIP, cfAccountId, cfApiToken), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
 
       // panel-auth
@@ -199,7 +199,74 @@ export default {
           if (b.proxyIP !== undefined) await setSettingD1(env, 'proxy_ip', b.proxyIP.trim());
           if (b.password !== undefined) await setSettingD1(env, 'panel_pass', b.password.trim());
           if (b.uuid !== undefined && isValidUUID(b.uuid.trim())) await setSettingD1(env, 'uuid', b.uuid.trim());
+          if (b.cfAccountId !== undefined) await setSettingD1(env, 'cf_account_id', b.cfAccountId.trim());
+          if (b.cfApiToken !== undefined) await setSettingD1(env, 'cf_api_token', b.cfApiToken.trim());
           return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
+        }
+
+        if (path === '/api/cf-metrics' && request.method === 'GET') {
+          const accountId = await getSettingD1(env, 'cf_account_id');
+          const apiToken = await getSettingD1(env, 'cf_api_token');
+          if (!accountId || !apiToken) {
+             return new Response(JSON.stringify({ok: false, error: 'Not Configured'}), {status: 200, headers: {'Content-Type': 'application/json'}});
+          }
+          
+          const now = new Date();
+          const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+          const end = now.toISOString();
+          
+          const query = `
+            query GetRequests($accountTag: String!, $start: String!, $end: String!) {
+              viewer {
+                accounts(filter: { accountTag: $accountTag }) {
+                  workersRequestAdaptiveGroups(
+                    limit: 1,
+                    filter: {
+                      datetime_geq: $start,
+                      datetime_leq: $end
+                    }
+                  ) {
+                    sum {
+                      requests
+                    }
+                  }
+                }
+              }
+            }
+          `;
+          
+          try {
+            const cfRes = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                query,
+                variables: {
+                  accountTag: accountId,
+                  start,
+                  end
+                }
+              })
+            });
+            const cfData = await cfRes.json();
+            
+            if (cfData.errors && cfData.errors.length > 0) {
+              return new Response(JSON.stringify({ok: false, error: cfData.errors[0].message}), {status: 200, headers: {'Content-Type': 'application/json'}});
+            }
+            
+            const accounts = cfData?.data?.viewer?.accounts;
+            let requestsUsed = 0;
+            if (accounts && accounts.length > 0 && accounts[0].workersRequestAdaptiveGroups && accounts[0].workersRequestAdaptiveGroups.length > 0) {
+              requestsUsed = accounts[0].workersRequestAdaptiveGroups[0].sum.requests || 0;
+            }
+            
+            return new Response(JSON.stringify({ok: true, requestsUsed, limit: 100000}), {status: 200, headers: {'Content-Type': 'application/json'}});
+          } catch(e) {
+            return new Response(JSON.stringify({ok: false, error: e.message}), {status: 200, headers: {'Content-Type': 'application/json'}});
+          }
         }
         
         return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});

@@ -215,19 +215,20 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
   
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
+  let activeUserID = null;
   
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
-    if (onUsage) {
-      return onUsage(bytes, 0); // returns false if limit exceeded
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, bytes, 0); // returns false if limit exceeded
     }
     return true;
   };
   
   const handleDownload = (bytes) => {
     currentSessionDownload += bytes;
-    if (onUsage) {
-      return onUsage(0, bytes);
+    if (onUsage && activeUserID) {
+      return onUsage(activeUserID, 0, bytes);
     }
     return true;
   };
@@ -283,6 +284,7 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         log('user auth failed or disabled');
         throw new Error('user not found or disabled');
       }
+      activeUserID = userObj.id;
       
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
 
