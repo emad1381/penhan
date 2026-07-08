@@ -494,7 +494,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
 }
 
 
-function panelPage(hostname, adminUUID) {
+function panelPage(hostname, adminUUID, defaultProxyIP) {
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -657,7 +657,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         </div>
         <div class="form-group">
           <label>آی‌پی پروکسی پیش‌فرض (Proxy IP)</label>
-          <input type="text" class="form-control" id="st-proxy" placeholder="مثال: 1.2.3.4">
+          <input type="text" class="form-control" id="st-proxy" value="${defaultProxyIP || ''}" placeholder="مثال: 1.2.3.4">
         </div>
       </div>
     </div>
@@ -776,7 +776,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             <td>
               <div class="flex-gap">
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? 'مسدود' : 'آزادسازی'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${hostname}/\${u.id}/sub', '_blank')">لینک ساب</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://${hostname}/\${u.id}/sub', '_blank')">لینک ساب</button>
                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">🗑️</button>
               </div>
             </td>
