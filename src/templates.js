@@ -191,7 +191,7 @@ function loginPage(uuid, host) {
 
   <div class="login-container">
     <div class="icon-wrapper">🔒</div>
-    <h1>پنل مدیریت ناهان</h1>
+    <h1>پنل مدیریت نهان</h1>
     <p class="subtitle">برای ورود به بخش مدیریت، رمز عبور را وارد کنید</p>
     
     <input type="password" class="input-field" id="passInput" placeholder="••••••••" autofocus autocomplete="current-password">
@@ -274,7 +274,7 @@ function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, curr
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>پروفایل اتصال ناهان</title>
+  <title>پروفایل اتصال نهان</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
 
@@ -682,7 +682,7 @@ function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, curr
   <div class="sub-container">
     <div class="header">
       <div class="header-logo">🛰️</div>
-      <div class="header-title">پروفایل اتصال ناهان (Nahan)</div>
+      <div class="header-title">پروفایل اتصال نهان (Nahan)</div>
       <div>
         <span class="status-badge">
           <span class="status-dot"></span>
@@ -800,7 +800,7 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>داشبورد مدیریت ناهان</title>
+  <title>داشبورد مدیریت نهان</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
 
@@ -1371,7 +1371,7 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
   <div class="container">
     <div class="header">
       <div class="badge-status">ورکر فعال</div>
-      <h1>پنل مدیریت ناهان</h1>
+      <h1>پنل مدیریت نهان</h1>
       <p>مدیریت پروکسی‌ها، آی‌پی تمیز و روتینگ ترافیک</p>
     </div>
 
