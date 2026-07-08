@@ -1938,19 +1938,27 @@ var src_default = {
         }
         return null;
       };
+      let pendingUsageBytes = 0;
+      let lastUsageUpdate = Date.now();
       const onUsage = (userID, upload, download) => {
         if (!env.DB)
           return true;
         let user = usersCache?.find((u) => u.id === userID);
         if (!user)
           return true;
-        user.used_bytes += upload + download;
-        if (upload + download > 0) {
-          ctx.waitUntil(updateUsageD1(env, userID, upload + download).catch(console.error));
+        const total = upload + download;
+        user.used_bytes += total;
+        pendingUsageBytes += total;
+        const now = Date.now();
+        if (pendingUsageBytes >= 512 * 1024 || now - lastUsageUpdate > 5e3 && pendingUsageBytes > 0) {
+          const bytesToUpdate = pendingUsageBytes;
+          pendingUsageBytes = 0;
+          lastUsageUpdate = now;
+          ctx.waitUntil(updateUsageD1(env, userID, bytesToUpdate).catch(console.error));
         }
         if (user.limit_bytes > 0 && user.used_bytes >= user.limit_bytes)
           return false;
-        if (user.expiry_date > 0 && Date.now() > user.expiry_date)
+        if (user.expiry_date > 0 && now > user.expiry_date)
           return false;
         return true;
       };
