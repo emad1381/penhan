@@ -10,7 +10,7 @@ function loginPage(uuid, host) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>┘ê╪▒┘ê╪» ╪¿┘ç ┘╛┘å┘ä ┘à╪»█î╪▒█î╪¬</title>
+  <title>ورود به پنل مدیریت</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
 
@@ -188,14 +188,14 @@ function loginPage(uuid, host) {
   <div class="toast" id="toast"></div>
 
   <div class="login-container">
-    <div class="icon-wrapper">≡ƒöÆ</div>
-    <h1>┘╛┘å┘ä ┘à╪»█î╪▒█î╪¬ ┘å┘ç╪º┘å</h1>
-    <p class="subtitle">╪¿╪▒╪º█î ┘ê╪▒┘ê╪» ╪¿┘ç ╪¿╪«╪┤ ┘à╪»█î╪▒█î╪¬╪î ╪▒┘à╪▓ ╪╣╪¿┘ê╪▒ ╪▒╪º ┘ê╪º╪▒╪» ┌⌐┘å█î╪»</p>
+    <div class="icon-wrapper">🔒</div>
+    <h1>پنل مدیریت نهان</h1>
+    <p class="subtitle">برای ورود به بخش مدیریت، رمز عبور را وارد کنید</p>
     
-    <input type="password" class="input-field" id="passInput" placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó" autofocus autocomplete="current-password">
+    <input type="password" class="input-field" id="passInput" placeholder="••••••••" autofocus autocomplete="current-password">
     <div class="error-msg" id="error"></div>
 
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">┘ê╪▒┘ê╪» ╪¿┘ç ┘╛┘å┘ä</button>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">ورود به پنل</button>
   </div>
 
   <script>
@@ -209,13 +209,13 @@ function loginPage(uuid, host) {
       const err = document.getElementById('error');
 
       if (!p) {
-        err.textContent = 'Γ¥î ┘ä╪╖┘ü╪º┘ï ╪▒┘à╪▓ ╪╣╪¿┘ê╪▒ ╪▒╪º ┘ê╪º╪▒╪» ┌⌐┘å█î╪»';
+        err.textContent = '❌ لطفاً رمز عبور را وارد کنید';
         err.classList.add('visible');
         return;
       }
 
       err.classList.remove('visible');
-      btn.textContent = '╪»╪▒ ╪¡╪º┘ä ╪¿╪▒╪▒╪│█î...';
+      btn.textContent = 'در حال بررسی...';
       btn.disabled = true;
 
       try {
@@ -227,15 +227,15 @@ function loginPage(uuid, host) {
         if (d.ok) {
           window.location.href = bp;
         } else {
-          err.textContent = 'Γ¥î ╪▒┘à╪▓ ╪╣╪¿┘ê╪▒ ╪º╪┤╪¬╪¿╪º┘ç ╪º╪│╪¬';
+          err.textContent = '❌ رمز عبور اشتباه است';
           err.classList.add('visible');
           input.value = '';
           input.focus();
         }
       } catch (e) {
-        showToast('Γ¥î ╪«╪╖╪º ╪»╪▒ ╪¿╪▒┘é╪▒╪º╪▒█î ╪º╪▒╪¬╪¿╪º╪╖ ╪¿╪º ╪│╪▒┘ê╪▒');
+        showToast('❌ خطا در برقراری ارتباط با سرور');
       } finally {
-        btn.textContent = '┘ê╪▒┘ê╪» ╪¿┘ç ┘╛┘å┘ä';
+        btn.textContent = 'ورود به پنل';
         btn.disabled = false;
       }
     }
@@ -264,7 +264,7 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>┘å╪╡╪¿ ┘ê ╪▒╪º┘çΓÇî╪º┘å╪»╪º╪▓█î ┘╛┘å┘ä ┘╛┘å┘ç╪º┘å</title>
+  <title>نصب و راه‌اندازی پنل پنهان</title>
   <style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
     :root {
@@ -303,98 +303,76 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
 </head>
 <body>
   <div class="container">
-    <h1>ΓÜÖ∩╕Å ┘å╪╡╪¿ ┘ê ╪▒╪º┘çΓÇî╪º┘å╪»╪º╪▓█î ┘ê╪▒┌⌐╪▒</h1>
+    <h1>⚙️ نصب و راه‌اندازی ورکر</h1>
     <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      ╪¿╪▒╪º█î ╪╣┘à┘ä┌⌐╪▒╪» ╪╡╪¡█î╪¡ ┘╛╪▒┘ê┌⌐╪│█î╪î ┘ê╪╢╪╣█î╪¬ ┘à╪¬╪║█î╪▒┘ç╪º█î ╪▓█î╪▒ ╪▒╪º ╪»╪▒ ╪¬┘å╪╕█î┘à╪º╪¬ ┌⌐┘ä╪º╪»┘ü┘ä╪▒ ╪¿╪▒╪▒╪│█î ┌⌐┘å█î╪».
+      برای عملکرد صحیح پروکسی، وضعیت متغیرهای زیر را در تنظیمات کلادفلر بررسی کنید.
     </p>
 
     <div class="status-box">
       <!-- KV Check -->
       <div class="item">
         <div>
-          <div class="item-title">┘ü╪╢╪º█î ╪░╪«█î╪▒┘çΓÇî╪│╪º╪▓█î KV <span class="code">nahan</span></div>
-          <div class="desc">╪¿╪▒╪º█î ╪░╪«█î╪▒┘ç ╪¬┘å╪╕█î┘à╪º╪¬ ┘╛┘å┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬. ╪»╪▒ ╪¿╪«╪┤ Bindings ┌⌐┘ä╪º╪»┘ü┘ä╪▒ █î┌⌐ KV ╪¿╪│╪º╪▓█î╪» ┘ê ┘å╪º┘à ╪ó┘å ╪▒╪º ╪»┘é█î┘é╪º┘ï <span class="code">nahan</span> ╪¿┌»╪░╪º╪▒█î╪».</div>
+          <div class="item-title">فضای ذخیره‌سازی KV <span class="code">nahan</span></div>
+          <div class="desc">برای ذخیره تنظیمات پنل الزامی است. در بخش Bindings کلادفلر یک KV بسازید و نام آن را دقیقاً <span class="code">nahan</span> بگذارید.</div>
         </div>
-        <div class="badge ${hasKV ? 'ok' : 'fail'}">${hasKV ? '┘à╪¬╪╡┘ä ╪┤╪» Γ£à' : '┘à╪¬╪╡┘ä ┘å█î╪│╪¬ Γ¥î'}</div>
+        <div class="badge ${hasKV ? 'ok' : 'fail'}">${hasKV ? 'متصل شد ✅' : 'متصل نیست ❌'}</div>
       </div>
       
       <!-- Password Check -->
       <div class="item">
         <div>
-          <div class="item-title">╪▒┘à╪▓ ╪╣╪¿┘ê╪▒ ╪º╪»┘à█î┘å <span class="code">PASSWORD</span></div>
-          <div class="desc">╪¿╪▒╪º█î ╪º┘à┘å█î╪¬ ┘╛┘å┘ä ╪º┘ä╪▓╪º┘à█î ╪º╪│╪¬. █î┌⌐ ┘à╪¬╪║█î╪▒ ┘à╪¡█î╪╖█î ╪¿┘ç ┘å╪º┘à <span class="code">PASSWORD</span> ╪»╪▒ ┌⌐┘ä╪º╪»┘ü┘ä╪▒ ╪¿╪│╪º╪▓█î╪».</div>
+          <div class="item-title">رمز عبور ادمین <span class="code">PASSWORD</span></div>
+          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PASSWORD</span> در کلادفلر بسازید.</div>
         </div>
-        <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? '╪¬┘å╪╕█î┘à ╪┤╪»┘ç Γ£à' : '╪¬┘å╪╕█î┘à ┘å╪┤╪»┘ç Γ¥î'}</div>
+        <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
 
       <!-- UUID Check -->
       <div class="item">
         <div>
-          <div class="item-title">╪┤┘å╪º╪│┘ç ┌⌐╪º╪▒╪¿╪▒ <span class="code">UUID</span></div>
-          <div class="desc">╪┤┘à╪º ╪¿╪º█î╪» █î┌⌐ UUID ┘à╪╣╪¬╪¿╪▒ (┘à╪¬╪║█î╪▒ ┘à╪¡█î╪╖█î <span class="code">UUID</span>) ╪»╪▒ ┌⌐┘ä╪º╪»┘ü┘ä╪▒ ╪¬┘å╪╕█î┘à ┌⌐┘å█î╪». ${currentUUID ? `┘à┘é╪»╪º╪▒ ┘ü╪╣┘ä█î: <span class="code">${currentUUID}</span>` : ''}</div>
+          <div class="item-title">شناسه کاربر <span class="code">UUID</span></div>
+          <div class="desc">شما باید یک UUID معتبر (متغیر محیطی <span class="code">UUID</span>) در کلادفلر تنظیم کنید. ${currentUUID ? `مقدار فعلی: <span class="code">${currentUUID}</span>` : ''}</div>
         </div>
-        <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? '╪¬┘å╪╕█î┘à ╪┤╪»┘ç Γ£à' : '╪¬┘å╪╕█î┘à ┘å╪┤╪»┘ç Γ¥î'}</div>
+        <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
 
       <!-- Trojan Pass Check -->
       <div class="item">
         <div>
-          <div class="item-title">╪▒┘à╪▓ ╪╣╪¿┘ê╪▒ ╪¬╪▒┘ê╪¼╪º┘å <span class="code">TR_PASS</span></div>
-          <div class="desc">╪▒┘à╪▓ ╪¬╪▒┘ê╪¼╪º┘å ╪º╪¼╪¿╪º╪▒█î ╪º╪│╪¬ (┘à╪¬╪║█î╪▒ ┘à╪¡█î╪╖█î <span class="code">TR_PASS</span>). ╪¿╪▒╪º█î ╪¼┘ä┘ê┌»█î╪▒█î ╪º╪▓ ╪┤┘å╪º╪│╪º█î█î ╪┤╪»┘å ╪¬┘ê╪│╪╖ ┌⌐┘ä╪º╪»┘ü┘ä╪▒ ╪¿╪º█î╪» ╪¿╪º UUID ┘à╪¬┘ü╪º┘ê╪¬ ╪¿╪º╪┤╪».</div>
+          <div class="item-title">رمز عبور تروجان <span class="code">TR_PASS</span></div>
+          <div class="desc">رمز تروجان اجباری است (متغیر محیطی <span class="code">TR_PASS</span>). برای جلوگیری از شناسایی شدن توسط کلادفلر باید با UUID متفاوت باشد.</div>
         </div>
-        <div class="badge ${hasTrPass ? 'ok' : 'fail'}">${hasTrPass ? '╪¬┘å╪╕█î┘à ╪┤╪»┘ç Γ£à' : '╪¬┘å╪╕█î┘à ┘å╪┤╪»┘ç Γ¥î'}</div>
+        <div class="badge ${hasTrPass ? 'ok' : 'fail'}">${hasTrPass ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
 
       <!-- Proxy IP Check -->
       <div class="item">
         <div>
-          <div class="item-title">╪ó█îΓÇî┘╛█î ┘╛╪▒┘ê┌⌐╪│█î <span class="code">PROXYIP</span></div>
-          <div class="desc">┘à┘é╪»╪º╪▒ ┘ü╪╣┘ä█î: ${currentProxyIP ? '<span class="code">'+currentProxyIP+'</span>' : '┘å╪»╪º╪▒╪»'}. ┘à╪¬╪║█î╪▒ ┘à╪¡█î╪╖█î <span class="code">PROXYIP</span> ╪¿╪▒╪º█î ╪»┘ê╪▒ ╪▓╪»┘å ┘à╪¡╪»┘ê╪»█î╪¬ ╪¿╪▒╪«█î ╪│╪º█î╪¬ΓÇî┘ç╪º.</div>
+          <div class="item-title">آی‌پی پروکسی <span class="code">PROXYIP</span></div>
+          <div class="desc">مقدار فعلی: ${currentProxyIP ? '<span class="code">'+currentProxyIP+'</span>' : 'ندارد'}. متغیر محیطی <span class="code">PROXYIP</span> برای دور زدن محدودیت برخی سایت‌ها.</div>
         </div>
-        <div class="badge info">╪º╪«╪¬█î╪º╪▒█î Γä╣∩╕Å</div>
+        <div class="badge info">اختیاری ℹ️</div>
       </div>
     </div>
 
     ${allGood ? `
     <div class="links-box">
-      <h3>Γ£à ╪│█î╪│╪¬┘à ┌⌐╪º┘à┘ä╪º┘ï ╪ó┘à╪º╪»┘ç ╪º╪│╪¬!</h3>
+      <h3>✅ سیستم کاملاً آماده است!</h3>
       <div class="desc" style="color:var(--text);">
-        ╪º╪▓ ╪º█î┘å ┘╛╪│ ╪¿╪º ╪¿╪º╪▓ ┌⌐╪▒╪»┘å ╪ó╪»╪▒╪│ ╪º╪╡┘ä█î ┘ê╪▒┌⌐╪▒╪î ╪╡┘ü╪¡┘ç ╪¼╪╣┘ä█î Nginx ╪▒╪º ╪«┘ê╪º┘ç█î╪» ╪»█î╪» ╪¬╪º ╪º╪│╪¬╪¬╪º╪▒ ╪¡┘ü╪╕ ╪┤┘ê╪».<br><br>
-        ≡ƒöù <strong>╪ó╪»╪▒╪│ ┘ê╪▒┘ê╪» ╪¿┘ç ┘╛┘å┘ä ╪┤┘à╪º:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}</span><br><br>
-        ≡ƒöù <strong>╪ó╪»╪▒╪│ ┘ä█î┘å┌⌐ ╪│╪º╪¿╪│┌⌐╪▒╪º█î┘╛ ╪┤┘à╪º:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}/sub</span><br>
+        از این پس با باز کردن آدرس اصلی ورکر، صفحه جعلی Nginx را خواهید دید تا استتار حفظ شود.<br><br>
+        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}</span><br><br>
+        🔗 <strong>آدرس لینک سابسکرایپ شما:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}/sub</span><br>
       </div>
     </div>
     ` : `
     <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      ΓÜá∩╕Å ╪¬╪º ╪▓┘à╪º┘å█î ┌⌐┘ç ┘à┘ê╪º╪▒╪» ╪º┘ä╪▓╪º┘à█î (KV ┘ê Password) ╪▒╪º ╪¬┘å╪╕█î┘à ┘å┌⌐┘å█î╪»╪î ╪º┘à┘å█î╪¬ ┘ê ╪╣┘à┘ä┌⌐╪▒╪» ┘╛╪▒┘ê┌⌐╪│█î ╪┤┘à╪º ┌⌐╪º┘à┘ä ┘å╪«┘ê╪º┘ç╪» ╪¿┘ê╪»!
+      ⚠️ تا زمانی که موارد الزامی (KV و Password) را تنظیم نکنید، امنیت و عملکرد پروکسی شما کامل نخواهد بود!
     </div>
     `}
   </div>
 </body>
 </html>`;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   const subLink = `https://${hostname}/${user.id}/sub`;
