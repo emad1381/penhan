@@ -259,13 +259,13 @@ function loginPage(uuid, host) {
 </html>`;
 }
 
-function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, currentTrojanPath) {
+function subscriptionPage(hostname, uuid, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath) {
   const addr = currentCleanIP || hostname;
   const vlessPath = currentVlessPath || '/?ed=2048';
   const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
 
   const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${uuid}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
+  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
   
   const subLink = `https://${hostname}/${uuid}/sub`;
 
@@ -786,14 +786,14 @@ function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, curr
 </html>`;
 }
 
-function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, hasPass, cfColo = 'N/A', tlsVersion = 'N/A') {
+function panelPage(hostname, uuid, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, hasPass, cfColo = 'N/A', tlsVersion = 'N/A') {
   const addr = currentCleanIP || hostname;
   
   const vlessPath = currentVlessPath || '/?ed=2048';
   const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
 
   const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${uuid}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
+  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
 
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -1504,6 +1504,26 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
         <div class="field-status" id="statusPass">${hasPass ? '🔒 پنل دارای رمز عبور است' : '🔓 پنل بدون رمز عبور'}</div>
       </div>
 
+      <!-- UUID Config -->
+      <div class="field-card">
+        <div class="field-label">🔑 شناسه کاربر (UUID)</div>
+        <div class="field-desc">شناسه یکتای اتصال برای کاربر. دقت کنید با تغییر این شناسه، آدرس ورود به پنل شما تغییر می‌کند.</div>
+        <div class="field-input-group">
+          <input type="text" class="field-input" id="inputUUID" placeholder="مثال: 86c50e3a-..." value="${uuid}">
+          <button class="btn-save" id="btnUUID" onclick="saveUUID()">ذخیره</button>
+        </div>
+      </div>
+
+      <!-- Trojan Pass Config -->
+      <div class="field-card">
+        <div class="field-label">🔐 رمز عبور تروجان (TR_PASS)</div>
+        <div class="field-desc">رمز عبور مورد استفاده برای اتصال از طریق پروتکل تروجان.</div>
+        <div class="field-input-group">
+          <input type="text" class="field-input" id="inputTrPass" placeholder="رمز جدید تروجان" value="${currentTrPass}">
+          <button class="btn-save" id="btnTrPass" onclick="saveTrPass()">ذخیره</button>
+        </div>
+      </div>
+
       <!-- VLESS WS Path Config -->
       <div class="field-card">
         <div class="field-label">🛤️ مسیر اختصاصی VLESS WebSocket (Obfuscated Path)</div>
@@ -1670,6 +1690,56 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
       }
     }
 
+    async function saveUUID() {
+      const val = document.getElementById('inputUUID').value.trim();
+      const btn = document.getElementById('btnUUID');
+      
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(bp + '/save-uuid', { method: 'POST', body: val });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('✅ شناسه کاربر با موفقیت تغییر کرد، در حال انتقال...');
+          setTimeout(() => {
+            window.location.href = '/' + val;
+          }, 1500);
+        } else {
+          showToast('❌ UUID وارد شده نامعتبر است', true);
+        }
+      } catch(e) {
+        showToast('❌ خطا در ارتباط با سرور', true);
+      } finally {
+        btn.textContent = 'ذخیره';
+        btn.disabled = false;
+      }
+    }
+
+    async function saveTrPass() {
+      const val = document.getElementById('inputTrPass').value.trim();
+      const btn = document.getElementById('btnTrPass');
+      
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(bp + '/save-trpass', { method: 'POST', body: val });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('✅ رمز تروجان با موفقیت تغییر کرد');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          showToast('❌ خطایی رخ داد', true);
+        }
+      } catch(e) {
+        showToast('❌ خطا در ارتباط با سرور', true);
+      } finally {
+        btn.textContent = 'ذخیره';
+        btn.disabled = false;
+      }
+    }
+
     async function saveTrojanPath() {
       const val = document.getElementById('inputTrojanPath').value.trim();
       const btn = document.getElementById('btnTrojanPath');
@@ -1709,7 +1779,7 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
       if (trojanPathInput && !trojanPathInput.startsWith('/')) trojanPathInput = '/' + trojanPathInput;
 
       const vlessWS = 'vless://' + uu + '@' + addr + ':443?encryption=none&security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(vlessPathInput) + '#VLESS-WS-' + host;
-      const trojanWS = 'trojan://' + uu + '@' + addr + ':443?security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(trojanPathInput) + '#Trojan-WS-' + host;
+      const trojanWS = 'trojan://${currentTrPass}@' + addr + ':443?security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(trojanPathInput) + '#Trojan-WS-' + host;
 
       document.getElementById('link-vlessWS').textContent = vlessWS;
       document.getElementById('link-trojanWS').textContent = trojanWS;
@@ -1801,8 +1871,8 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
 
 
 
-function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
-  const allGood = hasKV && hasPassword;
+function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentProxyIP) {
+  const allGood = hasKV && hasPassword && hasUUID && hasTrPass;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -1866,7 +1936,7 @@ function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
       <div class="item">
         <div>
           <div class="item-title">رمز عبور ادمین <span class="code">PASSWORD</span></div>
-          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی (Environment Variable) به نام <span class="code">PASSWORD</span> در کلادفلر بسازید.</div>
+          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PASSWORD</span> در کلادفلر بسازید.</div>
         </div>
         <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
@@ -1875,9 +1945,18 @@ function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
       <div class="item">
         <div>
           <div class="item-title">شناسه کاربر <span class="code">UUID</span></div>
-          <div class="desc">شناسه فعلی شما: <span class="code">${currentUUID}</span>. برای تغییر آن می‌توانید متغیر محیطی <span class="code">UUID</span> را تغییر دهید.</div>
+          <div class="desc">شما باید یک UUID معتبر (متغیر محیطی <span class="code">UUID</span>) در کلادفلر تنظیم کنید. ${currentUUID ? `مقدار فعلی: <span class="code">${currentUUID}</span>` : ''}</div>
         </div>
-        <div class="badge info">اختیاری ℹ️</div>
+        <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
+      </div>
+
+      <!-- Trojan Pass Check -->
+      <div class="item">
+        <div>
+          <div class="item-title">رمز عبور تروجان <span class="code">TR_PASS</span></div>
+          <div class="desc">رمز تروجان اجباری است (متغیر محیطی <span class="code">TR_PASS</span>). برای جلوگیری از شناسایی شدن توسط کلادفلر باید با UUID متفاوت باشد.</div>
+        </div>
+        <div class="badge ${hasTrPass ? 'ok' : 'fail'}">${hasTrPass ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
 
       <!-- Proxy IP Check -->

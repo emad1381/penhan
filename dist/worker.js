@@ -592,7 +592,7 @@ function processTrojanHeader(buffer, trojanPasswordHash) {
     isUDP
   };
 }
-async function trojanOverWSHandler(request, userID, proxyIP) {
+async function trojanOverWSHandler(request, trojanPass, proxyIP) {
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
   webSocket.accept();
@@ -631,7 +631,7 @@ async function trojanOverWSHandler(request, userID, proxyIP) {
           return;
         }
       }
-      const trojanPasswordHash = sha224_and_224(userID, true);
+      const trojanPasswordHash = sha224_and_224(trojanPass, true);
       const {
         hasError,
         message,
@@ -950,12 +950,12 @@ function loginPage(uuid, host) {
 </body>
 </html>`;
 }
-function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, currentTrojanPath) {
+function subscriptionPage(hostname, uuid, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath) {
   const addr = currentCleanIP || hostname;
   const vlessPath = currentVlessPath || "/?ed=2048";
   const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
   const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${uuid}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
+  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
   const subLink = `https://${hostname}/${uuid}/sub`;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -1473,12 +1473,12 @@ function subscriptionPage(hostname, uuid, currentCleanIP, currentVlessPath, curr
 </body>
 </html>`;
 }
-function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, hasPass, cfColo = "N/A", tlsVersion = "N/A") {
+function panelPage(hostname, uuid, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, hasPass, cfColo = "N/A", tlsVersion = "N/A") {
   const addr = currentCleanIP || hostname;
   const vlessPath = currentVlessPath || "/?ed=2048";
   const trojanPath = currentTrojanPath || `/${uuid}/trojan-ws`;
   const vlessWS = `vless://${uuid}@${addr}:443?encryption=none&security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${hostname}`;
-  const trojanWS = `trojan://${uuid}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
+  const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${hostname}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${hostname}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${hostname}`;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -2188,6 +2188,26 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
         <div class="field-status" id="statusPass">${hasPass ? "\u{1F512} \u067E\u0646\u0644 \u062F\u0627\u0631\u0627\u06CC \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0633\u062A" : "\u{1F513} \u067E\u0646\u0644 \u0628\u062F\u0648\u0646 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631"}</div>
       </div>
 
+      <!-- UUID Config -->
+      <div class="field-card">
+        <div class="field-label">\u{1F511} \u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 (UUID)</div>
+        <div class="field-desc">\u0634\u0646\u0627\u0633\u0647 \u06CC\u06A9\u062A\u0627\u06CC \u0627\u062A\u0635\u0627\u0644 \u0628\u0631\u0627\u06CC \u06A9\u0627\u0631\u0628\u0631. \u062F\u0642\u062A \u06A9\u0646\u06CC\u062F \u0628\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u0627\u06CC\u0646 \u0634\u0646\u0627\u0633\u0647\u060C \u0622\u062F\u0631\u0633 \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0634\u0645\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u0645\u06CC\u200C\u06A9\u0646\u062F.</div>
+        <div class="field-input-group">
+          <input type="text" class="field-input" id="inputUUID" placeholder="\u0645\u062B\u0627\u0644: 86c50e3a-..." value="${uuid}">
+          <button class="btn-save" id="btnUUID" onclick="saveUUID()">\u0630\u062E\u06CC\u0631\u0647</button>
+        </div>
+      </div>
+
+      <!-- Trojan Pass Config -->
+      <div class="field-card">
+        <div class="field-label">\u{1F510} \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062A\u0631\u0648\u062C\u0627\u0646 (TR_PASS)</div>
+        <div class="field-desc">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0645\u0648\u0631\u062F \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0628\u0631\u0627\u06CC \u0627\u062A\u0635\u0627\u0644 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u067E\u0631\u0648\u062A\u06A9\u0644 \u062A\u0631\u0648\u062C\u0627\u0646.</div>
+        <div class="field-input-group">
+          <input type="text" class="field-input" id="inputTrPass" placeholder="\u0631\u0645\u0632 \u062C\u062F\u06CC\u062F \u062A\u0631\u0648\u062C\u0627\u0646" value="${currentTrPass}">
+          <button class="btn-save" id="btnTrPass" onclick="saveTrPass()">\u0630\u062E\u06CC\u0631\u0647</button>
+        </div>
+      </div>
+
       <!-- VLESS WS Path Config -->
       <div class="field-card">
         <div class="field-label">\u{1F6E4}\uFE0F \u0645\u0633\u06CC\u0631 \u0627\u062E\u062A\u0635\u0627\u0635\u06CC VLESS WebSocket (Obfuscated Path)</div>
@@ -2354,6 +2374,56 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
       }
     }
 
+    async function saveUUID() {
+      const val = document.getElementById('inputUUID').value.trim();
+      const btn = document.getElementById('btnUUID');
+      
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(bp + '/save-uuid', { method: 'POST', body: val });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('\u2705 \u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F\u060C \u062F\u0631 \u062D\u0627\u0644 \u0627\u0646\u062A\u0642\u0627\u0644...');
+          setTimeout(() => {
+            window.location.href = '/' + val;
+          }, 1500);
+        } else {
+          showToast('\u274C UUID \u0648\u0627\u0631\u062F \u0634\u062F\u0647 \u0646\u0627\u0645\u0639\u062A\u0628\u0631 \u0627\u0633\u062A', true);
+        }
+      } catch(e) {
+        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
+      } finally {
+        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
+        btn.disabled = false;
+      }
+    }
+
+    async function saveTrPass() {
+      const val = document.getElementById('inputTrPass').value.trim();
+      const btn = document.getElementById('btnTrPass');
+      
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(bp + '/save-trpass', { method: 'POST', body: val });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('\u2705 \u0631\u0645\u0632 \u062A\u0631\u0648\u062C\u0627\u0646 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          showToast('\u274C \u062E\u0637\u0627\u06CC\u06CC \u0631\u062E \u062F\u0627\u062F', true);
+        }
+      } catch(e) {
+        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', true);
+      } finally {
+        btn.textContent = '\u0630\u062E\u06CC\u0631\u0647';
+        btn.disabled = false;
+      }
+    }
+
     async function saveTrojanPath() {
       const val = document.getElementById('inputTrojanPath').value.trim();
       const btn = document.getElementById('btnTrojanPath');
@@ -2393,7 +2463,7 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
       if (trojanPathInput && !trojanPathInput.startsWith('/')) trojanPathInput = '/' + trojanPathInput;
 
       const vlessWS = 'vless://' + uu + '@' + addr + ':443?encryption=none&security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(vlessPathInput) + '#VLESS-WS-' + host;
-      const trojanWS = 'trojan://' + uu + '@' + addr + ':443?security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(trojanPathInput) + '#Trojan-WS-' + host;
+      const trojanWS = 'trojan://${currentTrPass}@' + addr + ':443?security=tls&sni=' + host + '&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=' + host + '&path=' + encodeURIComponent(trojanPathInput) + '#Trojan-WS-' + host;
 
       document.getElementById('link-vlessWS').textContent = vlessWS;
       document.getElementById('link-trojanWS').textContent = trojanWS;
@@ -2481,8 +2551,8 @@ function panelPage(hostname, uuid, currentCleanIP, currentProxyIP, currentVlessP
 </body>
 </html>`;
 }
-function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
-  const allGood = hasKV && hasPassword;
+function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentProxyIP) {
+  const allGood = hasKV && hasPassword && hasUUID && hasTrPass;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -2546,7 +2616,7 @@ function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
       <div class="item">
         <div>
           <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PASSWORD</span></div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC (Environment Variable) \u0628\u0647 \u0646\u0627\u0645 <span class="code">PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.</div>
+          <div class="desc">\u0628\u0631\u0627\u06CC \u0627\u0645\u0646\u06CC\u062A \u067E\u0646\u0644 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0647 \u0646\u0627\u0645 <span class="code">PASSWORD</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.</div>
         </div>
         <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
@@ -2555,9 +2625,18 @@ function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
       <div class="item">
         <div>
           <div class="item-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
-          <div class="desc">\u0634\u0646\u0627\u0633\u0647 \u0641\u0639\u0644\u06CC \u0634\u0645\u0627: <span class="code">${currentUUID}</span>. \u0628\u0631\u0627\u06CC \u062A\u063A\u06CC\u06CC\u0631 \u0622\u0646 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">UUID</span> \u0631\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u062F\u0647\u06CC\u062F.</div>
+          <div class="desc">\u0634\u0645\u0627 \u0628\u0627\u06CC\u062F \u06CC\u06A9 UUID \u0645\u0639\u062A\u0628\u0631 (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">UUID</span>) \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F. ${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="code">${currentUUID}</span>` : ""}</div>
         </div>
-        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2139\uFE0F</div>
+        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
+      </div>
+
+      <!-- Trojan Pass Check -->
+      <div class="item">
+        <div>
+          <div class="item-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062A\u0631\u0648\u062C\u0627\u0646 <span class="code">TR_PASS</span></div>
+          <div class="desc">\u0631\u0645\u0632 \u062A\u0631\u0648\u062C\u0627\u0646 \u0627\u062C\u0628\u0627\u0631\u06CC \u0627\u0633\u062A (\u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC <span class="code">TR_PASS</span>). \u0628\u0631\u0627\u06CC \u062C\u0644\u0648\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u0634\u0646\u0627\u0633\u0627\u06CC\u06CC \u0634\u062F\u0646 \u062A\u0648\u0633\u0637 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0627\u06CC\u062F \u0628\u0627 UUID \u0645\u062A\u0641\u0627\u0648\u062A \u0628\u0627\u0634\u062F.</div>
+        </div>
+        <div class="badge ${hasTrPass ? "ok" : "fail"}">${hasTrPass ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647 \u2705" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 \u274C"}</div>
       </div>
 
       <!-- Proxy IP Check -->
@@ -2590,32 +2669,33 @@ function setupPage(hasKV, hasPassword, currentUUID, currentProxyIP) {
 }
 
 // src/index.js
-var defaultUserID = "86c50e3a-5b87-49dd-bd20-03c7f2735e40";
 var rateLimitMap = /* @__PURE__ */ new Map();
-if (!isValidUUID(defaultUserID)) {
-  throw new Error("uuid is not valid");
-}
 var src_default = {
   async fetch(request, env, ctx) {
     try {
-      const currentUserID = env.UUID || defaultUserID;
       let savedProxyIP = "";
       let savedCleanIP = "";
       let savedPass = "";
       let savedVlessPath = "";
       let savedTrojanPath = "";
+      let savedUUID = "";
+      let savedTrPass = "";
       if (env.nahan) {
         savedProxyIP = await env.nahan.get("proxy_ip") || "";
         savedCleanIP = await env.nahan.get("clean_ip") || "";
         savedPass = await env.nahan.get("panel_pass") || "";
         savedVlessPath = await env.nahan.get("vless_ws_path") || "";
         savedTrojanPath = await env.nahan.get("trojan_ws_path") || "";
+        savedUUID = await env.nahan.get("uuid") || "";
+        savedTrPass = await env.nahan.get("tr_pass") || "";
       }
       let currentProxyIP = savedProxyIP || env.PROXYIP || "";
       let currentCleanIP = savedCleanIP || "";
       let currentPanelPass = savedPass || env.PASSWORD || "";
       let currentVlessPath = savedVlessPath || "";
       let currentTrojanPath = savedTrojanPath || "";
+      let currentUserID = savedUUID || env.UUID || "";
+      let currentTrPass = savedTrPass || env.TR_PASS || "";
       const upgradeHeader = request.headers.get("Upgrade");
       const url = new URL(request.url);
       const path = url.pathname;
@@ -2623,7 +2703,7 @@ var src_default = {
         const decodedPath = decodeURIComponent(path).toLowerCase();
         const isTrojan = currentTrojanPath ? decodedPath.includes(decodeURIComponent(currentTrojanPath).toLowerCase()) : decodedPath.includes("trojan-ws") || decodedPath.includes("trojan");
         if (isTrojan) {
-          return await trojanOverWSHandler(request, currentUserID, currentProxyIP);
+          return await trojanOverWSHandler(request, currentTrPass, currentProxyIP);
         } else {
           return await vlessOverWSHandler(request, currentUserID, currentProxyIP);
         }
@@ -2631,14 +2711,16 @@ var src_default = {
       if (path === "/") {
         const hasKV = !!env.nahan;
         const hasPassword = !!currentPanelPass;
+        const hasUUID = !!currentUserID && isValidUUID(currentUserID);
+        const hasTrPass = !!currentTrPass;
         let showSetup = false;
-        if (!hasKV || !hasPassword) {
+        if (!hasKV || !hasPassword || !hasUUID || !hasTrPass) {
           showSetup = true;
         } else if (hasPassword && await isAuthed(request, currentPanelPass)) {
           showSetup = true;
         }
         if (showSetup) {
-          return new Response(setupPage(hasKV, hasPassword, currentUserID, currentProxyIP), {
+          return new Response(setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUserID, currentProxyIP), {
             status: 200,
             headers: { "Content-Type": "text/html; charset=utf-8" }
           });
@@ -2658,7 +2740,7 @@ var src_default = {
         }
         const cfColo = request.cf ? request.cf.colo : "N/A";
         const tlsVersion = request.cf ? request.cf.tlsVersion : "N/A";
-        return new Response(panelPage(host, currentUserID, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, !!currentPanelPass, cfColo, tlsVersion), {
+        return new Response(panelPage(host, currentUserID, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, !!currentPanelPass, cfColo, tlsVersion), {
           status: 200,
           headers: { "Content-Type": "text/html; charset=utf-8" }
         });
@@ -2672,7 +2754,7 @@ var src_default = {
           const vlessPath = currentVlessPath || "/?ed=2048";
           const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
           const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-          const trojanWS = `trojan://${currentUserID}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
+          const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
           const plainConfigs = `${vlessWS}
 ${trojanWS}
 `;
@@ -2685,7 +2767,7 @@ ${trojanWS}
             }
           });
         } else {
-          return new Response(subscriptionPage(host, currentUserID, currentCleanIP, currentVlessPath, currentTrojanPath), {
+          return new Response(subscriptionPage(host, currentUserID, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath), {
             status: 200,
             headers: {
               "Content-Type": "text/html; charset=utf-8",
@@ -2706,7 +2788,7 @@ ${trojanWS}
         const vlessPath = currentVlessPath || "/?ed=2048";
         const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
         const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-        const trojanWS = `trojan://${currentUserID}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
+        const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
         const subWS = `https://${host}/${currentUserID}/sub`;
         return new Response(JSON.stringify({
           ok: true,
@@ -2786,6 +2868,22 @@ ${trojanWS}
           if (env.nahan)
             await env.nahan.put("panel_pass", val, { expirationTtl: 31536e3 });
         }
+        if (body.uuid !== void 0) {
+          const val = body.uuid.trim();
+          if (isValidUUID(val)) {
+            currentUserID = val;
+            if (env.nahan)
+              await env.nahan.put("uuid", val, { expirationTtl: 31536e3 });
+          }
+        }
+        if (body.tr_pass !== void 0) {
+          const val = body.tr_pass.trim();
+          if (val) {
+            currentTrPass = val;
+            if (env.nahan)
+              await env.nahan.put("tr_pass", val, { expirationTtl: 31536e3 });
+          }
+        }
         return new Response(JSON.stringify({
           ok: true,
           message: "Settings updated successfully",
@@ -2794,7 +2892,9 @@ ${trojanWS}
             proxyIP: currentProxyIP || null,
             vlessPath: currentVlessPath || "/?ed=2048",
             trojanPath: currentTrojanPath || `/${currentUserID}/trojan-ws`,
-            hasPassword: !!currentPanelPass
+            hasPassword: !!currentPanelPass,
+            uuid: currentUserID,
+            tr_pass: currentTrPass
           }
         }), {
           status: 200,
@@ -2912,6 +3012,40 @@ ${trojanWS}
           await env.nahan.put("trojan_ws_path", newPath, { expirationTtl: 31536e3 });
         }
         return new Response(JSON.stringify({ ok: true, path: newPath }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      if (path === "/" + currentUserID + "/save-uuid") {
+        if (request.method !== "POST")
+          return new Response("Method Not Allowed", { status: 405 });
+        if (!isApiAuthed(request, currentPanelPass, currentUserID))
+          return new Response("Unauthorized", { status: 401 });
+        const body = (await request.text()).trim();
+        if (!isValidUUID(body)) {
+          return new Response(JSON.stringify({ ok: false, error: "Invalid UUID" }), { status: 400 });
+        }
+        if (env.nahan) {
+          await env.nahan.put("uuid", body, { expirationTtl: 31536e3 });
+        }
+        return new Response(JSON.stringify({ ok: true, uuid: body }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      }
+      if (path === "/" + currentUserID + "/save-trpass") {
+        if (request.method !== "POST")
+          return new Response("Method Not Allowed", { status: 405 });
+        if (!isApiAuthed(request, currentPanelPass, currentUserID))
+          return new Response("Unauthorized", { status: 401 });
+        const body = (await request.text()).trim();
+        if (!body) {
+          return new Response(JSON.stringify({ ok: false, error: "Password required" }), { status: 400 });
+        }
+        if (env.nahan) {
+          await env.nahan.put("tr_pass", body, { expirationTtl: 31536e3 });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
         });

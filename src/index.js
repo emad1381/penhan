@@ -7,12 +7,7 @@ import { trojanOverWSHandler } from './trojan.js';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';
 
 // ============ تنظیمات ============
-const defaultUserID = '86c50e3a-5b87-49dd-bd20-03c7f2735e40';
 const rateLimitMap = new Map();
-
-if (!isValidUUID(defaultUserID)) {
-  throw new Error('uuid is not valid');
-}
 
 const WS_READY_STATE_OPEN = 1;
 const WS_READY_STATE_CLOSING = 2;
@@ -21,26 +16,32 @@ const WS_READY_STATE_CLOSING = 2;
 export default {
   async fetch(request, env, ctx) {
     try {
-      const currentUserID = env.UUID || defaultUserID;
-
       // بارگذاری از KV (nahan)
       let savedProxyIP = '';
       let savedCleanIP = '';
       let savedPass = '';
       let savedVlessPath = '';
       let savedTrojanPath = '';
+      let savedUUID = '';
+      let savedTrPass = '';
+      
       if (env.nahan) {
         savedProxyIP    = (await env.nahan.get('proxy_ip')) || '';
         savedCleanIP    = (await env.nahan.get('clean_ip')) || '';
         savedPass       = (await env.nahan.get('panel_pass')) || '';
         savedVlessPath  = (await env.nahan.get('vless_ws_path')) || '';
         savedTrojanPath = (await env.nahan.get('trojan_ws_path')) || '';
+        savedUUID       = (await env.nahan.get('uuid')) || '';
+        savedTrPass     = (await env.nahan.get('tr_pass')) || '';
       }
+      
       let currentProxyIP    = savedProxyIP || env.PROXYIP || '';
       let currentCleanIP    = savedCleanIP || '';
       let currentPanelPass  = savedPass || env.PASSWORD || '';
       let currentVlessPath  = savedVlessPath || '';
       let currentTrojanPath = savedTrojanPath || '';
+      let currentUserID     = savedUUID || env.UUID || '';
+      let currentTrPass     = savedTrPass || env.TR_PASS || '';
 
       const upgradeHeader = request.headers.get('Upgrade');
       const url = new URL(request.url);
@@ -56,7 +57,7 @@ export default {
           : (decodedPath.includes('trojan-ws') || decodedPath.includes('trojan'));
 
         if (isTrojan) {
-          return await trojanOverWSHandler(request, currentUserID, currentProxyIP);
+          return await trojanOverWSHandler(request, currentTrPass, currentProxyIP);
         } else {
           return await vlessOverWSHandler(request, currentUserID, currentProxyIP);
         }
@@ -67,16 +68,18 @@ export default {
       if (path === '/') {
         const hasKV = !!env.nahan;
         const hasPassword = !!currentPanelPass;
+        const hasUUID = !!currentUserID && isValidUUID(currentUserID);
+        const hasTrPass = !!currentTrPass;
         
         let showSetup = false;
-        if (!hasKV || !hasPassword) {
+        if (!hasKV || !hasPassword || !hasUUID || !hasTrPass) {
           showSetup = true;
         } else if (hasPassword && (await isAuthed(request, currentPanelPass))) {
           showSetup = true;
         }
 
         if (showSetup) {
-          return new Response(setupPage(hasKV, hasPassword, currentUserID, currentProxyIP), {
+          return new Response(setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUserID, currentProxyIP), {
             status: 200,
             headers: { 'Content-Type': 'text/html; charset=utf-8' },
           });
@@ -99,7 +102,7 @@ export default {
         }
         const cfColo = request.cf ? request.cf.colo : 'N/A';
         const tlsVersion = request.cf ? request.cf.tlsVersion : 'N/A';
-        return new Response(panelPage(host, currentUserID, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, !!currentPanelPass, cfColo, tlsVersion), {
+        return new Response(panelPage(host, currentUserID, currentTrPass, currentCleanIP, currentProxyIP, currentVlessPath, currentTrojanPath, !!currentPanelPass, cfColo, tlsVersion), {
           status: 200,
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
         });
@@ -129,7 +132,7 @@ export default {
           const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
 
           const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-          const trojanWS = `trojan://${currentUserID}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
+          const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
 
           const plainConfigs = `${vlessWS}\n${trojanWS}\n`;
           const base64Configs = btoa(unescape(encodeURIComponent(plainConfigs)));
@@ -142,7 +145,7 @@ export default {
             }
           });
         } else {
-          return new Response(subscriptionPage(host, currentUserID, currentCleanIP, currentVlessPath, currentTrojanPath), {
+          return new Response(subscriptionPage(host, currentUserID, currentTrPass, currentCleanIP, currentVlessPath, currentTrojanPath), {
             status: 200,
             headers: {
               'Content-Type': 'text/html; charset=utf-8',
@@ -166,7 +169,7 @@ export default {
         const trojanPath = currentTrojanPath || `/${currentUserID}/trojan-ws`;
 
         const vlessWS = `vless://${currentUserID}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessPath)}#VLESS-WS-${host}`;
-        const trojanWS = `trojan://${currentUserID}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
+        const trojanWS = `trojan://${currentTrPass}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanPath)}#Trojan-WS-${host}`;
         const subWS = `https://${host}/${currentUserID}/sub`;
 
         return new Response(JSON.stringify({
@@ -244,6 +247,21 @@ export default {
           if (env.nahan) await env.nahan.put('panel_pass', val, { expirationTtl: 31536000 });
         }
 
+        if (body.uuid !== undefined) {
+          const val = body.uuid.trim();
+          if (isValidUUID(val)) {
+            currentUserID = val;
+            if (env.nahan) await env.nahan.put('uuid', val, { expirationTtl: 31536000 });
+          }
+        }
+        if (body.tr_pass !== undefined) {
+          const val = body.tr_pass.trim();
+          if (val) {
+            currentTrPass = val;
+            if (env.nahan) await env.nahan.put('tr_pass', val, { expirationTtl: 31536000 });
+          }
+        }
+
         return new Response(JSON.stringify({
           ok: true,
           message: "Settings updated successfully",
@@ -252,7 +270,9 @@ export default {
             proxyIP: currentProxyIP || null,
             vlessPath: currentVlessPath || '/?ed=2048',
             trojanPath: currentTrojanPath || `/${currentUserID}/trojan-ws`,
-            hasPassword: !!currentPanelPass
+            hasPassword: !!currentPanelPass,
+            uuid: currentUserID,
+            tr_pass: currentTrPass
           }
         }), {
           status: 200,
@@ -377,6 +397,42 @@ export default {
           await env.nahan.put('trojan_ws_path', newPath, { expirationTtl: 31536000 });
         }
         return new Response(JSON.stringify({ ok: true, path: newPath }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+
+      // POST: ذخیره UUID
+      if (path === '/' + currentUserID + '/save-uuid') {
+        if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+        if (!isApiAuthed(request, currentPanelPass, currentUserID)) return new Response('Unauthorized', { status: 401 });
+
+        const body = (await request.text()).trim();
+        if (!isValidUUID(body)) {
+           return new Response(JSON.stringify({ ok: false, error: 'Invalid UUID' }), { status: 400 });
+        }
+        if (env.nahan) {
+          await env.nahan.put('uuid', body, { expirationTtl: 31536000 });
+        }
+        return new Response(JSON.stringify({ ok: true, uuid: body }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+
+      // POST: ذخیره رمز تروجان
+      if (path === '/' + currentUserID + '/save-trpass') {
+        if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+        if (!isApiAuthed(request, currentPanelPass, currentUserID)) return new Response('Unauthorized', { status: 401 });
+
+        const body = (await request.text()).trim();
+        if (!body) {
+           return new Response(JSON.stringify({ ok: false, error: 'Password required' }), { status: 400 });
+        }
+        if (env.nahan) {
+          await env.nahan.put('tr_pass', body, { expirationTtl: 31536000 });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });

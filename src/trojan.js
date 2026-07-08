@@ -117,7 +117,7 @@ function processVlessHeader(vlessBuffer, userID) {
   };
 }
 
-async function trojanOverWSHandler(request, userID, proxyIP) {
+async function trojanOverWSHandler(request, trojanPass, proxyIP) {
   // @ts-ignore
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
@@ -164,7 +164,7 @@ async function trojanOverWSHandler(request, userID, proxyIP) {
         }
       }
 
-      const trojanPasswordHash = sha224_and_224(userID, true);
+      const trojanPasswordHash = sha224_and_224(trojanPass, true);
       const {
         hasError, message,
         portRemote = 443, addressRemote = '',
