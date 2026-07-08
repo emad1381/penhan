@@ -257,8 +257,8 @@ function loginPage(uuid, host) {
 </html>`;
 }
 
-function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentProxyIP) {
-  const allGood = hasKV && hasPassword && hasUUID && hasTrPass;
+function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
+  const allGood = hasD1 && hasPassword && hasUUID;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -305,24 +305,24 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
   <div class="container">
     <h1>⚙️ نصب و راه‌اندازی ورکر</h1>
     <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      برای عملکرد صحیح پروکسی، وضعیت متغیرهای زیر را در تنظیمات کلادفلر بررسی کنید.
+      برای عملکرد صحیح پروکسی، وضعیت متغیرها و دیتابیس را در تنظیمات کلادفلر بررسی کنید.
     </p>
 
     <div class="status-box">
-      <!-- KV Check -->
+      <!-- D1 Database Check -->
       <div class="item">
         <div>
-          <div class="item-title">فضای ذخیره‌سازی KV <span class="code">nahan</span></div>
-          <div class="desc">برای ذخیره تنظیمات پنل الزامی است. در بخش Bindings کلادفلر یک KV بسازید و نام آن را دقیقاً <span class="code">nahan</span> بگذارید.</div>
+          <div class="item-title">دیتابیس Cloudflare D1</div>
+          <div class="desc">برای ذخیره‌سازی کاربران و تنظیمات سیستم الزامی است. در بخش Bindings کلادفلر یک دیتابیس D1 اضافه کنید و نام بایندینگ آن را دقیقاً <span class="code">DB</span> بگذارید.</div>
         </div>
-        <div class="badge ${hasKV ? 'ok' : 'fail'}">${hasKV ? 'متصل شد ✅' : 'متصل نیست ❌'}</div>
+        <div class="badge ${hasD1 ? 'ok' : 'fail'}">${hasD1 ? 'متصل شد ✅' : 'متصل نیست ❌'}</div>
       </div>
       
       <!-- Password Check -->
       <div class="item">
         <div>
           <div class="item-title">رمز عبور ادمین <span class="code">PASSWORD</span></div>
-          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PASSWORD</span> در کلادفلر بسازید.</div>
+          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PASSWORD</span> در کلادفلر بسازید (پیشنهاد می‌شود آن را رمزگذاری کنید).</div>
         </div>
         <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
@@ -331,18 +331,9 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
       <div class="item">
         <div>
           <div class="item-title">شناسه کاربر <span class="code">UUID</span></div>
-          <div class="desc">شما باید یک UUID معتبر (متغیر محیطی <span class="code">UUID</span>) در کلادفلر تنظیم کنید. ${currentUUID ? `مقدار فعلی: <span class="code">${currentUUID}</span>` : ''}</div>
+          <div class="desc">شما باید یک UUID معتبر (متغیر محیطی <span class="code">UUID</span>) در کلادفلر تنظیم کنید که به عنوان آدرس پنل ادمین شما عمل می‌کند. ${currentUUID ? `مقدار فعلی: <span class="code">${currentUUID}</span>` : ''}</div>
         </div>
         <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
-      </div>
-
-      <!-- Trojan Pass Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">رمز عبور تروجان <span class="code">TR_PASS</span></div>
-          <div class="desc">رمز تروجان اجباری است (متغیر محیطی <span class="code">TR_PASS</span>). برای جلوگیری از شناسایی شدن توسط کلادفلر باید با UUID متفاوت باشد.</div>
-        </div>
-        <div class="badge ${hasTrPass ? 'ok' : 'fail'}">${hasTrPass ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>
 
       <!-- Proxy IP Check -->
@@ -360,13 +351,12 @@ function setupPage(hasKV, hasPassword, hasUUID, hasTrPass, currentUUID, currentP
       <h3>✅ سیستم کاملاً آماده است!</h3>
       <div class="desc" style="color:var(--text);">
         از این پس با باز کردن آدرس اصلی ورکر، صفحه جعلی Nginx را خواهید دید تا استتار حفظ شود.<br><br>
-        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}</span><br><br>
-        🔗 <strong>آدرس لینک سابسکرایپ شما:</strong><br><span class="code" style="color:#a78bfa;">/\x24{currentUUID}/sub</span><br>
+        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/${currentUUID}</span><br><br>
       </div>
     </div>
     ` : `
     <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      ⚠️ تا زمانی که موارد الزامی (KV و Password) را تنظیم نکنید، امنیت و عملکرد پروکسی شما کامل نخواهد بود!
+      ⚠️ تا زمانی که دیتابیس D1 و متغیرهای الزامی را تنظیم نکنید، امنیت و عملکرد پروکسی شما کامل نخواهد بود!
     </div>
     `}
   </div>

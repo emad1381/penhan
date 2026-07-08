@@ -82,7 +82,7 @@ export default {
         else if (await isAuthed(request, currentPanelPass)) showSetup = true;
         
         if (showSetup) {
-           return new Response(setupPage(true, !!currentPanelPass, !!currentAdminUUID, true, currentAdminUUID, currentProxyIP), {
+           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
            });
