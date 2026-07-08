@@ -1,0 +1,55 @@
+name: Auto Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required for creating releases and uploading assets
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Standard Worker
+        run: npm run build
+
+      - name: Build Obfuscated Worker
+        run: npm run build:obfuscate
+
+      - name: Update Latest Tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag -f latest
+          git push -f origin latest
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Release 🚀
+          body: |
+            This is an automated rolling release.
+            
+            It contains two files:
+            1. \`worker.js\`: The standard minified worker code.
+            2. \`worker_obfuscated.js\`: The heavily obfuscated code to bypass Cloudflare scanners.
+            
+            *Last updated automatically on push.*
+          files: |
+            dist/worker.js
+            dist/worker_obfuscated.js
+          make_latest: true
