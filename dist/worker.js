@@ -1225,6 +1225,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/fonts/webfonts/Vazirmatn-Bold.woff2" as="font" type="font/woff2" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"><\/script>
   <style>
     :root {
       --bg: #07070e;
@@ -1270,9 +1271,15 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     
     .btn-copy { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); color: #c084fc; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
     .btn-copy:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+    .btn-qr { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+    .btn-qr:hover { background: var(--accent); border-color: var(--accent); color: white; }
     
     .btn-sub { width: 100%; padding: 16px; background: linear-gradient(135deg, #a855f7, #ec4899); border: none; border-radius: 16px; color: white; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 12px; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.25); transition: 0.3s; }
     .btn-sub:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.4); }
+
+    .btn-sub-qr { width: 100%; padding: 14px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 16px; color: #c084fc; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 12px; transition: 0.3s; }
+    .btn-sub-qr:hover { background: rgba(168, 85, 247, 0.15); transform: translateY(-1px); }
   </style>
 </head>
 <body>
@@ -1314,7 +1321,21 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
         <div class="config-name">\u0627\u062A\u0635\u0627\u0644 VLESS WS</div>
         <div class="config-desc">\u0645\u0646\u0627\u0633\u0628 \u0628\u0631\u0627\u06CC \u062A\u0645\u0627\u0645 \u0633\u06CC\u0633\u062A\u0645\u200C\u0639\u0627\u0645\u0644\u200C\u0647\u0627</div>
       </div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF VLESS \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF VLESS \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
+        <button class="btn-qr" onclick="showQrModal('${vlessWS}', '\u0627\u062A\u0635\u0627\u0644 VLESS WS')" title="\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <line x1="7" y1="7" x2="7" y2="7" />
+            <line x1="17" y1="7" x2="17" y2="7" />
+            <line x1="17" y1="17" x2="17" y2="17" />
+            <line x1="7" y1="17" x2="7" y2="17" />
+          </svg>
+        </button>
+      </div>
     </div>
     
     <div class="config-card">
@@ -1322,11 +1343,59 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
         <div class="config-name">\u0627\u062A\u0635\u0627\u0644 TROJAN WS</div>
         <div class="config-desc">\u0633\u0627\u0632\u06AF\u0627\u0631 \u0628\u0627 \u06A9\u0644\u0627\u06CC\u0646\u062A\u200C\u0647\u0627\u06CC \u0645\u062D\u0628\u0648\u0628</div>
       </div>
-      <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF Trojan \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF Trojan \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
+        <button class="btn-qr" onclick="showQrModal('${trojanWS}', '\u0627\u062A\u0635\u0627\u0644 TROJAN WS')" title="\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <line x1="7" y1="7" x2="7" y2="7" />
+            <line x1="17" y1="7" x2="17" y2="7" />
+            <line x1="17" y1="17" x2="17" y2="17" />
+            <line x1="7" y1="17" x2="7" y2="17" />
+          </svg>
+        </button>
+      </div>
     </div>
     
     <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628 \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628 (Subscription Link)</button>
+    <button class="btn-sub-qr" onclick="showQrModal('${subLink}', '\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628')">\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628</button>
   </div>
+
+  <!-- QR Modal -->
+  <div id="qr-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:none; justify-content:center; align-items:center; z-index:10000; transition:0.3s;" onclick="closeQrModal()">
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:28px; padding:36px 32px; max-width:320px; width:90%; text-align:center; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s;" onclick="event.stopPropagation()">
+      <style>
+        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      </style>
+      <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
+      <div style="background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+      <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">\u0628\u0633\u062A\u0646</button>
+    </div>
+  </div>
+
+  <script>
+    let qrInstance = null;
+    function showQrModal(value, title) {
+      document.getElementById('qr-modal-title').textContent = title;
+      document.getElementById('qr-modal').style.display = 'flex';
+      if (!qrInstance) {
+        qrInstance = new QRious({
+          element: document.getElementById('qr-canvas'),
+          size: 200,
+          level: 'M'
+        });
+      }
+      qrInstance.value = value;
+    }
+    function closeQrModal() {
+      document.getElementById('qr-modal').style.display = 'none';
+    }
+  <\/script>
 </body>
 </html>`;
 }
