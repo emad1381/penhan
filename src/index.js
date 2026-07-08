@@ -216,14 +216,14 @@ export default {
           const end = now.toISOString();
           
           const query = `
-            query GetRequests($accountTag: String!, $start: String!, $end: String!) {
+            query {
               viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                  workersRequestAdaptiveGroups(
+                accounts(filter: { accountTag: "${accountId}" }) {
+                  workersInvocationsAdaptiveGroups(
                     limit: 1,
                     filter: {
-                      datetime_geq: $start,
-                      datetime_leq: $end
+                      datetime_geq: "${start}",
+                      datetime_leq: "${end}"
                     }
                   ) {
                     sum {
@@ -242,14 +242,7 @@ export default {
                 'Authorization': `Bearer ${apiToken}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({
-                query,
-                variables: {
-                  accountTag: accountId,
-                  start,
-                  end
-                }
-              })
+              body: JSON.stringify({ query })
             });
             const cfData = await cfRes.json();
             
@@ -259,8 +252,8 @@ export default {
             
             const accounts = cfData?.data?.viewer?.accounts;
             let requestsUsed = 0;
-            if (accounts && accounts.length > 0 && accounts[0].workersRequestAdaptiveGroups && accounts[0].workersRequestAdaptiveGroups.length > 0) {
-              requestsUsed = accounts[0].workersRequestAdaptiveGroups[0].sum.requests || 0;
+            if (accounts && accounts.length > 0 && accounts[0].workersInvocationsAdaptiveGroups && accounts[0].workersInvocationsAdaptiveGroups.length > 0) {
+              requestsUsed = accounts[0].workersInvocationsAdaptiveGroups[0].sum.requests || 0;
             }
             
             return new Response(JSON.stringify({ok: true, requestsUsed, limit: 100000}), {status: 200, headers: {'Content-Type': 'application/json'}});

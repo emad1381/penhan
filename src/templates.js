@@ -1012,7 +1012,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--primary)');
           }
         } else {
-          document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">تنظیم نشده (در تنظیمات)</span>';
+          if (data.error && data.error !== 'Not Configured') {
+            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--danger)">خطا: ' + data.error + '</span>';
+          } else {
+            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">تنظیم نشده (در تنظیمات)</span>';
+          }
           document.getElementById('cf-circle-container').style.display = 'none';
         }
       } catch (e) {
