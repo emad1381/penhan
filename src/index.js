@@ -76,6 +76,17 @@ export default {
         }
       }
 
+      if (path === '/debug-env') {
+         return new Response(JSON.stringify({
+           PASSWORD_type: typeof env.PASSWORD,
+           PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
+           UUID_type: typeof env.UUID,
+           UUID_length: env.UUID ? env.UUID.length : null,
+           db_panel_pass: await getSettingD1(env, 'panel_pass'),
+           db_uuid: await getSettingD1(env, 'uuid')
+         }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
       if (path === '/') {
         let showSetup = false;
         if (!currentPanelPass || !currentAdminUUID || !env.DB) showSetup = true;
@@ -83,16 +94,6 @@ export default {
         
         if (showSetup) {
            const envKeys = Object.keys(env);
-           if (path === '/debug-env') {
-             return new Response(JSON.stringify({
-               PASSWORD_type: typeof env.PASSWORD,
-               PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
-               UUID_type: typeof env.UUID,
-               UUID_length: env.UUID ? env.UUID.length : null,
-               db_panel_pass: await getSettingD1(env, 'panel_pass'),
-               db_uuid: await getSettingD1(env, 'uuid')
-             }), { headers: { 'Content-Type': 'application/json' } });
-           }
            return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP, envKeys), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
