@@ -1796,7 +1796,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--primary)');
           }
         } else {
-          document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 (\u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A)</span>';
+          if (data.error && data.error !== 'Not Configured') {
+            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--danger)">\u062E\u0637\u0627: ' + data.error + '</span>';
+          } else {
+            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 (\u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A)</span>';
+          }
           document.getElementById('cf-circle-container').style.display = 'none';
         }
       } catch (e) {
@@ -2023,14 +2027,14 @@ var src_default = {
           const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
           const end = now.toISOString();
           const query = `
-            query GetRequests($accountTag: String!, $start: String!, $end: String!) {
+            query {
               viewer {
-                accounts(filter: { accountTag: $accountTag }) {
-                  workersRequestAdaptiveGroups(
+                accounts(filter: { accountTag: "${accountId}" }) {
+                  workersInvocationsAdaptiveGroups(
                     limit: 1,
                     filter: {
-                      datetime_geq: $start,
-                      datetime_leq: $end
+                      datetime_geq: "${start}",
+                      datetime_leq: "${end}"
                     }
                   ) {
                     sum {
@@ -2048,14 +2052,7 @@ var src_default = {
                 "Authorization": `Bearer ${apiToken}`,
                 "Content-Type": "application/json"
               },
-              body: JSON.stringify({
-                query,
-                variables: {
-                  accountTag: accountId,
-                  start,
-                  end
-                }
-              })
+              body: JSON.stringify({ query })
             });
             const cfData = await cfRes.json();
             if (cfData.errors && cfData.errors.length > 0) {
@@ -2063,8 +2060,8 @@ var src_default = {
             }
             const accounts = cfData?.data?.viewer?.accounts;
             let requestsUsed = 0;
-            if (accounts && accounts.length > 0 && accounts[0].workersRequestAdaptiveGroups && accounts[0].workersRequestAdaptiveGroups.length > 0) {
-              requestsUsed = accounts[0].workersRequestAdaptiveGroups[0].sum.requests || 0;
+            if (accounts && accounts.length > 0 && accounts[0].workersInvocationsAdaptiveGroups && accounts[0].workersInvocationsAdaptiveGroups.length > 0) {
+              requestsUsed = accounts[0].workersInvocationsAdaptiveGroups[0].sum.requests || 0;
             }
             return new Response(JSON.stringify({ ok: true, requestsUsed, limit: 1e5 }), { status: 200, headers: { "Content-Type": "application/json" } });
           } catch (e) {
