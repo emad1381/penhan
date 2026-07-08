@@ -68,6 +68,13 @@ jobs:
             dist/worker_obfuscated.js
           make_latest: true
 
+      - name: Configure Worker Name
+        if: env.CF_WORKER_NAME != ''
+        run: |
+          sed -i "s/name = \"penhan\"/name = \"${{ env.CF_WORKER_NAME }}\"/g" wrangler.toml
+        env:
+          CF_WORKER_NAME: ${{ secrets.CF_WORKER_NAME }}
+
       - name: Inject KV ID into wrangler.toml
         run: |
           sed -i "s/YOUR_KV_NAMESPACE_ID_HERE/${{ secrets.CF_KV_ID }}/g" wrangler.toml
