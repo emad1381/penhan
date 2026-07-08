@@ -1853,9 +1853,16 @@ var src_default = {
           const host = request.headers.get("Host");
           const userAgent = (request.headers.get("User-Agent") || "").toLowerCase();
           const isProxyClient = userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box");
-          const addr = user.clean_ip || currentProxyIP || host;
-          const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=/?ed=2048#VLESS-${user.name}`;
-          const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${host}&fp=chrome&insecure=0&allowInsecure=0&type=ws&host=${host}&path=/trojan-ws#Trojan-${user.name}`;
+          const randomizeCase = (str) => str.split("").map((c) => Math.random() > 0.5 ? c.toUpperCase() : c.toLowerCase()).join("");
+          const randomSNI = randomizeCase(host);
+          const junkVal = Math.random().toString(36).substring(2, 10);
+          const vlessPathObj = { junk: junkVal, protocol: "vl" };
+          const trojanPathObj = { junk: junkVal, protocol: "tr" };
+          const vlessObfuscatedPath = "/" + btoa(JSON.stringify(vlessPathObj));
+          const trojanObfuscatedPath = "/trojan-" + btoa(JSON.stringify(trojanPathObj));
+          const addr = user.clean_ip || "172.64.155.209";
+          const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + "?ed=2048")}#VLESS-${user.name}`;
+          const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
           if (isProxyClient) {
             return new Response(btoa(unescape(encodeURIComponent(vlessWS + "\n" + trojanWS + "\n"))), { status: 200, headers: { "Content-Type": "text/plain" } });
           }
