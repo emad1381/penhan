@@ -324,8 +324,8 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, env
       <!-- Password Check -->
       <div class="item">
         <div>
-          <div class="item-title">رمز عبور ادمین <span class="code">PASSWORD</span></div>
-          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PASSWORD</span> در کلادفلر بسازید (پیشنهاد می‌شود آن را رمزگذاری کنید).</div>
+          <div class="item-title">رمز عبور ادمین <span class="code">PANEL_PASSWORD</span></div>
+          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PANEL_PASSWORD</span> در کلادفلر بسازید (پیشنهاد می‌شود آن را رمزگذاری کنید).</div>
         </div>
         <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
       </div>

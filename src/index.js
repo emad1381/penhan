@@ -33,7 +33,7 @@ export default {
       await setupD1Schema(env);
 
       let currentProxyIP = (await getSettingD1(env, 'proxy_ip')) || env.PROXYIP || '';
-      let currentPanelPass = (await getSettingD1(env, 'panel_pass')) || env.PASSWORD || '';
+      let currentPanelPass = (await getSettingD1(env, 'panel_pass')) || env.PANEL_PASSWORD || env.PASSWORD || '';
       let currentAdminUUID = (await getSettingD1(env, 'uuid')) || env.UUID || ''; 
       
       const upgradeHeader = request.headers.get('Upgrade');
@@ -78,6 +78,8 @@ export default {
 
       if (path === '/debug-env') {
          return new Response(JSON.stringify({
+           PANEL_PASSWORD_type: typeof env.PANEL_PASSWORD,
+           PANEL_PASSWORD_length: env.PANEL_PASSWORD ? env.PANEL_PASSWORD.length : null,
            PASSWORD_type: typeof env.PASSWORD,
            PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
            UUID_type: typeof env.UUID,
