@@ -1277,7 +1277,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
 </body>
 </html>`;
 }
-function panelPage(hostname, adminUUID) {
+function panelPage(hostname, adminUUID, defaultProxyIP) {
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -1437,7 +1437,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         </div>
         <div class="form-group">
           <label>\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 (Proxy IP)</label>
-          <input type="text" class="form-control" id="st-proxy" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
+          <input type="text" class="form-control" id="st-proxy" value="${defaultProxyIP || ""}" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
         </div>
       </div>
     </div>
@@ -1556,7 +1556,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             <td>
               <div class="flex-gap">
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? '\u0645\u0633\u062F\u0648\u062F' : '\u0622\u0632\u0627\u062F\u0633\u0627\u0632\u06CC'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://${hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">\u{1F5D1}\uFE0F</button>
               </div>
             </td>
