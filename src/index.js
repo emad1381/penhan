@@ -76,31 +76,18 @@ export default {
         }
       }
 
-      if (path === '/debug-env') {
-         return new Response(JSON.stringify({
-           PANEL_PASSWORD_type: typeof env.PANEL_PASSWORD,
-           PANEL_PASSWORD_length: env.PANEL_PASSWORD ? env.PANEL_PASSWORD.length : null,
-           PASSWORD_type: typeof env.PASSWORD,
-           PASSWORD_length: env.PASSWORD ? env.PASSWORD.length : null,
-           UUID_type: typeof env.UUID,
-           UUID_length: env.UUID ? env.UUID.length : null,
-           db_panel_pass: await getSettingD1(env, 'panel_pass'),
-           db_uuid: await getSettingD1(env, 'uuid')
-         }), { headers: { 'Content-Type': 'application/json' } });
-      }
+      const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
 
-      if (path === '/') {
-        let showSetup = false;
-        if (!currentPanelPass || !currentAdminUUID || !env.DB) showSetup = true;
-        else if (await isAuthed(request, currentPanelPass)) showSetup = true;
-        
-        if (showSetup) {
-           const envKeys = Object.keys(env);
-           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP, envKeys), {
+      if (!isSetupComplete) {
+        if (path === '/panel' || path === '/') {
+           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
            });
         }
+      }
+
+      if (path === '/') {
         return new Response(nginxPage(), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Server': 'nginx/1.24.0' } });
       }
 

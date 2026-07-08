@@ -258,114 +258,133 @@ function loginPage(uuid, host) {
 </html>`;
 }
 
-function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP, envKeys = []) {
+function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
   const allGood = hasD1 && hasPassword && hasUUID;
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>نصب و راه‌اندازی پنل پنهان</title>
+  <title>راه‌اندازی پنل پنهان</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;800&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #07070c;
-      --card-bg: rgba(18, 18, 30, 0.6);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #8b5cf6;
-      --accent-glow: rgba(139, 92, 246, 0.3);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
+      --bg: #07070e;
+      --card-bg: rgba(18, 18, 30, 0.45);
+      --border: rgba(255, 255, 255, 0.06);
+      --accent: #a855f7;
+      --accent-glow: rgba(168, 85, 247, 0.25);
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
       --success: #10b981;
       --error: #ef4444;
       --warning: #f59e0b;
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-x: hidden; position: relative; }
-    body::before, body::after { content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.15; filter: blur(50px); z-index: -1; }
-    body::before { top: -10%; left: -10%; }
-    body::after { bottom: -10%; right: -10%; }
-    .container { width: 100%; max-width: 600px; background: var(--card-bg); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 24px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-    h1 { font-size: 24px; font-weight: 800; margin-bottom: 20px; text-align: center; background: linear-gradient(135deg, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .status-box { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid var(--border); }
-    .item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .item:last-child { border-bottom: none; }
-    .item-title { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 10px; }
-    .badge { padding: 4px 10px; border-radius: 8px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-    .badge.ok { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-    .badge.fail { background: rgba(239, 68, 68, 0.15); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); }
-    .badge.warn { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
-    .badge.info { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
-    .desc { font-size: 13px; color: var(--text-muted); margin-top: 5px; line-height: 1.6; }
-    .code { background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #f472b6; word-break: break-all; }
-    .links-box { margin-top: 20px; padding: 15px; border-radius: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); }
-    .links-box h3 { color: var(--success); margin-bottom: 10px; font-size: 16px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-x: hidden; position: relative; }
+    
+    .blob { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.12; filter: blur(80px); z-index: -1; pointer-events: none; }
+    .blob-1 { top: -10%; left: -10%; }
+    .blob-2 { bottom: -10%; right: -10%; }
+
+    .container { width: 100%; max-width: 650px; background: var(--card-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border); border-radius: 32px; padding: 48px 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05); }
+    
+    .logo-area { text-align: center; margin-bottom: 32px; }
+    .logo-icon { font-size: 40px; margin-bottom: 12px; display: inline-block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    
+    h1 { font-family: Vazirmatn, sans-serif; font-size: 26px; font-weight: 850; margin-bottom: 8px; text-align: center; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { text-align: center; font-size: 14px; color: var(--text-muted); margin-bottom: 36px; line-height: 1.6; }
+    
+    .card-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+    .variable-card { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 20px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
+    .variable-card:hover { border-color: rgba(168, 85, 247, 0.3); transform: translateY(-2px); }
+    
+    .card-details { flex: 1; padding-left: 20px; text-align: right; }
+    .card-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    
+    .code { font-family: 'Outfit', monospace; font-size: 12px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); padding: 2px 8px; border-radius: 6px; color: #e9d5ff; white-space: nowrap; direction: ltr; display: inline-block; margin: 2px 0; }
+    .value-display { font-family: 'Outfit', monospace; font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: #cbd5e1; direction: ltr; display: inline-block; word-break: break-all; margin-top: 4px; }
+    
+    .badge { padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: 0.2s; }
+    .badge.ok { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
+    .badge.fail { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+    .badge.info { background: rgba(168, 85, 247, 0.08); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.15); }
+    
+    .success-panel { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 24px; padding: 28px; text-align: center; animation: pulseGlow 2s infinite alternate; }
+    @keyframes pulseGlow { 0% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.05); } 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); } }
+    .success-title { font-size: 18px; font-weight: 800; color: #34d399; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .success-desc { font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 20px; }
+    
+    .action-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; border: none; padding: 14px; border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer; transition: all 0.3s; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.3); }
+    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.45); }
+    
+    .warning-panel { text-align: center; padding: 16px; border-radius: 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 13px; font-weight: 500; line-height: 1.6; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>⚙️ نصب و راه‌اندازی ورکر</h1>
-    <p style="text-align:center; font-size:14px; color:var(--text-muted); margin-bottom:25px;">
-      برای عملکرد صحیح پروکسی، وضعیت متغیرها و دیتابیس را در تنظیمات کلادفلر بررسی کنید.
-    </p>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
 
-    <div class="status-box">
-      <!-- D1 Database Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">دیتابیس Cloudflare D1</div>
-          <div class="desc">برای ذخیره‌سازی کاربران و تنظیمات سیستم الزامی است. در بخش Bindings کلادفلر یک دیتابیس D1 اضافه کنید و نام بایندینگ آن را دقیقاً <span class="code">DB</span> بگذارید.</div>
+  <div class="container">
+    <div class="logo-area">
+      <div class="logo-icon">🔮</div>
+      <h1>راه‌اندازی پنل پنهان</h1>
+      <div class="subtitle">برای شروع به کار پروکسی، وضعیت دیتابیس و متغیرها را بررسی و تنظیم کنید.</div>
+    </div>
+
+    <div class="card-list">
+      <!-- Database Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">دیتابیس Cloudflare D1</div>
+          <div class="desc">برای ذخیره‌سازی کاربران و تنظیمات سیستم الزامی است. نام بایندینگ دیتابیس را در کلادفلر دقیقاً <span class="code">DB</span> بگذارید.</div>
         </div>
-        <div class="badge ${hasD1 ? 'ok' : 'fail'}">${hasD1 ? 'متصل شد ✅' : 'متصل نیست ❌'}</div>
+        <div class="badge ${hasD1 ? 'ok' : 'fail'}">${hasD1 ? 'متصل شده' : 'متصل نیست'}</div>
       </div>
       
-      <!-- Password Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">رمز عبور ادمین <span class="code">PANEL_PASSWORD</span></div>
-          <div class="desc">برای امنیت پنل الزامی است. یک متغیر محیطی به نام <span class="code">PANEL_PASSWORD</span> در کلادفلر بسازید (پیشنهاد می‌شود آن را رمزگذاری کنید).</div>
+      <!-- Password Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">رمز عبور ادمین <span class="code">PANEL_PASSWORD</span></div>
+          <div class="desc">جهت ورود به پنل مدیریت. یک متغیر محیطی با این نام در کلادفلر بسازید (پیشنهاد می‌شود آن را Encrypt کنید).</div>
         </div>
-        <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
+        <div class="badge ${hasPassword ? 'ok' : 'fail'}">${hasPassword ? 'تنظیم شده' : 'تنظیم نشده'}</div>
       </div>
 
-      <!-- UUID Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">شناسه کاربر <span class="code">UUID</span></div>
-          <div class="desc">شما باید یک UUID معتبر (متغیر محیطی <span class="code">UUID</span>) در کلادفلر تنظیم کنید که به عنوان آدرس پنل ادمین شما عمل می‌کند. ${currentUUID ? `مقدار فعلی: <span class="code">${currentUUID}</span>` : ''}</div>
+      <!-- UUID Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">شناسه کاربر <span class="code">UUID</span></div>
+          <div class="desc">شناسه پیش‌فرض سیستم. یک متغیر محیطی با نام <span class="code">UUID</span> در کلادفلر بسازید.<br>${currentUUID ? `مقدار فعلی: <span class="value-display">${currentUUID}</span>` : ''}</div>
         </div>
-        <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? 'تنظیم شده ✅' : 'تنظیم نشده ❌'}</div>
+        <div class="badge ${hasUUID ? 'ok' : 'fail'}">${hasUUID ? 'تنظیم شده' : 'تنظیم نشده'}</div>
       </div>
 
-      <!-- Proxy IP Check -->
-      <div class="item">
-        <div>
-          <div class="item-title">آی‌پی پروکسی <span class="code">PROXYIP</span></div>
-          <div class="desc">مقدار فعلی: ${currentProxyIP ? '<span class="code">'+currentProxyIP+'</span>' : 'ندارد'}. متغیر محیطی <span class="code">PROXYIP</span> برای دور زدن محدودیت برخی سایت‌ها.</div>
+      <!-- Proxy IP Card -->
+      <div class="variable-card">
+        <div class="card-details">
+          <div class="card-title">آی‌پی پروکسی <span class="code">PROXYIP</span></div>
+          <div class="desc">آی‌پی تمیز یا پروکسی پیش‌فرض. ${currentProxyIP ? `مقدار فعلی: <span class="value-display">${currentProxyIP}</span>` : 'تنظیم نشده.'}</div>
         </div>
-        <div class="badge info">اختیاری ℹ️</div>
+        <div class="badge info">اختیاری</div>
       </div>
     </div>
 
     ${allGood ? `
-    <div class="links-box">
-      <h3>✅ سیستم کاملاً آماده است!</h3>
-      <div class="desc" style="color:var(--text);">
-        از این پس با باز کردن آدرس اصلی ورکر، صفحه جعلی Nginx را خواهید دید تا استتار حفظ شود.<br><br>
-        🔗 <strong>آدرس ورود به پنل شما:</strong><br><span class="code" style="color:#a78bfa;">/panel</span><br><br>
-      </div>
+    <div class="success-panel">
+      <div class="success-title">🎉 سیستم کاملاً آماده است!</div>
+      <div class="success-desc">پیکربندی‌ها تکمیل شد. از این پس با باز کردن آدرس ورکر، صفحه پیش‌فرض Nginx جهت استتار نشان داده خواهد شد.</div>
+      <button class="action-btn" onclick="window.location.href='/panel'">🚪 ورود به پنل مدیریت</button>
     </div>
     ` : `
-    <div style="text-align:center; margin-top:20px; color:var(--warning); font-size:14px; font-weight: 500;">
-      ⚠️ تا زمانی که دیتابیس D1 و متغیرهای الزامی را تنظیم نکنید، امنیت و عملکرد پروکسی شما کامل نخواهد بود!
+    <div class="warning-panel">
+      ⚠️ تا زمانی که دیتابیس D1 و متغیرهای الزامی بالا را به درستی تنظیم نکنید، پنل مدیریت قابل استفاده نخواهد بود.
     </div>
     `}
-
-    <div style="margin-top:20px; padding:10px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid var(--border); font-size:11px; font-family:monospace; text-align:left; direction:ltr; color:var(--text-muted); word-break:break-all;">
-      DEBUG Env Keys: [${envKeys.join(', ')}]
-    </div>
   </div>
 </body>
 </html>`;
