@@ -42,12 +42,20 @@ async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
   return { write(chunk) { writer.write(chunk); } };
 }
 
-function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
+function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log, onUpload) {
   let readableStreamCancel = false;
   const stream = new ReadableStream({
     start(controller) {
       webSocketServer.addEventListener('message', (event) => {
         if (readableStreamCancel) return;
+        if (onUpload) {
+          const uploadOk = onUpload(event.data.byteLength || event.data.size || 0);
+          if (!uploadOk) {
+            controller.error(new Error('User limit exceeded during upload'));
+            safeCloseWebSocket(webSocketServer);
+            return;
+          }
+        }
         controller.enqueue(event.data);
       });
       webSocketServer.addEventListener('close', () => {
@@ -74,7 +82,7 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
   return stream;
 }
 
-async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log) {
+async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
   async function connectAndWrite(address, port) {
     const tcpSocket = connect({ hostname: address, port: port });
     remoteSocketWrapper.value = tcpSocket;
@@ -95,7 +103,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
     log('retrying with proxy IP: ' + proxyIP);
     try {
       const tcpSocket = await connectAndWrite(proxyIP, portRemote);
-      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
     } catch (err) {
       log('retry connect failed: ' + err);
       webSocket.close(1011, 'Retry failed: ' + err);
@@ -104,7 +112,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
 
   try {
     const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
+    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log, onDownload);
   } catch (error) {
     log('first connection attempt failed: ' + error);
     if (proxyIP) { retry(); }
@@ -112,7 +120,7 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
   }
 }
 
-async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log) {
+async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log, onDownload) {
   let vlessHeader = vlessResponseHeader;
   let hasIncomingData = false;
   try {
@@ -123,6 +131,14 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
           if (webSocket.readyState !== WS_READY_STATE_OPEN) {
             controller.error('webSocket.readyState is not open, maybe close');
             return;
+          }
+          if (onDownload) {
+            const downloadOk = onDownload(chunk.byteLength || chunk.size || 0);
+            if (!downloadOk) {
+              controller.error(new Error('User limit exceeded during download'));
+              safeCloseWebSocket(webSocket);
+              return;
+            }
           }
           if (vlessHeader && vlessHeader.byteLength > 0) {
             webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
@@ -143,13 +159,11 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
 }
 
 
-function processVlessHeader(vlessBuffer, userID) {
+function processVlessHeader(vlessBuffer) {
   if (vlessBuffer.byteLength < 24) { return { hasError: true, message: 'invalid data' }; }
   const version = new Uint8Array(vlessBuffer.slice(0, 1));
-  let isValidUser = false;
   let isUDP = false;
-  if (stringify(new Uint8Array(vlessBuffer.slice(1, 17))) === userID) { isValidUser = true; }
-  if (!isValidUser) { return { hasError: true, message: 'invalid user' }; }
+  const userID = stringify(new Uint8Array(vlessBuffer.slice(1, 17)));
   const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
   const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
   if (command === 1) { /* TCP */ }
@@ -187,17 +201,36 @@ function processVlessHeader(vlessBuffer, userID) {
   if (!addressValue) { return { hasError: true, message: 'addressValue is empty' }; }
   return {
     hasError: false, addressRemote: addressValue, addressType,
-    portRemote, rawDataIndex: addressValueIndex + addressLength, vlessVersion: version, isUDP,
+    portRemote, rawDataIndex: addressValueIndex + addressLength, vlessVersion: version, isUDP, userID
   };
 }
 
-async function vlessOverWSHandler(request, userID, proxyIP) {
+async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage) {
   // @ts-ignore
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
 
   webSocket.accept();
   webSocket.binaryType = 'arraybuffer';
+  
+  let currentSessionUpload = 0;
+  let currentSessionDownload = 0;
+  
+  const handleUpload = (bytes) => {
+    currentSessionUpload += bytes;
+    if (onUsage) {
+      return onUsage(bytes, 0); // returns false if limit exceeded
+    }
+    return true;
+  };
+  
+  const handleDownload = (bytes) => {
+    currentSessionDownload += bytes;
+    if (onUsage) {
+      return onUsage(0, bytes);
+    }
+    return true;
+  };
 
   let address = '';
   let portWithRandomLog = '';
@@ -206,7 +239,7 @@ async function vlessOverWSHandler(request, userID, proxyIP) {
   };
 
   const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
-  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log, handleUpload);
 
   let remoteSocketWrapper = { value: null };
   let udpStreamWrite = null;
@@ -242,7 +275,16 @@ async function vlessOverWSHandler(request, userID, proxyIP) {
         hasError, message,
         portRemote = 443, addressRemote = '',
         rawDataIndex, vlessVersion = new Uint8Array([0, 0]), isUDP,
-      } = processVlessHeader(chunk, userID);
+        userID
+      } = processVlessHeader(chunk);
+      
+      const userObj = await authenticate(userID);
+      if (!userObj || !userObj.enabled) {
+        log('user auth failed or disabled');
+        throw new Error('user not found or disabled');
+      }
+      
+      const proxyIP = userObj.proxy_ip || defaultProxyIP;
 
       address = addressRemote;
       portWithRandomLog = '' + portRemote + '--' + Math.random() + ' ' + (isUDP ? 'udp' : 'tcp');
@@ -265,7 +307,7 @@ async function vlessOverWSHandler(request, userID, proxyIP) {
         return;
       }
 
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log);
+      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
     },
     close() { log('readableWebSocketStream closed'); },
     abort(reason) { log('readableWebSocketStream aborted', JSON.stringify(reason)); },

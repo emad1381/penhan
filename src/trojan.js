@@ -117,13 +117,32 @@ function processVlessHeader(vlessBuffer, userID) {
   };
 }
 
-async function trojanOverWSHandler(request, trojanPass, proxyIP) {
+async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsage) {
   // @ts-ignore
   const webSocketPair = new WebSocketPair();
   const [client, webSocket] = Object.values(webSocketPair);
 
   webSocket.accept();
   webSocket.binaryType = 'arraybuffer';
+
+  let currentSessionUpload = 0;
+  let currentSessionDownload = 0;
+  
+  const handleUpload = (bytes) => {
+    currentSessionUpload += bytes;
+    if (onUsage) {
+      return onUsage(bytes, 0); // returns false if limit exceeded
+    }
+    return true;
+  };
+  
+  const handleDownload = (bytes) => {
+    currentSessionDownload += bytes;
+    if (onUsage) {
+      return onUsage(0, bytes);
+    }
+    return true;
+  };
 
   let address = '';
   let portWithRandomLog = '';
@@ -132,7 +151,7 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
   };
 
   const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
-  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+  const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log, handleUpload);
 
   let remoteSocketWrapper = { value: null };
   let udpStreamWrite = null;
@@ -164,12 +183,25 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
         }
       }
 
-      const trojanPasswordHash = sha224_and_224(trojanPass, true);
+      // We don't have the user's plain pass, we only have the hash.
+      // But we need to identify the user. We will iterate over users in the main script to find the match, or we can just pass the clientHash.
+      // Actually, we can just pass the clientHash to authenticate(), and main script will check if any user's hashed ID matches.
+      
+      const clientHash = new TextDecoder().decode(chunk.slice(0, 56));
+      
       const {
         hasError, message,
         portRemote = 443, addressRemote = '',
         rawDataIndex, isUDP,
-      } = processTrojanHeader(chunk, trojanPasswordHash);
+      } = processTrojanHeader(chunk, clientHash);
+      
+      const userObj = await authenticate(clientHash);
+      if (!userObj || !userObj.enabled) {
+        log('user auth failed or disabled');
+        throw new Error('user not found or disabled');
+      }
+      
+      const proxyIP = userObj.proxy_ip || defaultProxyIP;
 
       address = addressRemote;
       portWithRandomLog = '' + portRemote + '--' + Math.random() + ' ' + (isUDP ? 'udp' : 'tcp');
@@ -191,7 +223,7 @@ async function trojanOverWSHandler(request, trojanPass, proxyIP) {
         return;
       }
 
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log);
+      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
     },
     close() { log('readableWebSocketStream closed'); },
     abort(reason) { log('readableWebSocketStream aborted', JSON.stringify(reason)); },

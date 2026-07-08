@@ -182,4 +182,52 @@ function isApiAuthed(request, currentPanelPass, currentUserID) {
   return false;
 }
 
-export { sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify, safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed, isApiAuthed };
+// ============ D1 Database Helpers ============
+async function setupD1Schema(env) {
+  if (!env.DB) return;
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      clean_ip TEXT,
+      proxy_ip TEXT,
+      limit_bytes INTEGER DEFAULT 0,
+      used_bytes INTEGER DEFAULT 0,
+      expiry_date INTEGER,
+      enabled BOOLEAN DEFAULT 1
+    );`,
+    `CREATE TABLE IF NOT EXISTS api_keys (
+      key TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at INTEGER
+    );`
+  ];
+  for (const q of queries) {
+    try {
+      await env.DB.prepare(q).run();
+    } catch (e) {
+      console.error("D1 Schema setup error:", e);
+    }
+  }
+}
+
+async function getUserFromD1(env, uuid) {
+  if (!env.DB) return null;
+  try {
+    const { results } = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(uuid).all();
+    return results.length > 0 ? results[0] : null;
+  } catch (e) { return null; }
+}
+
+async function updateUsageD1(env, uuid, bytes) {
+  if (!env.DB || bytes === 0) return;
+  try {
+    await env.DB.prepare('UPDATE users SET used_bytes = used_bytes + ? WHERE id = ?').bind(bytes, uuid).run();
+  } catch (e) { console.error("Usage update error", e); }
+}
+
+export { 
+  sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify, 
+  safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed, isApiAuthed,
+  setupD1Schema, getUserFromD1, updateUsageD1
+};

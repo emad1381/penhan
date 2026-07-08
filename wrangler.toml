@@ -5,3 +5,8 @@ compatibility_date = "2023-12-01"
 [[kv_namespaces]]
 binding = "nahan"
 id = "YOUR_KV_NAMESPACE_ID_HERE"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "penhan_db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
