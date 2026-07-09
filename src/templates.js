@@ -964,7 +964,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           if (u.expiry_date) {
             const d = new Date(u.expiry_date);
             const pad = (n) => n.toString().padStart(2, '0');
-            const abs = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            const abs = \`\${d.getFullYear()}/\${pad(d.getMonth() + 1)}/\${pad(d.getDate())} \${pad(d.getHours())}:\${pad(d.getMinutes())}\`;
             
             const diff = u.expiry_date - Date.now();
             let rel = '';
@@ -975,13 +975,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             } else {
                const days = Math.floor(diff / 86400000);
                const hours = Math.floor((diff % 86400000) / 3600000);
-               rel = days > 0 ? `${days} روز و ${hours} ساعت` : `${hours} ساعت`;
+               rel = days > 0 ? \`\${days} روز و \${hours} ساعت\` : \`\${hours} ساعت\`;
             }
             
-            expiryHTML = `<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-              <span style="font-size:12px; font-weight:600; direction:ltr;">${abs}</span>
-              <span class="badge ${badgeClass}" style="font-size:10px; padding:2px 6px;">${rel}</span>
-            </div>`;
+            expiryHTML = \`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <span style="font-size:12px; font-weight:600; direction:ltr;">\${abs}</span>
+              <span class="badge \${badgeClass}" style="font-size:10px; padding:2px 6px;">\${rel}</span>
+            </div>\`;
           }
           let statusBadge = u.enabled ? '<span class="badge green">فعال</span>' : '<span class="badge red">مسدود</span>';
           
