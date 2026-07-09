@@ -424,6 +424,24 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
        daysLeftText = days + " روز";
      }
   }
+  
+  let statusClass = 'active';
+  let statusText = 'فعال';
+  let statusIcon = '<span style="font-size:10px;">●</span>';
+  
+  if (!user.enabled) {
+    statusClass = 'banned';
+    statusText = 'مسدود شده';
+    statusIcon = '<span class="blink-icon" style="font-size:12px;">⚠️</span>';
+  } else if (limit > 0 && used >= limit) {
+    statusClass = 'disabled';
+    statusText = 'غیر فعال (اتمام حجم)';
+    statusIcon = '<span class="blink-icon" style="font-size:10px;">●</span>';
+  } else if (user.expiry_date > 0 && Date.now() > user.expiry_date) {
+    statusClass = 'disabled';
+    statusText = 'غیر فعال (منقضی شده)';
+    statusIcon = '<span class="blink-icon" style="font-size:10px;">●</span>';
+  }
 
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -459,8 +477,12 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     
     h1 { font-size: 22px; margin-bottom: 6px; font-weight: 850; color: #fff; }
     
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); margin-bottom: 32px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 32px; }
+    .status-badge.active { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
     .status-badge.disabled { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+    .status-badge.banned { background: rgba(245, 158, 11, 0.08); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.15); }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
+    .blink-icon { animation: blink 1s ease-in-out infinite; }
     
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
     .stat-card { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 18px; text-align: center; }
@@ -497,8 +519,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   <div class="container">
     <div class="user-avatar">👤</div>
     <h1>${name}</h1>
-    <div class="status-badge ${user.enabled ? '' : 'disabled'}">
-      <span>●</span> ${user.enabled ? 'فعال' : 'غیرفعال / مسدود'}
+    <div class="status-badge ${statusClass}">
+      ${statusIcon} ${statusText}
     </div>
     
     <div class="stats-grid">
