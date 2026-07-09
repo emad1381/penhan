@@ -1214,6 +1214,22 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
       daysLeftText = days + " \u0631\u0648\u0632";
     }
   }
+  let statusClass = "active";
+  let statusText = "\u0641\u0639\u0627\u0644";
+  let statusIcon = '<span style="font-size:10px;">\u25CF</span>';
+  if (!user.enabled) {
+    statusClass = "banned";
+    statusText = "\u0645\u0633\u062F\u0648\u062F \u0634\u062F\u0647";
+    statusIcon = '<span class="blink-icon" style="font-size:12px;">\u26A0\uFE0F</span>';
+  } else if (limit > 0 && used >= limit) {
+    statusClass = "disabled";
+    statusText = "\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644 (\u0627\u062A\u0645\u0627\u0645 \u062D\u062C\u0645)";
+    statusIcon = '<span class="blink-icon" style="font-size:10px;">\u25CF</span>';
+  } else if (user.expiry_date > 0 && Date.now() > user.expiry_date) {
+    statusClass = "disabled";
+    statusText = "\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644 (\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647)";
+    statusIcon = '<span class="blink-icon" style="font-size:10px;">\u25CF</span>';
+  }
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -1248,8 +1264,12 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     
     h1 { font-size: 22px; margin-bottom: 6px; font-weight: 850; color: #fff; }
     
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); margin-bottom: 32px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 32px; }
+    .status-badge.active { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
     .status-badge.disabled { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
+    .status-badge.banned { background: rgba(245, 158, 11, 0.08); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.15); }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
+    .blink-icon { animation: blink 1s ease-in-out infinite; }
     
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
     .stat-card { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 18px; text-align: center; }
@@ -1286,8 +1306,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   <div class="container">
     <div class="user-avatar">\u{1F464}</div>
     <h1>${name}</h1>
-    <div class="status-badge ${user.enabled ? "" : "disabled"}">
-      <span>\u25CF</span> ${user.enabled ? "\u0641\u0639\u0627\u0644" : "\u063A\u06CC\u0631\u0641\u0639\u0627\u0644 / \u0645\u0633\u062F\u0648\u062F"}
+    <div class="status-badge ${statusClass}">
+      ${statusIcon} ${statusText}
     </div>
     
     <div class="stats-grid">
