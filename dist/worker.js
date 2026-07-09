@@ -2158,7 +2158,8 @@ var src_default = {
         if (user) {
           const host = request.headers.get("Host");
           const userAgent = (request.headers.get("User-Agent") || "").toLowerCase();
-          const isProxyClient = userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box");
+          const isBrowser = userAgent.includes("mozilla") || userAgent.includes("chrome") || userAgent.includes("safari") || userAgent.includes("applewebkit");
+          const isProxyClient = !isBrowser || userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box") || userAgent.includes("shadowrocket") || userAgent.includes("streisand") || userAgent.includes("v2box") || userAgent.includes("foxray") || userAgent.includes("loon") || userAgent.includes("nekobox");
           const randomizeCase = (str) => str.split("").map((c) => Math.random() > 0.5 ? c.toUpperCase() : c.toLowerCase()).join("");
           const randomSNI = randomizeCase(host);
           const junkVal = Math.random().toString(36).substring(2, 10);
