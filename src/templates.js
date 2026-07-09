@@ -414,15 +414,26 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     usageText = `${formatBytes(used)} (بدون سقف)`;
   }
   
-  let daysLeftText = "نامحدود";
+  let expiryAbsolute = "نامحدود";
+  let expiryRelative = "∞";
+  
   if (user.expiry_date > 0) {
-     const diff = user.expiry_date - Date.now();
-     if (diff < 0) {
-       daysLeftText = "منقضی شده";
-     } else {
-       const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-       daysLeftText = days + " روز";
-     }
+    const d = new Date(user.expiry_date);
+    const pad = (n) => n.toString().padStart(2, '0');
+    expiryAbsolute = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    
+    const diff = user.expiry_date - Date.now();
+    if (diff < 0) {
+      expiryRelative = "منقضی شده";
+    } else {
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      if (days > 0) {
+        expiryRelative = `${days} روز و ${hours} ساعت دیگر`;
+      } else {
+        expiryRelative = `${hours} ساعت دیگر`;
+      }
+    }
   }
   
   let statusClass = 'active';
@@ -526,7 +537,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">اعتبار زمانی</div>
-        <div class="stat-val">${daysLeftText}</div>
+        <div class="stat-val" style="font-size:14px; direction:ltr;">${expiryAbsolute}</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${expiryRelative}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">ترافیک مصرفی</div>
@@ -871,8 +883,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <input type="number" id="u-limit" class="form-control" value="0">
       </div>
       <div class="form-group">
-        <label>اعتبار زمانی (روز) - 0 برای نامحدود</label>
-        <input type="number" id="u-days" class="form-control" value="0">
+        <label>تاریخ انقضا (برای نامحدود، خالی بگذارید)</label>
+        <input type="datetime-local" id="u-expiry" class="form-control">
       </div>
       <div class="form-group">
         <label>Clean IP اختصاصی (اختیاری)</label>
@@ -948,10 +960,28 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         }
         data.users.forEach(u => {
           let usage = u.limit_bytes ? \`\${formatBytes(u.used_bytes)} / \${formatBytes(u.limit_bytes)}\` : \`\${formatBytes(u.used_bytes)} (∞)\`;
-          let days = '∞';
+          let expiryHTML = '<span style="color:#a1a1aa">نامحدود (∞)</span>';
           if (u.expiry_date) {
-            let left = Math.ceil((u.expiry_date - Date.now()) / 86400000);
-            days = left < 0 ? 'منقضی' : left + ' روز';
+            const d = new Date(u.expiry_date);
+            const pad = (n) => n.toString().padStart(2, '0');
+            const abs = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            
+            const diff = u.expiry_date - Date.now();
+            let rel = '';
+            let badgeClass = 'green';
+            if (diff < 0) {
+               rel = 'منقضی شده';
+               badgeClass = 'red';
+            } else {
+               const days = Math.floor(diff / 86400000);
+               const hours = Math.floor((diff % 86400000) / 3600000);
+               rel = days > 0 ? `${days} روز و ${hours} ساعت` : `${hours} ساعت`;
+            }
+            
+            expiryHTML = `<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <span style="font-size:12px; font-weight:600; direction:ltr;">${abs}</span>
+              <span class="badge ${badgeClass}" style="font-size:10px; padding:2px 6px;">${rel}</span>
+            </div>`;
           }
           let statusBadge = u.enabled ? '<span class="badge green">فعال</span>' : '<span class="badge red">مسدود</span>';
           
@@ -960,11 +990,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
             <td>\${statusBadge}</td>
             <td style="direction:ltr; text-align:right">\${usage}</td>
-            <td>\${days}</td>
+            <td>\${expiryHTML}</td>
             <td>
               <div class="flex-gap">
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? 'مسدود' : 'آزادسازی'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://${hostname}/\${u.id}/sub', '_blank')">لینک ساب</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${window.location.hostname}/\${u.id}/sub', '_blank')">لینک ساب</button>
                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">🗑️</button>
               </div>
             </td>
@@ -977,13 +1007,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const id = document.getElementById('u-uuid').value;
        const name = document.getElementById('u-name').value;
        let gb = parseFloat(document.getElementById('u-limit').value) || 0;
-       let days = parseInt(document.getElementById('u-days').value) || 0;
+       const expiryVal = document.getElementById('u-expiry').value;
        const clean = document.getElementById('u-cleanip').value;
        
        if (!id || !name) { alert("وارد کردن نام و UUID الزامی است!"); return; }
        
        const limit_bytes = gb * 1024 * 1024 * 1024;
-       const expiry_date = days > 0 ? Date.now() + (days * 86400000) : 0;
+       const expiry_date = expiryVal ? new Date(expiryVal).getTime() : 0;
        
        await fetch(basePath + '/users', {
          method: 'POST',
@@ -1063,7 +1093,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-uuid').disabled = false;
       document.getElementById('u-name').value = '';
       document.getElementById('u-limit').value = 0;
-      document.getElementById('u-days').value = 0;
+      document.getElementById('u-expiry').value = '';
       document.getElementById('u-cleanip').value = '';
       document.getElementById('user-modal-title').textContent = 'افزودن کاربر جدید';
       generateUUID();
@@ -1076,11 +1106,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-name').value = name;
       document.getElementById('u-limit').value = limitBytes ? (limitBytes / (1024 * 1024 * 1024)).toFixed(2) : 0;
       
-      let days = 0;
       if (expiryDate > 0) {
-        days = Math.max(0, Math.ceil((expiryDate - Date.now()) / 86400000));
+        const d = new Date(expiryDate);
+        const pad = (n) => n.toString().padStart(2, '0');
+        document.getElementById('u-expiry').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      } else {
+        document.getElementById('u-expiry').value = '';
       }
-      document.getElementById('u-days').value = days;
       document.getElementById('u-cleanip').value = cleanIp || '';
       document.getElementById('user-modal-title').textContent = 'ویرایش کاربر';
       openModal('user-modal');
