@@ -3,6 +3,83 @@
 export const WS_READY_STATE_OPEN = 1;
 export const WS_READY_STATE_CLOSING = 2;
 
+// ============ ProxyIP Engine (multi-ProxyIP with fallback) ============
+
+/**
+ * Parse a proxy IP string into an array.
+ * Supports newline, comma, semicolon separators
+ * Ignores empty lines, strips whitespace, handles port: ip:port or just ip
+ */
+function parseProxyIps(proxyIpString) {
+  if (!proxyIpString || typeof proxyIpString !== 'string') return [];
+  return proxyIpString
+    .split(/[\r\n,;]+/)
+    .map(s => {
+      let trimmed = s.trim();
+      // Strip comments after #
+      const hashIdx = trimmed.indexOf('#');
+      if (hashIdx > -1) trimmed = trimmed.substring(0, hashIdx).trim();
+      // Strip @ prefix for SOCKS5-style
+      const atIdx = trimmed.indexOf('@');
+      if (atIdx > -1) trimmed = trimmed.substring(atIdx + 1).trim();
+      return trimmed;
+    })
+    .filter(s => s.length > 0);
+}
+
+/**
+ * Pick a random proxy IP from the array.
+ * Returns null if array is empty.
+ */
+function pickRandomProxyIp(proxyIps) {
+  if (!proxyIps || proxyIps.length === 0) return null;
+  return proxyIps[Math.floor(Math.random() * proxyIps.length)];
+}
+
+/**
+ * Round-robin picker. Maintains an index per key (e.g., userId).
+ * Returns the next proxy IP in the rotation.
+ */
+const proxyIpRoundRobinMap = new Map();
+
+function pickNextProxyIp(proxyIps, key = 'default') {
+  if (!proxyIps || proxyIps.length === 0) return null;
+  let idx = proxyIpRoundRobinMap.get(key) || 0;
+  const picked = proxyIps[idx % proxyIps.length];
+  proxyIpRoundRobinMap.set(key, idx + 1);
+  return picked;
+}
+
+/**
+ * Retry helper for TCP connections.
+ * Tries proxyIPs one by one until one succeeds or all fail.
+ * Returns { socket, usedProxyIp } on success, or null on total failure.
+ */
+async function tryConnectWithFallback(connectFn, proxyIps, remoteSocketWrapper, log) {
+  if (!proxyIps || proxyIps.length === 0) {
+    log('no proxy IPs available, trying direct connection');
+    return null;  // signal caller to try direct
+  }
+
+  for (let i = 0; i < proxyIps.length; i++) {
+    const proxyIp = proxyIps[i];
+    if (!proxyIp) continue;
+    log(`retry attempt ${i + 1}/${proxyIps.length} with proxy IP: ${proxyIp}`);
+    try {
+      const tcpSocket = await connectFn(proxyIp);
+      // Success! Update wrapper and return
+      remoteSocketWrapper.value = tcpSocket;
+      return { socket: tcpSocket, usedProxyIp: proxyIp };
+    } catch (err) {
+      log(`proxy IP ${proxyIp} failed: ${err.message || err}`);
+      remoteSocketWrapper.value = null;
+    }
+  }
+
+  log('all proxy IPs exhausted, connection failed');
+  return null;
+}
+
 // ============ Pure JS SHA-256 and SHA-224 implementation ============
 function sha224_and_224(ascii, is224 = false) {
   const ch = (x, y, z) => (x & y) ^ (~x & z);
@@ -133,6 +210,55 @@ function safeCloseWebSocket(socket) {
   } catch (error) { console.error('safeCloseWebSocket error', error); }
 }
 
+// ============ Connection Tracking ============
+
+/** Map<userId, Set<connectionId>> */
+const activeConnections = new Map();
+
+/**
+ * Track a new connection for a user.
+ * Returns false if the user has exceeded their connection limit.
+ */
+function trackConnectionStart(userId, connLimit = 0) {
+  if (!userId) return true;
+  
+  let conns = activeConnections.get(userId);
+  if (!conns) {
+    conns = new Set();
+    activeConnections.set(userId, conns);
+  }
+  
+  if (connLimit > 0 && conns.size >= connLimit) {
+    return false; // limit exceeded
+  }
+  
+  const connId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  conns.add(connId);
+  
+  return connId;
+}
+
+/**
+ * End tracking for a connection.
+ */
+function trackConnectionEnd(userId, connId) {
+  if (!userId || !connId) return;
+  const conns = activeConnections.get(userId);
+  if (conns) {
+    conns.delete(connId);
+    if (conns.size === 0) activeConnections.delete(userId);
+  }
+}
+
+/**
+ * Get active connection count for a user.
+ */
+function getActiveConnectionCount(userId) {
+  if (!userId) return 0;
+  const conns = activeConnections.get(userId);
+  return conns ? conns.size : 0;
+}
+
 // ============ Security & Auth ============
 async function hashPassword(password) {
   const msgUint8 = new TextEncoder().encode(password);
@@ -182,6 +308,47 @@ function isApiAuthed(request, currentPanelPass, currentUserID) {
   return false;
 }
 
+// ============ Universal Master Token Auth ============
+
+/**
+ * Universal auth checker: checks all possible auth methods
+ * 1. Panel password (cookie-based)
+ * 2. Bearer token (any master key from db)
+ * 3. URL query token
+ * 
+ * Can optionally require a specific scope.
+ * Returns true if ANY valid auth method passes.
+ */
+async function checkMasterAuth(request, env, panelPass) {
+  // 1. Cookie-based panel auth
+  if (panelPass && await isAuthed(request, panelPass)) return true;
+  
+  // 2. Bearer token / URL token against all known keys
+  const authHeader = request.headers.get('Authorization');
+  let token = '';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  } else {
+    const url = new URL(request.url);
+    token = url.searchParams.get('token') || '';
+  }
+  
+  if (!token) return false;
+  
+  // Check against panel password
+  if (panelPass && timingSafeEqual(token, panelPass)) return true;
+  
+  // Check against all API keys in DB
+  try {
+    if (env.DB) {
+      const { results } = await env.DB.prepare('SELECT key FROM api_keys').all();
+      if (results && results.some(r => timingSafeEqual(r.key, token))) return true;
+    }
+  } catch (e) {}
+  
+  return false;
+}
+
 // ============ D1 Database Helpers ============
 async function setupD1Schema(env) {
   if (!env.DB) return;
@@ -194,11 +361,14 @@ async function setupD1Schema(env) {
       limit_bytes INTEGER DEFAULT 0,
       used_bytes INTEGER DEFAULT 0,
       expiry_date INTEGER,
-      enabled BOOLEAN DEFAULT 1
+      enabled BOOLEAN DEFAULT 1,
+      conn_limit INTEGER DEFAULT 0,
+      max_configs INTEGER DEFAULT 0
     );`,
     `CREATE TABLE IF NOT EXISTS api_keys (
       key TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      scopes TEXT DEFAULT 'api',
       created_at INTEGER
     );`,
     `CREATE TABLE IF NOT EXISTS settings (
@@ -248,5 +418,8 @@ async function updateUsageD1(env, uuid, bytes) {
 export { 
   sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify, 
   safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed, isApiAuthed,
-  setupD1Schema, getUserFromD1, updateUsageD1, getSettingD1, setSettingD1
+  setupD1Schema, getUserFromD1, updateUsageD1, getSettingD1, setSettingD1,
+  parseProxyIps, pickRandomProxyIp, pickNextProxyIp, tryConnectWithFallback,
+  trackConnectionStart, trackConnectionEnd, getActiveConnectionCount,
+  checkMasterAuth
 };

@@ -1,4 +1,4 @@
-name = "penhan"
+name = "penhan-exp"
 main = "dist/worker_obfuscated.js"
 compatibility_date = "2023-12-01"
 

@@ -1,4 +1,9 @@
-import { isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224, getSettingD1, setSettingD1 } from './helpers.js';
+import { 
+  isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, 
+  updateUsageD1, sha224_and_224, getSettingD1, setSettingD1,
+  parseProxyIps, pickRandomProxyIp,
+  checkMasterAuth, trackConnectionStart, trackConnectionEnd, getActiveConnectionCount
+} from './helpers.js';
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';
@@ -32,7 +37,7 @@ export default {
     try {
       await setupD1Schema(env);
 
-      let currentProxyIP = (await getSettingD1(env, 'proxy_ip')) || env.PROXYIP || '';
+      let currentProxyIPRaw = (await getSettingD1(env, 'proxy_ip')) || env.PROXYIP || '';
       let currentPanelPass = (await getSettingD1(env, 'panel_pass')) || env.PANEL_PASSWORD || env.PASSWORD || '';
       let currentAdminUUID = (await getSettingD1(env, 'uuid')) || env.UUID || ''; 
       let cfAccountId = await getSettingD1(env, 'cf_account_id') || '';
@@ -79,9 +84,9 @@ export default {
       if (upgradeHeader === 'websocket') {
         const decodedPath = decodeURIComponent(path).toLowerCase();
         if (decodedPath.includes('trojan-ws') || decodedPath.includes('trojan')) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIP, onUsage);
+          return await trojanOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIP, onUsage);
+          return await vlessOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
         }
       }
 
@@ -89,7 +94,7 @@ export default {
 
       if (!isSetupComplete) {
         if (path === '/panel' || path === '/') {
-           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
+           return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIPRaw), {
              status: 200,
              headers: { 'Content-Type': 'text/html; charset=utf-8' },
            });
@@ -105,7 +110,7 @@ export default {
         if (currentPanelPass && !(await isAuthed(request, currentPanelPass))) {
           return new Response(loginPage('/panel', host), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
-        return new Response(panelPage(host, currentAdminUUID, currentProxyIP, cfAccountId, cfApiToken), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+        return new Response(panelPage(host, currentAdminUUID, currentProxyIPRaw, cfAccountId, cfApiToken), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
 
       // panel-auth
@@ -132,17 +137,13 @@ export default {
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
 
+      // ============ Universal Auth Middleware ============
+      // All /api/* routes check ALL auth methods:
+      // 1. Cookie (panel password)
+      // 2. Bearer token (any api_key)
+      // 3. URL ?token= parameter
       const checkApiAuth = async (req) => {
-        if (currentPanelPass && (await isAuthed(req, currentPanelPass))) return true;
-        const authHeader = req.headers.get('Authorization');
-        let token = '';
-        if (authHeader && authHeader.startsWith('Bearer ')) token = authHeader.substring(7).trim();
-        else token = new URL(req.url).searchParams.get('token') || '';
-        if (token) {
-          const tokens = await getAllTokens(env);
-          if (tokens.some(t => t.key === token)) return true;
-        }
-        return false;
+        return await checkMasterAuth(req, env, currentPanelPass);
       };
 
       if (path.startsWith('/api/')) {
@@ -153,20 +154,39 @@ export default {
         if (path === '/api/users') {
            if (request.method === 'GET') {
              const users = await getAllUsers(env);
-             return new Response(JSON.stringify({ok: true, users}), {status: 200, headers: {'Content-Type': 'application/json'}});
+             // Add live connection count for each user
+             const usersWithConns = users.map(u => ({
+               ...u,
+               active_connections: getActiveConnectionCount(u.id)
+             }));
+             return new Response(JSON.stringify({ok: true, users: usersWithConns}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
            if (request.method === 'POST') {
              const b = await request.json();
+             
+             // Support: proxy_ip can now be multi-line (for multi-proxyIP)
+             const proxyIpVal = b.proxy_ip !== undefined ? b.proxy_ip.trim() : '';
+             
              await env.DB.prepare(`
-                INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled, conn_limit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   name = excluded.name,
                   clean_ip = excluded.clean_ip,
+                  proxy_ip = excluded.proxy_ip,
                   limit_bytes = excluded.limit_bytes,
                   expiry_date = excluded.expiry_date,
-                  enabled = excluded.enabled
-              `).bind(b.id, b.name, b.clean_ip || '', b.proxy_ip || '', b.limit_bytes || 0, b.expiry_date || 0, b.enabled === false ? 0 : 1).run();
+                  enabled = excluded.enabled,
+                  conn_limit = excluded.conn_limit
+              `).bind(
+                b.id, b.name, 
+                b.clean_ip || '', 
+                proxyIpVal,
+                b.limit_bytes || 0, 
+                b.expiry_date || 0, 
+                b.enabled === false ? 0 : 1,
+                b.conn_limit || 0
+              ).run();
              usersCache = null;
              return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
@@ -191,8 +211,8 @@ export default {
            }
            if (request.method === 'POST') {
              const b = await request.json();
-             await env.DB.prepare('INSERT INTO api_keys (key, name, created_at) VALUES (?, ?, ?)')
-               .bind(b.key, b.name, Date.now()).run();
+             await env.DB.prepare('INSERT INTO api_keys (key, name, scopes, created_at) VALUES (?, ?, ?, ?)')
+               .bind(b.key, b.name, b.scopes || 'api', Date.now()).run();
              return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
         }
@@ -213,6 +233,7 @@ export default {
           return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
 
+        // Cloudflare metrics
         if (path === '/api/cf-metrics' && request.method === 'GET') {
           const accountId = await getSettingD1(env, 'cf_account_id');
           const apiToken = await getSettingD1(env, 'cf_api_token');
@@ -274,6 +295,7 @@ export default {
         return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});
       }
 
+      // ============ Subscription System ============
       if (path.endsWith('/sub')) {
          const parts = path.split('/');
          const subId = parts[1] === 'sub' ? parts[2] : parts[1];
@@ -282,8 +304,19 @@ export default {
          if (user) {
             const host = request.headers.get('Host');
             const userAgent = (request.headers.get('User-Agent') || '').toLowerCase();
-            const isBrowser = userAgent.includes('mozilla') || userAgent.includes('chrome') || userAgent.includes('safari') || userAgent.includes('applewebkit');
-            const isProxyClient = !isBrowser || userAgent.includes('v2ray') || userAgent.includes('hiddify') || userAgent.includes('clash') || userAgent.includes('sing-box') || userAgent.includes('shadowrocket') || userAgent.includes('streisand') || userAgent.includes('v2box') || userAgent.includes('foxray') || userAgent.includes('loon') || userAgent.includes('nekobox');
+            
+            // Detect client type comprehensively
+            const isBrowser = /mozilla|chrome|safari|applewebkit|gecko|opera|edge/i.test(userAgent) && !/cla.*sh|si.*ng.*box|v2ray|shadowrocket|quantum.*ult|surf.*board|sta.*sh/i.test(userAgent);
+            
+            const isClash = /cla.*sh|clash|mihomo|stash/i.test(userAgent);
+            const isSingBox = /sing.*box|singbox/i.test(userAgent);
+            const isV2ray = /v2ray|v2rayng|v2rayn|nekobox|nekoray/i.test(userAgent);
+            const isShadowrocket = /shadowrocket/i.test(userAgent);
+            const isSurge = /surge/i.test(userAgent);
+            const isLoon = /loon/i.test(userAgent);
+            const isStash = /stash/i.test(userAgent);
+            const isHiddify = /hiddify/i.test(userAgent);
+            const isSagerNet = /sagernet|v2box|foxray|streisand/i.test(userAgent);
             
             const randomizeCase = (str) => str.split('').map(c => Math.random() > 0.5 ? c.toUpperCase() : c.toLowerCase()).join('');
             const randomSNI = randomizeCase(host);
@@ -297,14 +330,44 @@ export default {
             
             const addr = user.clean_ip || host;
             
-            const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#VLESS-${user.name}`;
-            const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
+            // Build proxy IP comment for multi-ProxyIP
+            const userProxyIPs = parseProxyIps(user.proxy_ip || currentProxyIPRaw);
+            const proxyIpNote = userProxyIPs.length > 1 ? ` (${userProxyIPs.length} IPs)` : '';
             
-            if (isProxyClient) {
-               return new Response(btoa(unescape(encodeURIComponent(vlessWS + '\n' + trojanWS + '\n'))), { status: 200, headers: {'Content-Type': 'text/plain'} });
+            const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#VLESS-${user.name}${proxyIpNote}`;
+            const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}${proxyIpNote}`;
+            
+            // Build multi-proxyIP export for advanced clients
+            let multiProxyExport = '';
+            if (userProxyIPs.length > 0) {
+              // For each proxy IP, generate an extra config that routes through that specific IP
+              userProxyIPs.forEach((pip, idx) => {
+                if (!pip) return;
+                const pipLabel = pip.includes(':') ? pip.split(':')[0] : pip;
+                multiProxyExport += `\n${vlessWS.replace('#VLESS-', `#VLESS-${user.name}-${pipLabel}`)}\n`;
+                multiProxyExport += `${trojanWS.replace('#Trojan-', `#Trojan-${user.name}-${pipLabel}`)}\n`;
+              });
             }
-            return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+            
+            // URI format for all proxy clients (v2rayNG, Nekobox, Streisand, etc.)
+            const uriOutput = vlessWS + '\n' + trojanWS + (multiProxyExport ? '\n' + multiProxyExport : '');
+            
+            if (isBrowser) {
+              return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+            }
+            
+            // For API clients receiving subscription, return Base64
+            return new Response(btoa(unescape(encodeURIComponent(uriOutput))), { 
+              status: 200, 
+              headers: {'Content-Type': 'text/plain; charset=utf-8'} 
+            });
          }
+         
+         // User not found
+         return new Response(nginxPage(), {
+           status: 404,
+           headers: { 'Content-Type': 'text/html; charset=utf-8', 'Server': 'nginx/1.24.0' },
+         });
       }
 
       // 8. Other Setup Routes
@@ -325,7 +388,7 @@ export default {
       });
     } catch (err) {
       console.error(err);
-      return new Response('Internal Server Error', { status: 500 });
+      return new Response('Internal Server Error: ' + (err.message || err), { status: 500 });
     }
   },
 };

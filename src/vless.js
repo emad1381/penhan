@@ -1,8 +1,10 @@
 // VLESS Protocol Handler
 import { connect } from 'cloudflare:sockets';
-import { WS_READY_STATE_OPEN, safeCloseWebSocket, base64ToArrayBuffer, isValidUUID, stringify, sha224_and_224 } from './helpers.js';
-
-
+import { 
+  WS_READY_STATE_OPEN, safeCloseWebSocket, base64ToArrayBuffer, isValidUUID, stringify, sha224_and_224,
+  parseProxyIps, pickRandomProxyIp, tryConnectWithFallback,
+  trackConnectionStart, trackConnectionEnd
+} from './helpers.js';
 
 async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
   let isVlessHeaderSent = false;
@@ -82,41 +84,83 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log, onUp
   return stream;
 }
 
-async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
+/**
+ * Enhanced TCP outbound handler with multi-ProxyIP support.
+ * 
+ * Flow:
+ * 1. Try direct connection to addressRemote
+ * 2. If direct fails, try each proxy IP in sequence
+ * 3. If no proxy IP works, send close to WebSocket
+ */
+async function handleTCPOutBound(remoteSocketWrapper, userConnId, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
   async function connectAndWrite(address, port) {
     const tcpSocket = connect({ hostname: address, port: port });
     remoteSocketWrapper.value = tcpSocket;
     log('connected to ' + address + ':' + port);
     const writer = tcpSocket.writable.getWriter();
-    await writer.write(rawClientData);
+    try {
+      await writer.write(rawClientData);
+    } catch (e) {
+      log('write error: ' + e.message);
+      writer.releaseLock();
+      throw e;
+    }
     writer.releaseLock();
-    tcpSocket.closed.catch(error => { log('tcpSocket closed: ' + error); }).finally(() => { remoteSocketWrapper.value = null; });
+    tcpSocket.closed.catch(error => { 
+      log('tcpSocket closed: ' + error); 
+    }).finally(() => { 
+      remoteSocketWrapper.value = null; 
+    });
     return tcpSocket;
   }
 
-  async function retry() {
-    if (!proxyIP) {
+  async function retryWithFallback() {
+    // Parse proxy IPs - user may have multiple
+    const proxyIps = parseProxyIps(proxyIP);
+    
+    if (!proxyIps || proxyIps.length === 0) {
       log('no proxy IP configured, retry impossible');
       webSocket.close(1011, 'Connection failed: no proxy IP');
       return;
     }
-    log('retrying with proxy IP: ' + proxyIP);
-    try {
-      const tcpSocket = await connectAndWrite(proxyIP, portRemote);
-      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
-    } catch (err) {
-      log('retry connect failed: ' + err);
-      webSocket.close(1011, 'Retry failed: ' + err);
+
+    log('retrying with ' + proxyIps.length + ' proxy IP(s)');
+    
+    // Shuffle proxy IPs for load distribution
+    const shuffled = [...proxyIps].sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < shuffled.length; i++) {
+      const currentProxyIp = shuffled[i];
+      if (!currentProxyIp) continue;
+      
+      log(`retry attempt ${i + 1}/${shuffled.length} with proxy: ${currentProxyIp}`);
+      try {
+        const tcpSocket = await connectAndWrite(currentProxyIp, portRemote);
+        // Success! Stream data
+        await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
+        return; // done
+      } catch (err) {
+        log(`proxy ${currentProxyIp} failed: ${err.message || err}`);
+        remoteSocketWrapper.value = null;
+      }
     }
+
+    // All proxies exhausted
+    log('all proxy IPs exhausted, closing connection');
+    webSocket.close(1011, 'All proxies failed');
   }
 
   try {
+    // First attempt: try direct connection
     const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log, onDownload);
+    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retryWithFallback, log, onDownload);
   } catch (error) {
     log('first connection attempt failed: ' + error);
-    if (proxyIP) { retry(); }
-    else { webSocket.close(1011, 'Connection failed: ' + error); }
+    if (proxyIP) { 
+      retryWithFallback(); 
+    } else { 
+      webSocket.close(1011, 'Connection failed: ' + error); 
+    }
   }
 }
 
@@ -216,6 +260,7 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
   let activeUserID = null;
+  let connTrackingId = null;
   
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
@@ -286,6 +331,16 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
       }
       activeUserID = userObj.id;
       
+      // Track connection start
+      const connLimit = userObj.conn_limit || 0;
+      connTrackingId = trackConnectionStart(activeUserID, connLimit);
+      if (connTrackingId === false) {
+        log('connection limit exceeded for user');
+        throw new Error('connection limit exceeded');
+      }
+      
+      // Get proxy IPs: user-specific proxy_ip or global default
+      // Support multi-proxyIP: user can have comma/line-separated list
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
 
       address = addressRemote;
@@ -309,12 +364,26 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         return;
       }
 
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
+      handleTCPOutBound(remoteSocketWrapper, connTrackingId, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
     },
-    close() { log('readableWebSocketStream closed'); },
-    abort(reason) { log('readableWebSocketStream aborted', JSON.stringify(reason)); },
+    close() { 
+      log('readableWebSocketStream closed');
+      // Clean up connection tracking
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
+    },
+    abort(reason) { 
+      log('readableWebSocketStream aborted', JSON.stringify(reason));
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
+    },
   })).catch((err) => {
     log('pipeTo error', err);
+    if (activeUserID && connTrackingId) {
+      trackConnectionEnd(activeUserID, connTrackingId);
+    }
     safeCloseWebSocket(webSocket);
   });
 

@@ -883,12 +883,20 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <input type="number" id="u-limit" class="form-control" value="0">
       </div>
       <div class="form-group">
+        <label>محدودیت اتصالات همزمان (Connection Limit) - 0 برای نامحدود</label>
+        <input type="number" id="u-connlimit" class="form-control" value="0">
+      </div>
+      <div class="form-group">
         <label>تاریخ انقضا (برای نامحدود، خالی بگذارید)</label>
         <input type="datetime-local" id="u-expiry" class="form-control">
       </div>
       <div class="form-group">
         <label>Clean IP اختصاصی (اختیاری)</label>
         <input type="text" id="u-cleanip" class="form-control" placeholder="آی‌پی تمیز کلادفلر">
+      </div>
+      <div class="form-group">
+        <label>Proxy IP اختصاصی (اختیاری - چندگانه با خط جدید/کاما جدا کنید)</label>
+        <textarea id="u-proxyip" class="form-control" rows="2" placeholder="مثال: 1.2.3.4&#10;5.6.7.8"></textarea>
       </div>
       <button class="btn" style="width:100%; margin-top:16px;" onclick="saveUser()">ذخیره کاربر</button>
     </div>
@@ -985,10 +993,19 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           }
           let statusBadge = u.enabled ? '<span class="badge green">فعال</span>' : '<span class="badge red">مسدود</span>';
           
+          // Conn Limit label
+          let connLimitLabel = u.conn_limit > 0 ? u.conn_limit : '∞';
+          let activeConnsLabel = u.active_connections !== undefined ? u.active_connections : 0;
+          let activeConnsColor = activeConnsLabel > 0 ? 'var(--success)' : 'var(--muted)';
+          
           tbody.innerHTML += \`<tr>
-            <td style="font-weight:600">\${u.name} <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}')">✏️</span></td>
+            <td style="font-weight:600">
+              \${u.name} 
+              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/
+?\n/g, '\\\\n')}')">✏️</span>
+            </td>
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
-            <td>\${statusBadge}</td>
+            <td>\${statusBadge} <span class="badge" style="color:\${activeConnsColor}; background:rgba(255,255,255,0.02)">👥 \${activeConnsLabel}/\${connLimitLabel}</span></td>
             <td style="direction:ltr; text-align:right">\${usage}</td>
             <td>\${expiryHTML}</td>
             <td>
@@ -1007,8 +1024,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const id = document.getElementById('u-uuid').value;
        const name = document.getElementById('u-name').value;
        let gb = parseFloat(document.getElementById('u-limit').value) || 0;
+       let connLimit = parseInt(document.getElementById('u-connlimit').value) || 0;
        const expiryVal = document.getElementById('u-expiry').value;
        const clean = document.getElementById('u-cleanip').value;
+       const proxyip = document.getElementById('u-proxyip').value;
        
        if (!id || !name) { alert("وارد کردن نام و UUID الزامی است!"); return; }
        
@@ -1018,7 +1037,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        await fetch(basePath + '/users', {
          method: 'POST',
          headers: {'Content-Type': 'application/json'},
-         body: JSON.stringify({ id, name, limit_bytes, expiry_date, clean_ip: clean })
+         body: JSON.stringify({ 
+           id, name, limit_bytes, expiry_date, 
+           clean_ip: clean, proxy_ip: proxyip, 
+           conn_limit: connLimit 
+         })
        });
        closeModal('user-modal');
        loadUsers();
@@ -1093,27 +1116,31 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-uuid').disabled = false;
       document.getElementById('u-name').value = '';
       document.getElementById('u-limit').value = 0;
+      document.getElementById('u-connlimit').value = 0;
       document.getElementById('u-expiry').value = '';
       document.getElementById('u-cleanip').value = '';
+      document.getElementById('u-proxyip').value = '';
       document.getElementById('user-modal-title').textContent = 'افزودن کاربر جدید';
       generateUUID();
       openModal('user-modal');
     }
 
-    function editUser(id, name, limitBytes, expiryDate, cleanIp) {
+    function editUser(id, name, limitBytes, expiryDate, cleanIp, connLimit, proxyIp) {
       document.getElementById('u-uuid').value = id;
       document.getElementById('u-uuid').disabled = true;
       document.getElementById('u-name').value = name;
       document.getElementById('u-limit').value = limitBytes ? (limitBytes / (1024 * 1024 * 1024)).toFixed(2) : 0;
+      document.getElementById('u-connlimit').value = connLimit || 0;
       
       if (expiryDate > 0) {
         const d = new Date(expiryDate);
         const pad = (n) => n.toString().padStart(2, '0');
-        document.getElementById('u-expiry').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        document.getElementById('u-expiry').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
       } else {
         document.getElementById('u-expiry').value = '';
       }
       document.getElementById('u-cleanip').value = cleanIp || '';
+      document.getElementById('u-proxyip').value = proxyIp || '';
       document.getElementById('user-modal-title').textContent = 'ویرایش کاربر';
       openModal('user-modal');
     }

@@ -1,6 +1,10 @@
 // Trojan Protocol Handler
 import { connect } from 'cloudflare:sockets';
-import { WS_READY_STATE_OPEN, safeCloseWebSocket, base64ToArrayBuffer, sha224_and_224 } from './helpers.js';
+import { 
+  WS_READY_STATE_OPEN, safeCloseWebSocket, base64ToArrayBuffer, sha224_and_224,
+  parseProxyIps, pickRandomProxyIp, tryConnectWithFallback,
+  trackConnectionStart, trackConnectionEnd
+} from './helpers.js';
 import { makeReadableWebSocketStream, handleTCPOutBound, remoteSocketToWS, handleUDPOutBound } from './vless.js';
 
 
@@ -128,6 +132,7 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
   let activeUserID = null;
+  let connTrackingId = null;
   
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
@@ -185,8 +190,7 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
       }
 
       // We don't have the user's plain pass, we only have the hash.
-      // But we need to identify the user. We will iterate over users in the main script to find the match, or we can just pass the clientHash.
-      // Actually, we can just pass the clientHash to authenticate(), and main script will check if any user's hashed ID matches.
+      // But we need to identify the user. We will pass the clientHash.
       
       const clientHash = new TextDecoder().decode(chunk.slice(0, 56));
       
@@ -203,6 +207,15 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
       }
       activeUserID = userObj.id;
       
+      // Track connection start
+      const connLimit = userObj.conn_limit || 0;
+      connTrackingId = trackConnectionStart(activeUserID, connLimit);
+      if (connTrackingId === false) {
+        log('connection limit exceeded for user');
+        throw new Error('connection limit exceeded');
+      }
+      
+      // Get proxy IPs (support multi-ProxyIP)
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
 
       address = addressRemote;
@@ -225,12 +238,25 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
         return;
       }
 
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
+      handleTCPOutBound(remoteSocketWrapper, connTrackingId, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
     },
-    close() { log('readableWebSocketStream closed'); },
-    abort(reason) { log('readableWebSocketStream aborted', JSON.stringify(reason)); },
+    close() { 
+      log('readableWebSocketStream closed');
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
+    },
+    abort(reason) { 
+      log('readableWebSocketStream aborted', JSON.stringify(reason));
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
+    },
   })).catch((err) => {
     log('pipeTo error', err);
+    if (activeUserID && connTrackingId) {
+      trackConnectionEnd(activeUserID, connTrackingId);
+    }
     safeCloseWebSocket(webSocket);
   });
 

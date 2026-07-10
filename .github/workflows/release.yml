@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - penhan-experimental
 
 jobs:
   build-and-release:
@@ -36,7 +37,7 @@ jobs:
           git add dist/
           # Only commit if there are changes
           git diff --staged --quiet || git commit -m "chore: auto-build and obfuscate [skip ci]"
-          git pull --rebase origin main || true
+          git pull --rebase origin ${{ github.ref_name }} || true
           git push origin HEAD:${{ github.ref }}
 
       - name: Generate Tag and Changelog

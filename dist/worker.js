@@ -1,6 +1,20 @@
 // src/helpers.js
 var WS_READY_STATE_OPEN = 1;
 var WS_READY_STATE_CLOSING = 2;
+function parseProxyIps(proxyIpString) {
+  if (!proxyIpString || typeof proxyIpString !== "string")
+    return [];
+  return proxyIpString.split(/[\r\n,;]+/).map((s) => {
+    let trimmed = s.trim();
+    const hashIdx = trimmed.indexOf("#");
+    if (hashIdx > -1)
+      trimmed = trimmed.substring(0, hashIdx).trim();
+    const atIdx = trimmed.indexOf("@");
+    if (atIdx > -1)
+      trimmed = trimmed.substring(atIdx + 1).trim();
+    return trimmed;
+  }).filter((s) => s.length > 0);
+}
 function sha224_and_224(ascii, is224 = false) {
   const ch = (x, y, z) => x & y ^ ~x & z;
   const maj = (x, y, z) => x & y ^ x & z ^ y & z;
@@ -185,6 +199,38 @@ function safeCloseWebSocket(socket) {
     console.error("safeCloseWebSocket error", error);
   }
 }
+var activeConnections = /* @__PURE__ */ new Map();
+function trackConnectionStart(userId, connLimit = 0) {
+  if (!userId)
+    return true;
+  let conns = activeConnections.get(userId);
+  if (!conns) {
+    conns = /* @__PURE__ */ new Set();
+    activeConnections.set(userId, conns);
+  }
+  if (connLimit > 0 && conns.size >= connLimit) {
+    return false;
+  }
+  const connId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  conns.add(connId);
+  return connId;
+}
+function trackConnectionEnd(userId, connId) {
+  if (!userId || !connId)
+    return;
+  const conns = activeConnections.get(userId);
+  if (conns) {
+    conns.delete(connId);
+    if (conns.size === 0)
+      activeConnections.delete(userId);
+  }
+}
+function getActiveConnectionCount(userId) {
+  if (!userId)
+    return 0;
+  const conns = activeConnections.get(userId);
+  return conns ? conns.size : 0;
+}
 async function hashPassword(password) {
   const msgUint8 = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
@@ -210,6 +256,31 @@ async function isAuthed(request, pass) {
   const hashedPass = await hashPassword(pass);
   return timingSafeEqual(match[1], hashedPass);
 }
+async function checkMasterAuth(request, env, panelPass) {
+  if (panelPass && await isAuthed(request, panelPass))
+    return true;
+  const authHeader = request.headers.get("Authorization");
+  let token = "";
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7).trim();
+  } else {
+    const url = new URL(request.url);
+    token = url.searchParams.get("token") || "";
+  }
+  if (!token)
+    return false;
+  if (panelPass && timingSafeEqual(token, panelPass))
+    return true;
+  try {
+    if (env.DB) {
+      const { results } = await env.DB.prepare("SELECT key FROM api_keys").all();
+      if (results && results.some((r) => timingSafeEqual(r.key, token)))
+        return true;
+    }
+  } catch (e) {
+  }
+  return false;
+}
 async function setupD1Schema(env) {
   if (!env.DB)
     return;
@@ -222,11 +293,14 @@ async function setupD1Schema(env) {
       limit_bytes INTEGER DEFAULT 0,
       used_bytes INTEGER DEFAULT 0,
       expiry_date INTEGER,
-      enabled BOOLEAN DEFAULT 1
+      enabled BOOLEAN DEFAULT 1,
+      conn_limit INTEGER DEFAULT 0,
+      max_configs INTEGER DEFAULT 0
     );`,
     `CREATE TABLE IF NOT EXISTS api_keys (
       key TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      scopes TEXT DEFAULT 'api',
       created_at INTEGER
     );`,
     `CREATE TABLE IF NOT EXISTS settings (
@@ -360,13 +434,19 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log, onUp
   });
   return stream;
 }
-async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
+async function handleTCPOutBound(remoteSocketWrapper, userConnId, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
   async function connectAndWrite(address, port) {
     const tcpSocket = connect({ hostname: address, port });
     remoteSocketWrapper.value = tcpSocket;
     log("connected to " + address + ":" + port);
     const writer = tcpSocket.writable.getWriter();
-    await writer.write(rawClientData);
+    try {
+      await writer.write(rawClientData);
+    } catch (e) {
+      log("write error: " + e.message);
+      writer.releaseLock();
+      throw e;
+    }
     writer.releaseLock();
     tcpSocket.closed.catch((error) => {
       log("tcpSocket closed: " + error);
@@ -375,28 +455,39 @@ async function handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote,
     });
     return tcpSocket;
   }
-  async function retry() {
-    if (!proxyIP) {
+  async function retryWithFallback() {
+    const proxyIps = parseProxyIps(proxyIP);
+    if (!proxyIps || proxyIps.length === 0) {
       log("no proxy IP configured, retry impossible");
       webSocket.close(1011, "Connection failed: no proxy IP");
       return;
     }
-    log("retrying with proxy IP: " + proxyIP);
-    try {
-      const tcpSocket = await connectAndWrite(proxyIP, portRemote);
-      remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
-    } catch (err) {
-      log("retry connect failed: " + err);
-      webSocket.close(1011, "Retry failed: " + err);
+    log("retrying with " + proxyIps.length + " proxy IP(s)");
+    const shuffled = [...proxyIps].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < shuffled.length; i++) {
+      const currentProxyIp = shuffled[i];
+      if (!currentProxyIp)
+        continue;
+      log(`retry attempt ${i + 1}/${shuffled.length} with proxy: ${currentProxyIp}`);
+      try {
+        const tcpSocket = await connectAndWrite(currentProxyIp, portRemote);
+        await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log, onDownload);
+        return;
+      } catch (err) {
+        log(`proxy ${currentProxyIp} failed: ${err.message || err}`);
+        remoteSocketWrapper.value = null;
+      }
     }
+    log("all proxy IPs exhausted, closing connection");
+    webSocket.close(1011, "All proxies failed");
   }
   try {
     const tcpSocket = await connectAndWrite(addressRemote, portRemote);
-    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log, onDownload);
+    await remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retryWithFallback, log, onDownload);
   } catch (error) {
     log("first connection attempt failed: " + error);
     if (proxyIP) {
-      retry();
+      retryWithFallback();
     } else {
       webSocket.close(1011, "Connection failed: " + error);
     }
@@ -513,6 +604,7 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
   let activeUserID = null;
+  let connTrackingId = null;
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
     if (onUsage && activeUserID) {
@@ -577,6 +669,12 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         throw new Error("user not found or disabled");
       }
       activeUserID = userObj.id;
+      const connLimit = userObj.conn_limit || 0;
+      connTrackingId = trackConnectionStart(activeUserID, connLimit);
+      if (connTrackingId === false) {
+        log("connection limit exceeded for user");
+        throw new Error("connection limit exceeded");
+      }
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
@@ -596,16 +694,25 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         udpStreamWrite(rawClientData);
         return;
       }
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
+      handleTCPOutBound(remoteSocketWrapper, connTrackingId, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, handleDownload);
     },
     close() {
       log("readableWebSocketStream closed");
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
     },
     abort(reason) {
       log("readableWebSocketStream aborted", JSON.stringify(reason));
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
     }
   })).catch((err) => {
     log("pipeTo error", err);
+    if (activeUserID && connTrackingId) {
+      trackConnectionEnd(activeUserID, connTrackingId);
+    }
     safeCloseWebSocket(webSocket);
   });
   return new Response(null, { status: 101, webSocket: client });
@@ -676,6 +783,7 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
   let currentSessionUpload = 0;
   let currentSessionDownload = 0;
   let activeUserID = null;
+  let connTrackingId = null;
   const handleUpload = (bytes) => {
     currentSessionUpload += bytes;
     if (onUsage && activeUserID) {
@@ -739,6 +847,12 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
         throw new Error("user not found or disabled");
       }
       activeUserID = userObj.id;
+      const connLimit = userObj.conn_limit || 0;
+      connTrackingId = trackConnectionStart(activeUserID, connLimit);
+      if (connTrackingId === false) {
+        log("connection limit exceeded for user");
+        throw new Error("connection limit exceeded");
+      }
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
@@ -757,16 +871,25 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
         udpStreamWrite(rawClientData);
         return;
       }
-      handleTCPOutBound(remoteSocketWrapper, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
+      handleTCPOutBound(remoteSocketWrapper, connTrackingId, addressRemote, portRemote, rawClientData, webSocket, new Uint8Array([]), proxyIP, log, handleDownload);
     },
     close() {
       log("readableWebSocketStream closed");
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
     },
     abort(reason) {
       log("readableWebSocketStream aborted", JSON.stringify(reason));
+      if (activeUserID && connTrackingId) {
+        trackConnectionEnd(activeUserID, connTrackingId);
+      }
     }
   })).catch((err) => {
     log("pipeTo error", err);
+    if (activeUserID && connTrackingId) {
+      trackConnectionEnd(activeUserID, connTrackingId);
+    }
     safeCloseWebSocket(webSocket);
   });
   return new Response(null, { status: 101, webSocket: client });
@@ -1204,14 +1327,23 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   } else {
     usageText = `${formatBytes(used)} (\u0628\u062F\u0648\u0646 \u0633\u0642\u0641)`;
   }
-  let daysLeftText = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  let expiryAbsolute = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  let expiryRelative = "\u221E";
   if (user.expiry_date > 0) {
+    const d = new Date(user.expiry_date);
+    const pad = (n) => n.toString().padStart(2, "0");
+    expiryAbsolute = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     const diff = user.expiry_date - Date.now();
     if (diff < 0) {
-      daysLeftText = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
+      expiryRelative = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
     } else {
-      const days = Math.ceil(diff / (1e3 * 60 * 60 * 24));
-      daysLeftText = days + " \u0631\u0648\u0632";
+      const days = Math.floor(diff / (1e3 * 60 * 60 * 24));
+      const hours = Math.floor(diff % (1e3 * 60 * 60 * 24) / (1e3 * 60 * 60));
+      if (days > 0) {
+        expiryRelative = `${days} \u0631\u0648\u0632 \u0648 ${hours} \u0633\u0627\u0639\u062A \u062F\u06CC\u06AF\u0631`;
+      } else {
+        expiryRelative = `${hours} \u0633\u0627\u0639\u062A \u062F\u06CC\u06AF\u0631`;
+      }
     }
   }
   let statusClass = "active";
@@ -1313,7 +1445,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC</div>
-        <div class="stat-val">${daysLeftText}</div>
+        <div class="stat-val" style="font-size:14px; direction:ltr;">${expiryAbsolute}</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${expiryRelative}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">\u062A\u0631\u0627\u0641\u06CC\u06A9 \u0645\u0635\u0631\u0641\u06CC</div>
@@ -1653,12 +1786,20 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <input type="number" id="u-limit" class="form-control" value="0">
       </div>
       <div class="form-group">
-        <label>\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC (\u0631\u0648\u0632) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
-        <input type="number" id="u-days" class="form-control" value="0">
+        <label>\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0627\u062A\u0635\u0627\u0644\u0627\u062A \u0647\u0645\u0632\u0645\u0627\u0646 (Connection Limit) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
+        <input type="number" id="u-connlimit" class="form-control" value="0">
+      </div>
+      <div class="form-group">
+        <label>\u062A\u0627\u0631\u06CC\u062E \u0627\u0646\u0642\u0636\u0627 (\u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F\u060C \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F)</label>
+        <input type="datetime-local" id="u-expiry" class="form-control">
       </div>
       <div class="form-group">
         <label>Clean IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
         <input type="text" id="u-cleanip" class="form-control" placeholder="\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631">
+      </div>
+      <div class="form-group">
+        <label>Proxy IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC - \u0686\u0646\u062F\u06AF\u0627\u0646\u0647 \u0628\u0627 \u062E\u0637 \u062C\u062F\u06CC\u062F/\u06A9\u0627\u0645\u0627 \u062C\u062F\u0627 \u06A9\u0646\u06CC\u062F)</label>
+        <textarea id="u-proxyip" class="form-control" rows="2" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4&#10;5.6.7.8"></textarea>
       </div>
       <button class="btn" style="width:100%; margin-top:16px;" onclick="saveUser()">\u0630\u062E\u06CC\u0631\u0647 \u06A9\u0627\u0631\u0628\u0631</button>
     </div>
@@ -1730,23 +1871,51 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         }
         data.users.forEach(u => {
           let usage = u.limit_bytes ? \`\${formatBytes(u.used_bytes)} / \${formatBytes(u.limit_bytes)}\` : \`\${formatBytes(u.used_bytes)} (\u221E)\`;
-          let days = '\u221E';
+          let expiryHTML = '<span style="color:#a1a1aa">\u0646\u0627\u0645\u062D\u062F\u0648\u062F (\u221E)</span>';
           if (u.expiry_date) {
-            let left = Math.ceil((u.expiry_date - Date.now()) / 86400000);
-            days = left < 0 ? '\u0645\u0646\u0642\u0636\u06CC' : left + ' \u0631\u0648\u0632';
+            const d = new Date(u.expiry_date);
+            const pad = (n) => n.toString().padStart(2, '0');
+            const abs = \`\${d.getFullYear()}/\${pad(d.getMonth() + 1)}/\${pad(d.getDate())} \${pad(d.getHours())}:\${pad(d.getMinutes())}\`;
+            
+            const diff = u.expiry_date - Date.now();
+            let rel = '';
+            let badgeClass = 'green';
+            if (diff < 0) {
+               rel = '\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647';
+               badgeClass = 'red';
+            } else {
+               const days = Math.floor(diff / 86400000);
+               const hours = Math.floor((diff % 86400000) / 3600000);
+               rel = days > 0 ? \`\${days} \u0631\u0648\u0632 \u0648 \${hours} \u0633\u0627\u0639\u062A\` : \`\${hours} \u0633\u0627\u0639\u062A\`;
+            }
+            
+            expiryHTML = \`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <span style="font-size:12px; font-weight:600; direction:ltr;">\${abs}</span>
+              <span class="badge \${badgeClass}" style="font-size:10px; padding:2px 6px;">\${rel}</span>
+            </div>\`;
           }
           let statusBadge = u.enabled ? '<span class="badge green">\u0641\u0639\u0627\u0644</span>' : '<span class="badge red">\u0645\u0633\u062F\u0648\u062F</span>';
           
+          // Conn Limit label
+          let connLimitLabel = u.conn_limit > 0 ? u.conn_limit : '\u221E';
+          let activeConnsLabel = u.active_connections !== undefined ? u.active_connections : 0;
+          let activeConnsColor = activeConnsLabel > 0 ? 'var(--success)' : 'var(--muted)';
+          
           tbody.innerHTML += \`<tr>
-            <td style="font-weight:600">\${u.name} <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}')">\u270F\uFE0F</span></td>
+            <td style="font-weight:600">
+              \${u.name} 
+              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/
+?
+/g, '\\\\n')}')">\u270F\uFE0F</span>
+            </td>
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
-            <td>\${statusBadge}</td>
+            <td>\${statusBadge} <span class="badge" style="color:\${activeConnsColor}; background:rgba(255,255,255,0.02)">\u{1F465} \${activeConnsLabel}/\${connLimitLabel}</span></td>
             <td style="direction:ltr; text-align:right">\${usage}</td>
-            <td>\${days}</td>
+            <td>\${expiryHTML}</td>
             <td>
               <div class="flex-gap">
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? '\u0645\u0633\u062F\u0648\u062F' : '\u0622\u0632\u0627\u062F\u0633\u0627\u0632\u06CC'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://${hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${window.location.hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">\u{1F5D1}\uFE0F</button>
               </div>
             </td>
@@ -1759,18 +1928,24 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const id = document.getElementById('u-uuid').value;
        const name = document.getElementById('u-name').value;
        let gb = parseFloat(document.getElementById('u-limit').value) || 0;
-       let days = parseInt(document.getElementById('u-days').value) || 0;
+       let connLimit = parseInt(document.getElementById('u-connlimit').value) || 0;
+       const expiryVal = document.getElementById('u-expiry').value;
        const clean = document.getElementById('u-cleanip').value;
+       const proxyip = document.getElementById('u-proxyip').value;
        
        if (!id || !name) { alert("\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0646\u0627\u0645 \u0648 UUID \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A!"); return; }
        
        const limit_bytes = gb * 1024 * 1024 * 1024;
-       const expiry_date = days > 0 ? Date.now() + (days * 86400000) : 0;
+       const expiry_date = expiryVal ? new Date(expiryVal).getTime() : 0;
        
        await fetch(basePath + '/users', {
          method: 'POST',
          headers: {'Content-Type': 'application/json'},
-         body: JSON.stringify({ id, name, limit_bytes, expiry_date, clean_ip: clean })
+         body: JSON.stringify({ 
+           id, name, limit_bytes, expiry_date, 
+           clean_ip: clean, proxy_ip: proxyip, 
+           conn_limit: connLimit 
+         })
        });
        closeModal('user-modal');
        loadUsers();
@@ -1845,25 +2020,31 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-uuid').disabled = false;
       document.getElementById('u-name').value = '';
       document.getElementById('u-limit').value = 0;
-      document.getElementById('u-days').value = 0;
+      document.getElementById('u-connlimit').value = 0;
+      document.getElementById('u-expiry').value = '';
       document.getElementById('u-cleanip').value = '';
+      document.getElementById('u-proxyip').value = '';
       document.getElementById('user-modal-title').textContent = '\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F';
       generateUUID();
       openModal('user-modal');
     }
 
-    function editUser(id, name, limitBytes, expiryDate, cleanIp) {
+    function editUser(id, name, limitBytes, expiryDate, cleanIp, connLimit, proxyIp) {
       document.getElementById('u-uuid').value = id;
       document.getElementById('u-uuid').disabled = true;
       document.getElementById('u-name').value = name;
       document.getElementById('u-limit').value = limitBytes ? (limitBytes / (1024 * 1024 * 1024)).toFixed(2) : 0;
+      document.getElementById('u-connlimit').value = connLimit || 0;
       
-      let days = 0;
       if (expiryDate > 0) {
-        days = Math.max(0, Math.ceil((expiryDate - Date.now()) / 86400000));
+        const d = new Date(expiryDate);
+        const pad = (n) => n.toString().padStart(2, '0');
+        document.getElementById('u-expiry').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      } else {
+        document.getElementById('u-expiry').value = '';
       }
-      document.getElementById('u-days').value = days;
       document.getElementById('u-cleanip').value = cleanIp || '';
+      document.getElementById('u-proxyip').value = proxyIp || '';
       document.getElementById('user-modal-title').textContent = '\u0648\u06CC\u0631\u0627\u06CC\u0634 \u06A9\u0627\u0631\u0628\u0631';
       openModal('user-modal');
     }
@@ -1941,7 +2122,7 @@ var src_default = {
   async fetch(request, env, ctx) {
     try {
       await setupD1Schema(env);
-      let currentProxyIP = await getSettingD1(env, "proxy_ip") || env.PROXYIP || "";
+      let currentProxyIPRaw = await getSettingD1(env, "proxy_ip") || env.PROXYIP || "";
       let currentPanelPass = await getSettingD1(env, "panel_pass") || env.PANEL_PASSWORD || env.PASSWORD || "";
       let currentAdminUUID = await getSettingD1(env, "uuid") || env.UUID || "";
       let cfAccountId = await getSettingD1(env, "cf_account_id") || "";
@@ -1985,15 +2166,15 @@ var src_default = {
       if (upgradeHeader === "websocket") {
         const decodedPath = decodeURIComponent(path).toLowerCase();
         if (decodedPath.includes("trojan-ws") || decodedPath.includes("trojan")) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIP, onUsage);
+          return await trojanOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIP, onUsage);
+          return await vlessOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
         }
       }
       const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
       if (!isSetupComplete) {
         if (path === "/panel" || path === "/") {
-          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIP), {
+          return new Response(setupPage(!!env.DB, !!currentPanelPass, !!currentAdminUUID, currentAdminUUID, currentProxyIPRaw), {
             status: 200,
             headers: { "Content-Type": "text/html; charset=utf-8" }
           });
@@ -2007,7 +2188,7 @@ var src_default = {
         if (currentPanelPass && !await isAuthed(request, currentPanelPass)) {
           return new Response(loginPage("/panel", host), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
         }
-        return new Response(panelPage(host, currentAdminUUID, currentProxyIP, cfAccountId, cfApiToken), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+        return new Response(panelPage(host, currentAdminUUID, currentProxyIPRaw, cfAccountId, cfApiToken), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
       if (path === "/panel/panel-auth" && request.method === "POST") {
         const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -2035,20 +2216,7 @@ var src_default = {
         return new Response(JSON.stringify({ ok: false }), { status: 200 });
       }
       const checkApiAuth = async (req) => {
-        if (currentPanelPass && await isAuthed(req, currentPanelPass))
-          return true;
-        const authHeader = req.headers.get("Authorization");
-        let token = "";
-        if (authHeader && authHeader.startsWith("Bearer "))
-          token = authHeader.substring(7).trim();
-        else
-          token = new URL(req.url).searchParams.get("token") || "";
-        if (token) {
-          const tokens = await getAllTokens(env);
-          if (tokens.some((t) => t.key === token))
-            return true;
-        }
-        return false;
+        return await checkMasterAuth(req, env, currentPanelPass);
       };
       if (path.startsWith("/api/")) {
         if (!await checkApiAuth(request)) {
@@ -2057,20 +2225,36 @@ var src_default = {
         if (path === "/api/users") {
           if (request.method === "GET") {
             const users = await getAllUsers(env);
-            return new Response(JSON.stringify({ ok: true, users }), { status: 200, headers: { "Content-Type": "application/json" } });
+            const usersWithConns = users.map((u) => ({
+              ...u,
+              active_connections: getActiveConnectionCount(u.id)
+            }));
+            return new Response(JSON.stringify({ ok: true, users: usersWithConns }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
           if (request.method === "POST") {
             const b = await request.json();
+            const proxyIpVal = b.proxy_ip !== void 0 ? b.proxy_ip.trim() : "";
             await env.DB.prepare(`
-                INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (id, name, clean_ip, proxy_ip, limit_bytes, expiry_date, enabled, conn_limit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   name = excluded.name,
                   clean_ip = excluded.clean_ip,
+                  proxy_ip = excluded.proxy_ip,
                   limit_bytes = excluded.limit_bytes,
                   expiry_date = excluded.expiry_date,
-                  enabled = excluded.enabled
-              `).bind(b.id, b.name, b.clean_ip || "", b.proxy_ip || "", b.limit_bytes || 0, b.expiry_date || 0, b.enabled === false ? 0 : 1).run();
+                  enabled = excluded.enabled,
+                  conn_limit = excluded.conn_limit
+              `).bind(
+              b.id,
+              b.name,
+              b.clean_ip || "",
+              proxyIpVal,
+              b.limit_bytes || 0,
+              b.expiry_date || 0,
+              b.enabled === false ? 0 : 1,
+              b.conn_limit || 0
+            ).run();
             usersCache = null;
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
@@ -2094,7 +2278,7 @@ var src_default = {
           }
           if (request.method === "POST") {
             const b = await request.json();
-            await env.DB.prepare("INSERT INTO api_keys (key, name, created_at) VALUES (?, ?, ?)").bind(b.key, b.name, Date.now()).run();
+            await env.DB.prepare("INSERT INTO api_keys (key, name, scopes, created_at) VALUES (?, ?, ?, ?)").bind(b.key, b.name, b.scopes || "api", Date.now()).run();
             return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
         }
@@ -2178,8 +2362,16 @@ var src_default = {
         if (user) {
           const host = request.headers.get("Host");
           const userAgent = (request.headers.get("User-Agent") || "").toLowerCase();
-          const isBrowser = userAgent.includes("mozilla") || userAgent.includes("chrome") || userAgent.includes("safari") || userAgent.includes("applewebkit");
-          const isProxyClient = !isBrowser || userAgent.includes("v2ray") || userAgent.includes("hiddify") || userAgent.includes("clash") || userAgent.includes("sing-box") || userAgent.includes("shadowrocket") || userAgent.includes("streisand") || userAgent.includes("v2box") || userAgent.includes("foxray") || userAgent.includes("loon") || userAgent.includes("nekobox");
+          const isBrowser = /mozilla|chrome|safari|applewebkit|gecko|opera|edge/i.test(userAgent) && !/cla.*sh|si.*ng.*box|v2ray|shadowrocket|quantum.*ult|surf.*board|sta.*sh/i.test(userAgent);
+          const isClash = /cla.*sh|clash|mihomo|stash/i.test(userAgent);
+          const isSingBox = /sing.*box|singbox/i.test(userAgent);
+          const isV2ray = /v2ray|v2rayng|v2rayn|nekobox|nekoray/i.test(userAgent);
+          const isShadowrocket = /shadowrocket/i.test(userAgent);
+          const isSurge = /surge/i.test(userAgent);
+          const isLoon = /loon/i.test(userAgent);
+          const isStash = /stash/i.test(userAgent);
+          const isHiddify = /hiddify/i.test(userAgent);
+          const isSagerNet = /sagernet|v2box|foxray|streisand/i.test(userAgent);
           const randomizeCase = (str) => str.split("").map((c) => Math.random() > 0.5 ? c.toUpperCase() : c.toLowerCase()).join("");
           const randomSNI = randomizeCase(host);
           const junkVal = Math.random().toString(36).substring(2, 10);
@@ -2188,13 +2380,36 @@ var src_default = {
           const vlessObfuscatedPath = "/" + btoa(JSON.stringify(vlessPathObj));
           const trojanObfuscatedPath = "/trojan-" + btoa(JSON.stringify(trojanPathObj));
           const addr = user.clean_ip || host;
-          const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + "?ed=2048")}#VLESS-${user.name}`;
-          const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
-          if (isProxyClient) {
-            return new Response(btoa(unescape(encodeURIComponent(vlessWS + "\n" + trojanWS + "\n"))), { status: 200, headers: { "Content-Type": "text/plain" } });
+          const userProxyIPs = parseProxyIps(user.proxy_ip || currentProxyIPRaw);
+          const proxyIpNote = userProxyIPs.length > 1 ? ` (${userProxyIPs.length} IPs)` : "";
+          const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + "?ed=2048")}#VLESS-${user.name}${proxyIpNote}`;
+          const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}${proxyIpNote}`;
+          let multiProxyExport = "";
+          if (userProxyIPs.length > 0) {
+            userProxyIPs.forEach((pip, idx) => {
+              if (!pip)
+                return;
+              const pipLabel = pip.includes(":") ? pip.split(":")[0] : pip;
+              multiProxyExport += `
+${vlessWS.replace("#VLESS-", `#VLESS-${user.name}-${pipLabel}`)}
+`;
+              multiProxyExport += `${trojanWS.replace("#Trojan-", `#Trojan-${user.name}-${pipLabel}`)}
+`;
+            });
           }
-          return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+          const uriOutput = vlessWS + "\n" + trojanWS + (multiProxyExport ? "\n" + multiProxyExport : "");
+          if (isBrowser) {
+            return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+          }
+          return new Response(btoa(unescape(encodeURIComponent(uriOutput))), {
+            status: 200,
+            headers: { "Content-Type": "text/plain; charset=utf-8" }
+          });
         }
+        return new Response(nginxPage(), {
+          status: 404,
+          headers: { "Content-Type": "text/html; charset=utf-8", "Server": "nginx/1.24.0" }
+        });
       }
       if (path === "/panel/save-uuid" && request.method === "POST") {
         const body = (await request.text()).trim();
@@ -2213,7 +2428,7 @@ var src_default = {
       });
     } catch (err) {
       console.error(err);
-      return new Response("Internal Server Error", { status: 500 });
+      return new Response("Internal Server Error: " + (err.message || err), { status: 500 });
     }
   }
 };
