@@ -293,9 +293,196 @@ export default {
         }
         
         return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});
-      }
+              }
 
-      // ============ Subscription System ============
+              // ============ Proxy IP API ============
+              if (path === '/api/proxyip' && request.method === 'GET') {
+                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                const { results } = await env.DB.prepare('SELECT * FROM proxyip ORDER BY status DESC, ping ASC').all();
+                return new Response(JSON.stringify({ok: true, proxyip: results}), {status: 200, headers: {'Content-Type': 'application/json'}});
+              }
+
+              if (path === '/api/proxyip' && request.method === 'POST') {
+                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                const b = await request.json();
+                const { ip, port, country, city, isp } = b;
+                if (!ip) return new Response(JSON.stringify({ok: false, error: 'IP is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+                const p = parseInt(b.port) || 443;
+                try {
+                  await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, b.country || '', b.city || '', b.isp || '', Date.now()).run();
+                  return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                } catch(e) {
+                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                }
+              }
+
+              if (path === '/api/proxyip' && request.method === 'DELETE') {
+                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                const b = await request.json();
+                const { ip, port } = b;
+                if (!ip) return new Response(JSON.stringify({ok: false, error: 'IP is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+                const p = parseInt(port) || 443;
+                try {
+                  await env.DB.prepare('DELETE FROM proxyip WHERE ip = ? AND port = ?').bind(ip, p).run();
+                  return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                } catch(e) {
+                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                }
+              }
+
+              if (path === '/api/proxyip/refresh' && request.method === 'POST') {
+                              // Refresh all proxy IPs - test connectivity
+                              if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                              const { results: dbResults } = await env.DB.prepare('SELECT * FROM proxyip').all();
+       
+                              const testPromises = dbResults.map(async (p) => {
+                                try {
+                                  const start = Date.now();
+                                  const controller = new AbortController();
+                                  const timeout = setTimeout(() => controller.abort(), 5000);
+                                  const resp = await fetch(`https://${p.ip}:${p.port}/cdn-cgi/trace`, { 
+                                    method: 'GET',
+                                    signal: controller.signal,
+                                    cf: { resolveTimeout: 3000 }
+                                  });
+                                  clearTimeout(timeout);
+                                  const ping = Date.now() - start;
+                                  const status = resp.ok ? 'active' : 'dead';
+                                  return { ip: p.ip, port: p.port, ping, status };
+                                } catch(e) {
+                                  return { ip: p.ip, port: p.port, ping: null, status: 'dead' };
+                                }
+                              });
+       
+                              const testResults = await Promise.all(testPromises);
+       
+                              for (const r of testResults) {
+                                await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`)
+                                  .bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
+                              }
+       
+                              return new Response(JSON.stringify({ok: true, tested: testResults.length}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                            }
+
+              if (path === '/api/proxyip/test' && request.method === 'POST') {
+                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                const b = await request.json();
+                const { ip, port } = b;
+                if (!ip) return new Response(JSON.stringify({ok: false, error: 'IP is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+                const p = parseInt(port) || 443;
+        
+                try {
+                  const start = Date.now();
+                  const controller = new AbortController();
+                  const timeout = setTimeout(() => controller.abort(), 5000);
+                  const resp = await fetch(`https://${ip}:${p}/cdn-cgi/trace`, { 
+                    method: 'GET',
+                    signal: controller.signal,
+                    cf: { resolveTimeout: 3000 }
+                  });
+                  clearTimeout(timeout);
+                  const ping = Date.now() - start;
+                  const status = resp.ok ? 'active' : 'dead';
+          
+                  // Update in DB
+                  await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`)
+                    .bind(status, ping, Date.now(), ip, p).run();
+          
+                  return new Response(JSON.stringify({ok: true, ping, status}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                } catch(e) {
+                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                }
+              }
+
+              if (path === '/api/proxyip/fetch' && request.method === 'POST') {
+                // Fetch from public sources like CMliu/GitHub
+                try {
+                  const sources = [
+                    'https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt',
+                    'https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt',
+                  ];
+          
+                  let allIPs = [];
+                  for (const source of sources) {
+                    try {
+                      const resp = await fetch(source);
+                      if (resp.ok) {
+                        const text = await resp.text();
+                        const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+                        allIPs.push(...lines);
+                      }
+                    } catch(e) { console.error('Failed to fetch from', source, e); }
+                  }
+          
+                  // Parse IPs
+                  const validIPs = [];
+                  for (const line of allIPs) {
+                    const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
+                    if (match) {
+                      validIPs.push({
+                        ip: match[1],
+                        port: parseInt(match[2]) || 443,
+                        remark: match[3] || ''
+                      });
+                    }
+                  }
+          
+                  // Insert into DB
+                  let inserted = 0;
+                  for (const item of validIPs) {
+                    try {
+                      await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                        ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, '', '', '', Date.now()).run();
+                      inserted++;
+                    } catch(e) {}
+                  }
+          
+                  return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                } catch(e) {
+                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                }
+              }
+
+              if (path === '/api/proxyip/import' && request.method === 'POST') {
+                const b = await request.json();
+                const { text, format } = b;
+                if (!text) return new Response(JSON.stringify({ok: false, error: 'Text is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+        
+                let lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+                let inserted = 0;
+        
+                if (format === 'ip:port') {
+                  for (const line of lines) {
+                    const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
+                    if (match) {
+                      try {
+                        await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                          ON CONFLICT(ip, port) DO NOTHING`).bind(match[1], parseInt(match[2]), '', '', '', Date.now()).run();
+                        inserted++;
+                      } catch(e) {}
+                    }
+                  }
+                }
+        
+                return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
+              }
+
+              if (path === '/api/proxyip/bulk-delete' && request.method === 'POST') {
+                const b = await request.json();
+                const { ips } = b; // [{ip, port}]
+                if (!Array.isArray(ips) || ips.length === 0) return new Response(JSON.stringify({ok: false, error: 'Invalid data'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+        
+                let deleted = 0;
+                for (const item of ips) {
+                  try {
+                    await env.DB.prepare('DELETE FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port).run();
+                    deleted++;
+                  } catch(e) {}
+                }
+        
+                return new Response(JSON.stringify({ok: true, deleted}), {status: 200, headers: {'Content-Type': 'application/json'}});
+              }
       if (path.endsWith('/sub')) {
          const parts = path.split('/');
          const subId = parts[1] === 'sub' ? parts[2] : parts[1];

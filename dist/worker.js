@@ -286,27 +286,38 @@ async function setupD1Schema(env) {
     return;
   const queries = [
     `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      clean_ip TEXT,
-      proxy_ip TEXT,
-      limit_bytes INTEGER DEFAULT 0,
-      used_bytes INTEGER DEFAULT 0,
-      expiry_date INTEGER,
-      enabled BOOLEAN DEFAULT 1,
-      conn_limit INTEGER DEFAULT 0,
-      max_configs INTEGER DEFAULT 0
-    );`,
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        clean_ip TEXT,
+        proxy_ip TEXT,
+        limit_bytes INTEGER DEFAULT 0,
+        used_bytes INTEGER DEFAULT 0,
+        expiry_date INTEGER,
+        enabled BOOLEAN DEFAULT 1,
+        conn_limit INTEGER DEFAULT 0,
+        max_configs INTEGER DEFAULT 0
+      );`,
     `CREATE TABLE IF NOT EXISTS api_keys (
-      key TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      scopes TEXT DEFAULT 'api',
-      created_at INTEGER
-    );`,
+        key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scopes TEXT DEFAULT 'api',
+        created_at INTEGER
+      );`,
     `CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );`
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );`,
+    `CREATE TABLE IF NOT EXISTS proxyip (
+        ip TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 443,
+        country TEXT,
+        city TEXT,
+        isp TEXT,
+        ping INTEGER,
+        status TEXT DEFAULT 'unknown',
+        last_check INTEGER,
+        PRIMARY KEY (ip, port)
+      );`
   ];
   for (const q of queries) {
     try {
@@ -1626,6 +1637,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
   <div class="sidebar">
     <div class="brand">\u0646\u0647\u0627\u0646</div>
     <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">\u{1F465}</span> \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
+    <div class="nav-item" onclick="nav('proxyip')"><span class="nav-icon">\u{1F310}</span> \u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</div>
     <div class="nav-item" onclick="nav('api')"><span class="nav-icon">\u{1F511}</span> \u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</div>
     <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">\u2699\uFE0F</span> \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</div>
     <div style="flex:1"></div>
@@ -1762,7 +1774,87 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     
   </div>
 
-  <!-- Modals -->
+      <!-- Proxy IP Manager Page -->
+    <div id="page-proxyip" class="page">
+      <div class="header">
+        <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</h2>
+        <button class="btn" onclick="openModal('proxyip-add-modal')">+ \u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP</button>
+      </div>
+
+      <!-- Stats Cards -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">\u06A9\u0644 Proxy IP\u0647\u0627</div>
+          <div id="stat-total-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">\u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0641\u0639\u0627\u0644</div>
+          <div id="stat-active-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">
+            \u0645\u06CC\u0627\u0646\u06AF\u06CC\u0646 \u067E\u06CC\u0646\u06AF
+            <span style="cursor:pointer; font-size:11px;" onclick="refreshAllProxyIP(); this.style.transform='rotate(360deg)'; setTimeout(()=>this.style.transform='', 300); transition='0.3s';" title="\u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC">\u{1F504}</span>
+          </div>
+          <div id="stat-avg-ping" style="font-size:18px; font-weight:bold; margin-top:8px;">--</div>
+        </div>
+      </div>
+
+      <!-- Filters & Actions -->
+      <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+        <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
+          <option value="">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
+          <option value="IR">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
+          <option value="DE">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
+          <option value="US">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
+          <option value="NL">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
+          <option value="FR">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
+          <option value="SG">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
+          <option value="JP">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
+          <option value="TR">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
+        </select>
+        <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
+          <option value="">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
+          <option value="active">\u2705 \u0641\u0639\u0627\u0644</option>
+          <option value="slow">\u{1F422} \u06A9\u0646\u062F</option>
+          <option value="dead">\u274C \u0645\u0631\u062F\u0647</option>
+        </select>
+        <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
+          \u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647
+        </button>
+        <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
+          \u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639 \u0639\u0645\u0648\u0645\u06CC
+        </button>
+        <div style="flex:1"></div>
+        <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+          \u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A
+        </button>
+      </div>
+
+      <!-- Proxy IP Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;">\u2713</th>
+              <th>\u0622\u06CC\u200C\u067E\u06CC / \u0647\u0627\u0633\u062A</th>
+              <th>\u067E\u0648\u0631\u062A</th>
+              <th>\u06A9\u0634\u0648\u0631 / \u0634\u0647\u0631</th>
+              <th>\u0627\u0633\u0646 / ISP</th>
+              <th>\u067E\u06CC\u0646\u06AF (ms)</th>
+              <th>\u0648\u0636\u0639\u06CC\u062A</th>
+              <th>\u0622\u062E\u0631\u06CC\u0646 \u0686\u06A9</th>
+              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+            </tr>
+          </thead>
+          <tbody id="proxyip-tbody">
+            <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+<!-- Modals -->
   <div class="modal-overlay" id="user-modal">
     <div class="modal">
       <div class="modal-header">
@@ -2080,7 +2172,263 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }
     }
 
-    // Init
+    
+
+    // ============ Proxy IP Manager ============
+    let proxyIPData = [];
+    let proxyIPSelectedRows = new Set();
+
+    async function loadProxyIP() {
+      try {
+        const res = await fetch(basePath + '/proxyip');
+        if (!res.ok) throw new Error('Failed to load proxy IPs');
+        const data = await res.json();
+        proxyIPData = data.proxyip || [];
+        renderProxyIPTable();
+        updateProxyIPStats();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted);">\u062E\u0637\u0627 \u062F\u0631 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC: ' + e.message + '</td></tr>';
+      }
+    }
+
+    function updateProxyIPStats() {
+      const total = proxyIPData.length;
+      const active = proxyIPData.filter(p => p.status === 'active').length;
+      const avgPing = active > 0 ? Math.round(proxyIPData.filter(p => p.status === 'active').reduce((a, b) => a + (b.ping || 0), 0) / active) : 0;
+      
+      document.getElementById('stat-total-proxyip').textContent = total;
+      document.getElementById('stat-active-proxyip').textContent = active;
+      document.getElementById('stat-avg-ping').textContent = avgPing > 0 ? avgPing + ' ms' : '--';
+    }
+
+    function renderProxyIPTable() {
+      const tbody = document.getElementById('proxyip-tbody');
+      const countryFilter = document.getElementById('proxyip-filter-country')?.value || '';
+      const statusFilter = document.getElementById('proxyip-filter-status')?.value || '';
+
+      let filtered = proxyIPData;
+      if (countryFilter) filtered = filtered.filter(p => p.country === countryFilter);
+      if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">\u0647\u06CC\u0686 Proxy IP\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(p => {
+        const statusClass = p.status === 'active' ? 'green' : (p.status === 'slow' ? 'yellow' : 'red');
+        const statusText = p.status === 'active' ? '\u2705 \u0641\u0639\u0627\u0644' : (p.status === 'slow' ? '\u{1F422} \u06A9\u0646\u062F' : '\u274C \u0645\u0631\u062F\u0647');
+        const countryFlag = p.country === 'IR' ? '\u{1F1EE}\u{1F1F7}' : p.country === 'DE' ? '\u{1F1E9}\u{1F1EA}' : p.country === 'US' ? '\u{1F1FA}\u{1F1F8}' : p.country === 'NL' ? '\u{1F1F3}\u{1F1F1}' : p.country === 'FR' ? '\u{1F1EB}\u{1F1F7}' : p.country === 'SG' ? '\u{1F1F8}\u{1F1EC}' : p.country === 'JP' ? '\u{1F1EF}\u{1F1F5}' : p.country === 'TR' ? '\u{1F1F9}\u{1F1F7}' : '\u{1F30D}';
+        const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '\u2014';
+        
+        return \`<tr>
+          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" onchange="toggleProxyIPSelection(this)"></td>
+          <td style="font-family:monospace; font-size:13px;">\${p.ip}:\${p.port}</td>
+          <td>\${p.port}</td>
+          <td>\${countryFlag} \${p.city || '\u2014'}</td>
+          <td>\${p.isp || '\u2014'}</td>
+          <td style="font-family:monospace;">\${p.ping || '\u2014'}</td>
+          <td><span class="badge \${statusClass}">\${statusText}</span></td>
+          <td style="font-size:12px; color:var(--muted);">\${lastCheck}</td>
+          <td>
+            <div class="flex-gap">
+              <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="testProxyIP('\${p.ip}', \${p.port})">\u062A\u0633\u062A</button>
+              <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteProxyIP('\${p.ip}', \${p.port})">\u{1F5D1}\uFE0F</button>
+            </div>
+          </td>
+        </tr>\`;
+      }).join('');
+    }
+
+    function filterProxyIP() {
+      renderProxyIPTable();
+    }
+
+    async function refreshAllProxyIP() {
+      const btn = event.target.closest('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A...';
+      btn.disabled = true;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          await loadProxyIP();
+        } else {
+          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A: ' + e.message);
+      }
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+
+    async function testProxyIP(ip, port) {
+      if (!confirm(\`\u0622\u06CC\u0627 \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u06CC\u062F \${ip}:\${port} \u0631\u0627 \u062A\u0633\u062A \u06A9\u0646\u06CC\u062F\u061F\`)) return;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(\`\u2705 \u062A\u0633\u062A \u0645\u0648\u0641\u0642! \u067E\u06CC\u0646\u06AF: \${data.ping} ms\`);
+          loadProxyIP();
+        } else {
+          alert('\u274C \u062A\u0633\u062A \u0646\u0627\u0645\u0648\u0641\u0642: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+    }
+
+    async function fetchProxyIPFromSources() {
+      const btn = event.target.closest('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '\u2601\uFE0F \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
+      btn.disabled = true;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert('\u2705 \${data.count} \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
+          loadProxyIP();
+        } else {
+          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+
+    function toggleProxyIPSelection(checkbox) {
+      const val = checkbox.value;
+      if (checkbox.checked) proxyIPSelectedRows.add(val);
+      else proxyIPSelectedRows.delete(val);
+    }
+
+    function openProxyIPAddModal() {
+      document.getElementById('proxyip-add-modal-title').textContent = '\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F';
+      document.getElementById('pi-ip').value = '';
+      document.getElementById('pi-port').value = '443';
+      document.getElementById('pi-country').value = '';
+      document.getElementById('pi-city').value = '';
+      document.getElementById('pi-isp').value = '';
+      openModal('proxyip-add-modal');
+    }
+
+    async function saveProxyIP() {
+      const ip = document.getElementById('pi-ip').value.trim();
+      const port = parseInt(document.getElementById('pi-port').value) || 443;
+      const country = document.getElementById('pi-country').value.trim();
+      const city = document.getElementById('pi-city').value.trim();
+      const isp = document.getElementById('pi-isp').value.trim();
+      
+      if (!ip) { alert('\u0622\u06CC\u200C\u067E\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A'); return; }
+      
+      try {
+        const res = await fetch(basePath + '/proxyip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port, country, city, isp })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('proxyip-add-modal');
+          loadProxyIP();
+        } else {
+          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+    }
+
+    async function deleteProxyIP(ip, port) {
+      if (!confirm(\`\u0622\u06CC\u0627 \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u06CC\u062F \${ip}:\${port} \u0631\u0627 \u062D\u0630\u0641 \u06A9\u0646\u06CC\u062F\u061F\`)) return;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port })
+        });
+        const data = await res.json();
+        if (data.success) loadProxyIP();
+        else alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+    }
+
+    // Proxy IP Import Modal
+    function openProxyIPImportModal() {
+      document.getElementById('pi-import-text').value = '';
+      document.getElementById('pi-import-format').value = 'ip:port';
+      openModal('proxyip-import-modal');
+    }
+
+    async function importProxyIP() {
+      const text = document.getElementById('pi-import-text').value.trim();
+      const format = document.getElementById('pi-import-format').value;
+      if (!text) { alert('\u0645\u062A\u0646 \u062E\u0627\u0644\u06CC \u0627\u0633\u062A'); return; }
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, format })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('proxyip-import-modal');
+          alert('\u2705 \${data.count} \u0622\u06CC\u200C\u067E\u06CC \u0648\u0627\u0631\u062F \u0634\u062F');
+          loadProxyIP();
+        } else {
+          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+    }
+
+    async function deleteSelectedProxyIP() {
+      if (proxyIPSelectedRows.size === 0) { alert('\u0647\u06CC\u0686 \u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0646\u0634\u062F\u0647'); return; }
+      if (!confirm(\`\u0622\u06CC\u0627 \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u06CC\u062F \${proxyIPSelectedRows.size} \u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647 \u0631\u0627 \u062D\u0630\u0641 \u06A9\u0646\u06CC\u062F\u061F\`)) return;
+      
+      const ips = Array.from(proxyIPSelectedRows).map(v => {
+        const [ip, port] = v.split(':');
+        return { ip, port: parseInt(port) };
+      });
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ips })
+        });
+        const data = await res.json();
+        if (data.success) {
+          proxyIPSelectedRows.clear();
+          loadProxyIP();
+        } else {
+          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+        }
+      } catch (e) {
+        alert('\u062E\u0637\u0627: ' + e.message);
+      }
+    }
+
+
+// Init
     loadUsers();
     loadTokens();
     loadCfMetrics();
@@ -2352,6 +2700,178 @@ var src_default = {
           }
         }
         return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/proxyip" && request.method === "GET") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const { results } = await env.DB.prepare("SELECT * FROM proxyip ORDER BY status DESC, ping ASC").all();
+        return new Response(JSON.stringify({ ok: true, proxyip: results }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/proxyip" && request.method === "POST") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const b = await request.json();
+        const { ip, port, country, city, isp } = b;
+        if (!ip)
+          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        const p = parseInt(b.port) || 443;
+        try {
+          await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, b.country || "", b.city || "", b.isp || "", Date.now()).run();
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+      if (path === "/api/proxyip" && request.method === "DELETE") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const b = await request.json();
+        const { ip, port } = b;
+        if (!ip)
+          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        const p = parseInt(port) || 443;
+        try {
+          await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(ip, p).run();
+          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+      if (path === "/api/proxyip/refresh" && request.method === "POST") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip").all();
+        const testPromises = dbResults.map(async (p) => {
+          try {
+            const start = Date.now();
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5e3);
+            const resp = await fetch(`https://${p.ip}:${p.port}/cdn-cgi/trace`, {
+              method: "GET",
+              signal: controller.signal,
+              cf: { resolveTimeout: 3e3 }
+            });
+            clearTimeout(timeout);
+            const ping = Date.now() - start;
+            const status = resp.ok ? "active" : "dead";
+            return { ip: p.ip, port: p.port, ping, status };
+          } catch (e) {
+            return { ip: p.ip, port: p.port, ping: null, status: "dead" };
+          }
+        });
+        const testResults = await Promise.all(testPromises);
+        for (const r of testResults) {
+          await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
+        }
+        return new Response(JSON.stringify({ ok: true, tested: testResults.length }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/proxyip/test" && request.method === "POST") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const b = await request.json();
+        const { ip, port } = b;
+        if (!ip)
+          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        const p = parseInt(port) || 443;
+        try {
+          const start = Date.now();
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5e3);
+          const resp = await fetch(`https://${ip}:${p}/cdn-cgi/trace`, {
+            method: "GET",
+            signal: controller.signal,
+            cf: { resolveTimeout: 3e3 }
+          });
+          clearTimeout(timeout);
+          const ping = Date.now() - start;
+          const status = resp.ok ? "active" : "dead";
+          await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, ping, Date.now(), ip, p).run();
+          return new Response(JSON.stringify({ ok: true, ping, status }), { status: 200, headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+      if (path === "/api/proxyip/fetch" && request.method === "POST") {
+        try {
+          const sources = [
+            "https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt",
+            "https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt"
+          ];
+          let allIPs = [];
+          for (const source of sources) {
+            try {
+              const resp = await fetch(source);
+              if (resp.ok) {
+                const text = await resp.text();
+                const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+                allIPs.push(...lines);
+              }
+            } catch (e) {
+              console.error("Failed to fetch from", source, e);
+            }
+          }
+          const validIPs = [];
+          for (const line of allIPs) {
+            const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
+            if (match) {
+              validIPs.push({
+                ip: match[1],
+                port: parseInt(match[2]) || 443,
+                remark: match[3] || ""
+              });
+            }
+          }
+          let inserted = 0;
+          for (const item of validIPs) {
+            try {
+              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                        ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, "", "", "", Date.now()).run();
+              inserted++;
+            } catch (e) {
+            }
+          }
+          return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+      }
+      if (path === "/api/proxyip/import" && request.method === "POST") {
+        const b = await request.json();
+        const { text, format } = b;
+        if (!text)
+          return new Response(JSON.stringify({ ok: false, error: "Text is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        let lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+        let inserted = 0;
+        if (format === "ip:port") {
+          for (const line of lines) {
+            const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
+            if (match) {
+              try {
+                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                          ON CONFLICT(ip, port) DO NOTHING`).bind(match[1], parseInt(match[2]), "", "", "", Date.now()).run();
+                inserted++;
+              } catch (e) {
+              }
+            }
+          }
+        }
+        return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/proxyip/bulk-delete" && request.method === "POST") {
+        const b = await request.json();
+        const { ips } = b;
+        if (!Array.isArray(ips) || ips.length === 0)
+          return new Response(JSON.stringify({ ok: false, error: "Invalid data" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        let deleted = 0;
+        for (const item of ips) {
+          try {
+            await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).run();
+            deleted++;
+          } catch (e) {
+          }
+        }
+        return new Response(JSON.stringify({ ok: true, deleted }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (path.endsWith("/sub")) {
         const parts = path.split("/");

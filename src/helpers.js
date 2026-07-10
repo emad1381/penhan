@@ -353,29 +353,40 @@ async function checkMasterAuth(request, env, panelPass) {
 async function setupD1Schema(env) {
   if (!env.DB) return;
   const queries = [
-    `CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      clean_ip TEXT,
-      proxy_ip TEXT,
-      limit_bytes INTEGER DEFAULT 0,
-      used_bytes INTEGER DEFAULT 0,
-      expiry_date INTEGER,
-      enabled BOOLEAN DEFAULT 1,
-      conn_limit INTEGER DEFAULT 0,
-      max_configs INTEGER DEFAULT 0
-    );`,
-    `CREATE TABLE IF NOT EXISTS api_keys (
-      key TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      scopes TEXT DEFAULT 'api',
-      created_at INTEGER
-    );`,
-    `CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );`
-  ];
+      `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        clean_ip TEXT,
+        proxy_ip TEXT,
+        limit_bytes INTEGER DEFAULT 0,
+        used_bytes INTEGER DEFAULT 0,
+        expiry_date INTEGER,
+        enabled BOOLEAN DEFAULT 1,
+        conn_limit INTEGER DEFAULT 0,
+        max_configs INTEGER DEFAULT 0
+      );`,
+      `CREATE TABLE IF NOT EXISTS api_keys (
+        key TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        scopes TEXT DEFAULT 'api',
+        created_at INTEGER
+      );`,
+      `CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );`,
+      `CREATE TABLE IF NOT EXISTS proxyip (
+        ip TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 443,
+        country TEXT,
+        city TEXT,
+        isp TEXT,
+        ping INTEGER,
+        status TEXT DEFAULT 'unknown',
+        last_check INTEGER,
+        PRIMARY KEY (ip, port)
+      );`
+    ];
   for (const q of queries) {
     try {
       await env.DB.prepare(q).run();

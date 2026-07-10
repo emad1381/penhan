@@ -720,6 +720,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
   <div class="sidebar">
     <div class="brand">نهان</div>
     <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">👥</span> کاربران</div>
+    <div class="nav-item" onclick="nav('proxyip')"><span class="nav-icon">🌐</span> مدیریت Proxy IP</div>
     <div class="nav-item" onclick="nav('api')"><span class="nav-icon">🔑</span> توکن‌های API</div>
     <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">⚙️</span> تنظیمات سیستم</div>
     <div style="flex:1"></div>
@@ -859,7 +860,87 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     
   </div>
 
-  <!-- Modals -->
+      <!-- Proxy IP Manager Page -->
+    <div id="page-proxyip" class="page">
+      <div class="header">
+        <h2 class="title">مدیریت Proxy IP</h2>
+        <button class="btn" onclick="openModal('proxyip-add-modal')">+ افزودن Proxy IP</button>
+      </div>
+
+      <!-- Stats Cards -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">کل Proxy IPها</div>
+          <div id="stat-total-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted)">آی‌پی‌های فعال</div>
+          <div id="stat-active-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        </div>
+        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
+          <div style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">
+            میانگین پینگ
+            <span style="cursor:pointer; font-size:11px;" onclick="refreshAllProxyIP(); this.style.transform='rotate(360deg)'; setTimeout(()=>this.style.transform='', 300); transition='0.3s';" title="بروزرسانی">🔄</span>
+          </div>
+          <div id="stat-avg-ping" style="font-size:18px; font-weight:bold; margin-top:8px;">--</div>
+        </div>
+      </div>
+
+      <!-- Filters & Actions -->
+      <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+        <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
+          <option value="">🌍 همه کشورها</option>
+          <option value="IR">🇮🇷 ایران</option>
+          <option value="DE">🇩🇪 آلمان</option>
+          <option value="US">🇺🇸 آمریکا</option>
+          <option value="NL">🇳🇱 هلند</option>
+          <option value="FR">🇫🇷 فرانسه</option>
+          <option value="SG">🇸🇬 سنگاپور</option>
+          <option value="JP">🇯🇵 ژاپن</option>
+          <option value="TR">🇹🇷 ترکیه</option>
+        </select>
+        <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
+          <option value="">⚡ همه وضعیت‌ها</option>
+          <option value="active">✅ فعال</option>
+          <option value="slow">🐢 کند</option>
+          <option value="dead">❌ مرده</option>
+        </select>
+        <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
+          🔄 بروزرسانی همه
+        </button>
+        <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
+          ☁️ دریافت از منابع عمومی
+        </button>
+        <div style="flex:1"></div>
+        <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+          📥 وارد کردن لیست
+        </button>
+      </div>
+
+      <!-- Proxy IP Table -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;">✓</th>
+              <th>آی‌پی / هاست</th>
+              <th>پورت</th>
+              <th>کشور / شهر</th>
+              <th>اسن / ISP</th>
+              <th>پینگ (ms)</th>
+              <th>وضعیت</th>
+              <th>آخرین چک</th>
+              <th>عملیات</th>
+            </tr>
+          </thead>
+          <tbody id="proxyip-tbody">
+            <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">در حال دریافت...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+<!-- Modals -->
   <div class="modal-overlay" id="user-modal">
     <div class="modal">
       <div class="modal-header">
@@ -1177,7 +1258,263 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }
     }
 
-    // Init
+    
+
+    // ============ Proxy IP Manager ============
+    let proxyIPData = [];
+    let proxyIPSelectedRows = new Set();
+
+    async function loadProxyIP() {
+      try {
+        const res = await fetch(basePath + '/proxyip');
+        if (!res.ok) throw new Error('Failed to load proxy IPs');
+        const data = await res.json();
+        proxyIPData = data.proxyip || [];
+        renderProxyIPTable();
+        updateProxyIPStats();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted);">خطا در بارگذاری: ' + e.message + '</td></tr>';
+      }
+    }
+
+    function updateProxyIPStats() {
+      const total = proxyIPData.length;
+      const active = proxyIPData.filter(p => p.status === 'active').length;
+      const avgPing = active > 0 ? Math.round(proxyIPData.filter(p => p.status === 'active').reduce((a, b) => a + (b.ping || 0), 0) / active) : 0;
+      
+      document.getElementById('stat-total-proxyip').textContent = total;
+      document.getElementById('stat-active-proxyip').textContent = active;
+      document.getElementById('stat-avg-ping').textContent = avgPing > 0 ? avgPing + ' ms' : '--';
+    }
+
+    function renderProxyIPTable() {
+      const tbody = document.getElementById('proxyip-tbody');
+      const countryFilter = document.getElementById('proxyip-filter-country')?.value || '';
+      const statusFilter = document.getElementById('proxyip-filter-status')?.value || '';
+
+      let filtered = proxyIPData;
+      if (countryFilter) filtered = filtered.filter(p => p.country === countryFilter);
+      if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">هیچ Proxy IPی یافت نشد</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(p => {
+        const statusClass = p.status === 'active' ? 'green' : (p.status === 'slow' ? 'yellow' : 'red');
+        const statusText = p.status === 'active' ? '✅ فعال' : (p.status === 'slow' ? '🐢 کند' : '❌ مرده');
+        const countryFlag = p.country === 'IR' ? '🇮🇷' : p.country === 'DE' ? '🇩🇪' : p.country === 'US' ? '🇺🇸' : p.country === 'NL' ? '🇳🇱' : p.country === 'FR' ? '🇫🇷' : p.country === 'SG' ? '🇸🇬' : p.country === 'JP' ? '🇯🇵' : p.country === 'TR' ? '🇹🇷' : '🌍';
+        const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '—';
+        
+        return \`<tr>
+          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" onchange="toggleProxyIPSelection(this)"></td>
+          <td style="font-family:monospace; font-size:13px;">\${p.ip}:\${p.port}</td>
+          <td>\${p.port}</td>
+          <td>\${countryFlag} \${p.city || '—'}</td>
+          <td>\${p.isp || '—'}</td>
+          <td style="font-family:monospace;">\${p.ping || '—'}</td>
+          <td><span class="badge \${statusClass}">\${statusText}</span></td>
+          <td style="font-size:12px; color:var(--muted);">\${lastCheck}</td>
+          <td>
+            <div class="flex-gap">
+              <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="testProxyIP('\${p.ip}', \${p.port})">تست</button>
+              <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteProxyIP('\${p.ip}', \${p.port})">🗑️</button>
+            </div>
+          </td>
+        </tr>\`;
+      }).join('');
+    }
+
+    function filterProxyIP() {
+      renderProxyIPTable();
+    }
+
+    async function refreshAllProxyIP() {
+      const btn = event.target.closest('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '🔄 در حال تست...';
+      btn.disabled = true;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          await loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا در تست: ' + e.message);
+      }
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+
+    async function testProxyIP(ip, port) {
+      if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را تست کنید؟\`)) return;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(\`✅ تست موفق! پینگ: \${data.ping} ms\`);
+          loadProxyIP();
+        } else {
+          alert('❌ تست ناموفق: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+    }
+
+    async function fetchProxyIPFromSources() {
+      const btn = event.target.closest('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '☁️ در حال دریافت...';
+      btn.disabled = true;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ \${data.count} آی‌پی جدید دریافت شد');
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
+
+    function toggleProxyIPSelection(checkbox) {
+      const val = checkbox.value;
+      if (checkbox.checked) proxyIPSelectedRows.add(val);
+      else proxyIPSelectedRows.delete(val);
+    }
+
+    function openProxyIPAddModal() {
+      document.getElementById('proxyip-add-modal-title').textContent = 'افزودن Proxy IP جدید';
+      document.getElementById('pi-ip').value = '';
+      document.getElementById('pi-port').value = '443';
+      document.getElementById('pi-country').value = '';
+      document.getElementById('pi-city').value = '';
+      document.getElementById('pi-isp').value = '';
+      openModal('proxyip-add-modal');
+    }
+
+    async function saveProxyIP() {
+      const ip = document.getElementById('pi-ip').value.trim();
+      const port = parseInt(document.getElementById('pi-port').value) || 443;
+      const country = document.getElementById('pi-country').value.trim();
+      const city = document.getElementById('pi-city').value.trim();
+      const isp = document.getElementById('pi-isp').value.trim();
+      
+      if (!ip) { alert('آی‌پی الزامی است'); return; }
+      
+      try {
+        const res = await fetch(basePath + '/proxyip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port, country, city, isp })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('proxyip-add-modal');
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+    }
+
+    async function deleteProxyIP(ip, port) {
+      if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را حذف کنید؟\`)) return;
+      
+      try {
+        const res = await fetch(basePath + '/proxyip', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port })
+        });
+        const data = await res.json();
+        if (data.success) loadProxyIP();
+        else alert('خطا: ' + (data.error || 'نامشخص'));
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+    }
+
+    // Proxy IP Import Modal
+    function openProxyIPImportModal() {
+      document.getElementById('pi-import-text').value = '';
+      document.getElementById('pi-import-format').value = 'ip:port';
+      openModal('proxyip-import-modal');
+    }
+
+    async function importProxyIP() {
+      const text = document.getElementById('pi-import-text').value.trim();
+      const format = document.getElementById('pi-import-format').value;
+      if (!text) { alert('متن خالی است'); return; }
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, format })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeModal('proxyip-import-modal');
+          alert('✅ \${data.count} آی‌پی وارد شد');
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+    }
+
+    async function deleteSelectedProxyIP() {
+      if (proxyIPSelectedRows.size === 0) { alert('هیچ آی‌پی انتخاب نشده'); return; }
+      if (!confirm(\`آیا می‌خواهید \${proxyIPSelectedRows.size} آی‌پی انتخاب شده را حذف کنید؟\`)) return;
+      
+      const ips = Array.from(proxyIPSelectedRows).map(v => {
+        const [ip, port] = v.split(':');
+        return { ip, port: parseInt(port) };
+      });
+      
+      try {
+        const res = await fetch(basePath + '/proxyip/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ips })
+        });
+        const data = await res.json();
+        if (data.success) {
+          proxyIPSelectedRows.clear();
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (e) {
+        alert('خطا: ' + e.message);
+      }
+    }
+
+
+// Init
     loadUsers();
     loadTokens();
     loadCfMetrics();
