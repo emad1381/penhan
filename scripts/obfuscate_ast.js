@@ -8,6 +8,7 @@ const outputFile = path.join(__dirname, '../dist/worker_obfuscated.js');
 const sourceCode = fs.readFileSync(inputFile, 'utf8');
 
 const obfuscationResult = JavaScriptObfuscator.obfuscate(sourceCode, {
+    target: 'node',
     compact: true,
     controlFlowFlattening: true,
     controlFlowFlatteningThreshold: 0.5,
