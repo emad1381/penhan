@@ -887,57 +887,75 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
 
       <!-- Filters & Actions -->
-      <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
-        <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
-          <option value="">🌍 همه کشورها</option>
-          <option value="IR">🇮🇷 ایران</option>
-          <option value="DE">🇩🇪 آلمان</option>
-          <option value="US">🇺🇸 آمریکا</option>
-          <option value="NL">🇳🇱 هلند</option>
-          <option value="FR">🇫🇷 فرانسه</option>
-          <option value="SG">🇸🇬 سنگاپور</option>
-          <option value="JP">🇯🇵 ژاپن</option>
-          <option value="TR">🇹🇷 ترکیه</option>
-        </select>
-        <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
-          <option value="">⚡ همه وضعیت‌ها</option>
-          <option value="active">✅ فعال</option>
-          <option value="slow">🐢 کند</option>
-          <option value="dead">❌ مرده</option>
-        </select>
-        <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
-          🔄 بروزرسانی همه
-        </button>
-        <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
-          ☁️ دریافت از منابع عمومی
-        </button>
-        <div style="flex:1"></div>
-        <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
-          📥 وارد کردن لیست
-        </button>
-      </div>
+                  <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+                    <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
+                      <option value="">🌍 همه کشورها</option>
+                      <option value="IR">🇮🇷 ایران</option>
+                      <option value="DE">🇩🇪 آلمان</option>
+                      <option value="US">🇺🇸 آمریکا</option>
+                      <option value="NL">🇳🇱 هلند</option>
+                      <option value="FR">🇫🇷 فرانسه</option>
+                      <option value="SG">🇸🇬 سنگاپور</option>
+                      <option value="JP">🇯🇵 ژاپن</option>
+                      <option value="TR">🇹🇷 ترکیه</option>
+                    </select>
+                    <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
+                      <option value="">⚡ همه وضعیت‌ها</option>
+                      <option value="active">✅ فعال</option>
+                      <option value="slow">🐢 کند</option>
+                      <option value="dead">❌ مرده</option>
+                    </select>
+                    <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
+                      🔄 بروزرسانی همه
+                    </button>
+                    <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
+                      ☁️ دریافت از منابع عمومی
+                    </button>
+                    <button class="btn btn-outline" onclick="detectCountriesForIPs()" style="display:flex; align-items:center; gap:6px;">
+                      🌍 تشخیص کشورها
+                    </button>
+                    <div style="flex:1"></div>
+                    <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+                      📥 وارد کردن لیست
+                    </button>
+                  </div>
 
-      <!-- Proxy IP Table -->
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:40px;">✓</th>
-              <th>آی‌پی / هاست</th>
-              <th>پورت</th>
-              <th>کشور / شهر</th>
-              <th>اسن / ISP</th>
-              <th>پینگ (ms)</th>
-              <th>وضعیت</th>
-              <th>آخرین چک</th>
-              <th>عملیات</th>
-            </tr>
-          </thead>
-          <tbody id="proxyip-tbody">
-            <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">در حال دریافت...</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <!-- Selection Toolbar (appears when items selected) -->
+            <div id="proxyip-selection-toolbar" style="display:none; gap:12px; margin-bottom:16px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; align-items:center; flex-wrap:wrap;">
+              <span id="proxyip-selected-count" style="font-weight:600; color:var(--primary);">۰ آی‌پی انتخاب شده</span>
+              <div style="flex:1"></div>
+              <button class="btn btn-outline" onclick="selectAllProxyIP(true)" style="font-size:12px;">✅ انتخاب همه</button>
+              <button class="btn btn-outline" onclick="selectAllProxyIP(false)" style="font-size:12px;">❌ لغو انتخاب</button>
+              <button class="btn btn-danger" onclick="deleteSelectedProxyIP()" style="display:flex; align-items:center; gap:6px; font-weight:600;">
+                🗑️ حذف انتخاب‌ها (<span id="proxyip-toolbar-count">0</span>)
+              </button>
+            </div>
+
+            <!-- Proxy IP Table -->
+            <div class="table-container">
+              <!-- Proxy IP Table -->
+                    <div class="table-container">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="width:50px; text-align:center;">
+                              <input type="checkbox" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="انتخاب/لغو همه آی‌پی‌های قابل مشاهده">
+                            </th>
+                            <th>آی‌پی / هاست</th>
+                            <th>پورت</th>
+                            <th>کشور / شهر</th>
+                            <th>اسن / ISP</th>
+                            <th>پینگ (ms)</th>
+                            <th>وضعیت</th>
+                            <th>آخرین چک</th>
+                            <th>عملیات</th>
+                          </tr>
+                        </thead>
+                        <tbody id="proxyip-tbody">
+                          <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">در حال دریافت...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
     </div>
 
 <!-- Modals -->
@@ -1374,32 +1392,148 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
 
     async function fetchProxyIPFromSources() {
-      const btn = event.target.closest('button');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '☁️ در حال دریافت...';
-      btn.disabled = true;
+          const btn = event.target.closest('button');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '☁️ در حال دریافت...';
+          btn.disabled = true;
       
-      try {
-        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          alert('✅ \${data.count} آی‌پی جدید دریافت شد');
-          loadProxyIP();
-        } else {
-          alert('خطا: ' + (data.error || 'نامشخص'));
+          try {
+            const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+              alert('✅ ${data.count} آی‌پی جدید دریافت شد');
+              loadProxyIP();
+            } else {
+              alert('خطا: ' + (data.error || 'نامشخص'));
+            }
+          } catch (e) {
+            alert('خطا: ' + e.message);
+          }
+          btn.innerHTML = originalText;
+          btn.disabled = false;
         }
-      } catch (e) {
-        alert('خطا: ' + e.message);
-      }
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
 
-    function toggleProxyIPSelection(checkbox) {
-      const val = checkbox.value;
-      if (checkbox.checked) proxyIPSelectedRows.add(val);
-      else proxyIPSelectedRows.delete(val);
-    }
+        async function detectCountriesForIPs() {
+          const btn = event.target.closest('button');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '🌍 در حال تشخیص...';
+          btn.disabled = true;
+
+          try {
+            // Get IPs that don't have country yet
+            const res = await fetch(basePath + '/proxyip');
+            const data = await res.json();
+            const ipsWithoutCountry = (data.proxyip || []).filter(p => !p.country || p.country === '');
+        
+            if (ipsWithoutCountry.length === 0) {
+              alert('✅ همه آی‌پی‌ها کشور دارند');
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              return;
+            }
+
+            let detected = 0;
+            for (const item of ipsWithoutCountry) {
+              try {
+                const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
+                if (geoResp.ok) {
+                  const geoData = await geoResp.json();
+                  if (geoData.countryCode) {
+                    // Update in DB
+                    await fetch(basePath + '/proxyip', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        ip: item.ip, 
+                        port: item.port,
+                        country: geoData.countryCode,
+                        city: geoData.city || '',
+                        isp: geoData.isp || geoData.org || geoData.as || ''
+                      })
+                    });
+                    detected++;
+                  }
+                }
+                // Rate limit: 45 req/min = ~1.3s delay
+                await new Promise(r => setTimeout(r, 1400));
+              } catch(e) { console.error('GeoIP error for', item.ip, e); }
+            }
+
+            alert('✅ ' + detected + ' آی‌پی کشورشان تشخیص داده شد');
+            loadProxyIP();
+          } catch (e) {
+            alert('خطا: ' + e.message);
+          }
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+
+        function toggleProxyIPSelection(checkbox) {
+          const val = checkbox.value;
+          if (checkbox.checked) proxyIPSelectedRows.add(val);
+          else proxyIPSelectedRows.delete(val);
+          updateSelectionToolbar();
+        }
+
+        function toggleSelectAllProxyIP(selectAllCheckbox) {
+          const isChecked = selectAllCheckbox.checked;
+          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+          checkboxes.forEach(cb => {
+            cb.checked = isChecked;
+            const val = cb.value;
+            if (isChecked) proxyIPSelectedRows.add(val);
+            else proxyIPSelectedRows.delete(val);
+          });
+          updateSelectionToolbar();
+        }
+
+        function selectAllProxyIP(select) {
+          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+          const selectAllCheckbox = document.getElementById('proxyip-select-all');
+          if (select) {
+            checkboxes.forEach(cb => {
+              cb.checked = true;
+              proxyIPSelectedRows.add(cb.value);
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = true;
+          } else {
+            checkboxes.forEach(cb => {
+              cb.checked = false;
+              proxyIPSelectedRows.delete(cb.value);
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+          }
+          updateSelectionToolbar();
+        }
+
+        function updateSelectionToolbar() {
+          const count = proxyIPSelectedRows.size;
+          const toolbar = document.getElementById('proxyip-selection-toolbar');
+          const countEl = document.getElementById('proxyip-selected-count');
+          const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
+          const selectAllCheckbox = document.getElementById('proxyip-select-all');
+      
+          if (count > 0) {
+            toolbar.style.display = 'flex';
+            countEl.textContent = count + ' آی‌پی انتخاب شده';
+            toolbarCountEl.textContent = count;
+          } else {
+            toolbar.style.display = 'none';
+            countEl.textContent = '۰ آی‌پی انتخاب شده';
+            toolbarCountEl.textContent = 0;
+          }
+      
+          // Update select-all checkbox state
+          const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
+          if (visibleCheckboxes.length > 0) {
+            const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
+            selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+          } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+          }
+        }
 
     function openProxyIPAddModal() {
       document.getElementById('proxyip-add-modal-title').textContent = 'افزودن Proxy IP جدید';

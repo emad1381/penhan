@@ -1801,57 +1801,75 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
 
       <!-- Filters & Actions -->
-      <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
-        <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
-          <option value="">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
-          <option value="IR">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
-          <option value="DE">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
-          <option value="US">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
-          <option value="NL">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
-          <option value="FR">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
-          <option value="SG">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
-          <option value="JP">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
-          <option value="TR">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
-        </select>
-        <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
-          <option value="">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
-          <option value="active">\u2705 \u0641\u0639\u0627\u0644</option>
-          <option value="slow">\u{1F422} \u06A9\u0646\u062F</option>
-          <option value="dead">\u274C \u0645\u0631\u062F\u0647</option>
-        </select>
-        <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
-          \u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647
-        </button>
-        <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
-          \u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639 \u0639\u0645\u0648\u0645\u06CC
-        </button>
-        <div style="flex:1"></div>
-        <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
-          \u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A
-        </button>
-      </div>
+                  <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
+                    <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
+                      <option value="">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
+                      <option value="IR">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
+                      <option value="DE">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
+                      <option value="US">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
+                      <option value="NL">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
+                      <option value="FR">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
+                      <option value="SG">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
+                      <option value="JP">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
+                      <option value="TR">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
+                    </select>
+                    <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
+                      <option value="">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
+                      <option value="active">\u2705 \u0641\u0639\u0627\u0644</option>
+                      <option value="slow">\u{1F422} \u06A9\u0646\u062F</option>
+                      <option value="dead">\u274C \u0645\u0631\u062F\u0647</option>
+                    </select>
+                    <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
+                      \u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647
+                    </button>
+                    <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
+                      \u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639 \u0639\u0645\u0648\u0645\u06CC
+                    </button>
+                    <button class="btn btn-outline" onclick="detectCountriesForIPs()" style="display:flex; align-items:center; gap:6px;">
+                      \u{1F30D} \u062A\u0634\u062E\u06CC\u0635 \u06A9\u0634\u0648\u0631\u0647\u0627
+                    </button>
+                    <div style="flex:1"></div>
+                    <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+                      \u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A
+                    </button>
+                  </div>
 
-      <!-- Proxy IP Table -->
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:40px;">\u2713</th>
-              <th>\u0622\u06CC\u200C\u067E\u06CC / \u0647\u0627\u0633\u062A</th>
-              <th>\u067E\u0648\u0631\u062A</th>
-              <th>\u06A9\u0634\u0648\u0631 / \u0634\u0647\u0631</th>
-              <th>\u0627\u0633\u0646 / ISP</th>
-              <th>\u067E\u06CC\u0646\u06AF (ms)</th>
-              <th>\u0648\u0636\u0639\u06CC\u062A</th>
-              <th>\u0622\u062E\u0631\u06CC\u0646 \u0686\u06A9</th>
-              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
-            </tr>
-          </thead>
-          <tbody id="proxyip-tbody">
-            <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
-          </tbody>
-        </table>
-      </div>
+            <!-- Selection Toolbar (appears when items selected) -->
+            <div id="proxyip-selection-toolbar" style="display:none; gap:12px; margin-bottom:16px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; align-items:center; flex-wrap:wrap;">
+              <span id="proxyip-selected-count" style="font-weight:600; color:var(--primary);">\u06F0 \u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647</span>
+              <div style="flex:1"></div>
+              <button class="btn btn-outline" onclick="selectAllProxyIP(true)" style="font-size:12px;">\u2705 \u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0645\u0647</button>
+              <button class="btn btn-outline" onclick="selectAllProxyIP(false)" style="font-size:12px;">\u274C \u0644\u063A\u0648 \u0627\u0646\u062A\u062E\u0627\u0628</button>
+              <button class="btn btn-danger" onclick="deleteSelectedProxyIP()" style="display:flex; align-items:center; gap:6px; font-weight:600;">
+                \u{1F5D1}\uFE0F \u062D\u0630\u0641 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0647\u0627 (<span id="proxyip-toolbar-count">0</span>)
+              </button>
+            </div>
+
+            <!-- Proxy IP Table -->
+            <div class="table-container">
+              <!-- Proxy IP Table -->
+                    <div class="table-container">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="width:50px; text-align:center;">
+                              <input type="checkbox" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="\u0627\u0646\u062A\u062E\u0627\u0628/\u0644\u063A\u0648 \u0647\u0645\u0647 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0642\u0627\u0628\u0644 \u0645\u0634\u0627\u0647\u062F\u0647">
+                            </th>
+                            <th>\u0622\u06CC\u200C\u067E\u06CC / \u0647\u0627\u0633\u062A</th>
+                            <th>\u067E\u0648\u0631\u062A</th>
+                            <th>\u06A9\u0634\u0648\u0631 / \u0634\u0647\u0631</th>
+                            <th>\u0627\u0633\u0646 / ISP</th>
+                            <th>\u067E\u06CC\u0646\u06AF (ms)</th>
+                            <th>\u0648\u0636\u0639\u06CC\u062A</th>
+                            <th>\u0622\u062E\u0631\u06CC\u0646 \u0686\u06A9</th>
+                            <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+                          </tr>
+                        </thead>
+                        <tbody id="proxyip-tbody">
+                          <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
     </div>
 
 <!-- Modals -->
@@ -2288,32 +2306,148 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
 
     async function fetchProxyIPFromSources() {
-      const btn = event.target.closest('button');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '\u2601\uFE0F \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
-      btn.disabled = true;
+          const btn = event.target.closest('button');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '\u2601\uFE0F \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
+          btn.disabled = true;
       
-      try {
-        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          alert('\u2705 \${data.count} \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
-          loadProxyIP();
-        } else {
-          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+          try {
+            const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+              alert('\u2705 ${data.count} \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
+              loadProxyIP();
+            } else {
+              alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+            }
+          } catch (e) {
+            alert('\u062E\u0637\u0627: ' + e.message);
+          }
+          btn.innerHTML = originalText;
+          btn.disabled = false;
         }
-      } catch (e) {
-        alert('\u062E\u0637\u0627: ' + e.message);
-      }
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    }
 
-    function toggleProxyIPSelection(checkbox) {
-      const val = checkbox.value;
-      if (checkbox.checked) proxyIPSelectedRows.add(val);
-      else proxyIPSelectedRows.delete(val);
-    }
+        async function detectCountriesForIPs() {
+          const btn = event.target.closest('button');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '\u{1F30D} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0634\u062E\u06CC\u0635...';
+          btn.disabled = true;
+
+          try {
+            // Get IPs that don't have country yet
+            const res = await fetch(basePath + '/proxyip');
+            const data = await res.json();
+            const ipsWithoutCountry = (data.proxyip || []).filter(p => !p.country || p.country === '');
+        
+            if (ipsWithoutCountry.length === 0) {
+              alert('\u2705 \u0647\u0645\u0647 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u06A9\u0634\u0648\u0631 \u062F\u0627\u0631\u0646\u062F');
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+              return;
+            }
+
+            let detected = 0;
+            for (const item of ipsWithoutCountry) {
+              try {
+                const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
+                if (geoResp.ok) {
+                  const geoData = await geoResp.json();
+                  if (geoData.countryCode) {
+                    // Update in DB
+                    await fetch(basePath + '/proxyip', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        ip: item.ip, 
+                        port: item.port,
+                        country: geoData.countryCode,
+                        city: geoData.city || '',
+                        isp: geoData.isp || geoData.org || geoData.as || ''
+                      })
+                    });
+                    detected++;
+                  }
+                }
+                // Rate limit: 45 req/min = ~1.3s delay
+                await new Promise(r => setTimeout(r, 1400));
+              } catch(e) { console.error('GeoIP error for', item.ip, e); }
+            }
+
+            alert('\u2705 ' + detected + ' \u0622\u06CC\u200C\u067E\u06CC \u06A9\u0634\u0648\u0631\u0634\u0627\u0646 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F');
+            loadProxyIP();
+          } catch (e) {
+            alert('\u062E\u0637\u0627: ' + e.message);
+          }
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+
+        function toggleProxyIPSelection(checkbox) {
+          const val = checkbox.value;
+          if (checkbox.checked) proxyIPSelectedRows.add(val);
+          else proxyIPSelectedRows.delete(val);
+          updateSelectionToolbar();
+        }
+
+        function toggleSelectAllProxyIP(selectAllCheckbox) {
+          const isChecked = selectAllCheckbox.checked;
+          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+          checkboxes.forEach(cb => {
+            cb.checked = isChecked;
+            const val = cb.value;
+            if (isChecked) proxyIPSelectedRows.add(val);
+            else proxyIPSelectedRows.delete(val);
+          });
+          updateSelectionToolbar();
+        }
+
+        function selectAllProxyIP(select) {
+          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+          const selectAllCheckbox = document.getElementById('proxyip-select-all');
+          if (select) {
+            checkboxes.forEach(cb => {
+              cb.checked = true;
+              proxyIPSelectedRows.add(cb.value);
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = true;
+          } else {
+            checkboxes.forEach(cb => {
+              cb.checked = false;
+              proxyIPSelectedRows.delete(cb.value);
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+          }
+          updateSelectionToolbar();
+        }
+
+        function updateSelectionToolbar() {
+          const count = proxyIPSelectedRows.size;
+          const toolbar = document.getElementById('proxyip-selection-toolbar');
+          const countEl = document.getElementById('proxyip-selected-count');
+          const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
+          const selectAllCheckbox = document.getElementById('proxyip-select-all');
+      
+          if (count > 0) {
+            toolbar.style.display = 'flex';
+            countEl.textContent = count + ' \u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
+            toolbarCountEl.textContent = count;
+          } else {
+            toolbar.style.display = 'none';
+            countEl.textContent = '\u06F0 \u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
+            toolbarCountEl.textContent = 0;
+          }
+      
+          // Update select-all checkbox state
+          const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
+          if (visibleCheckboxes.length > 0) {
+            const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
+            selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+          } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+          }
+        }
 
     function openProxyIPAddModal() {
       document.getElementById('proxyip-add-modal-title').textContent = '\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F';
@@ -2792,6 +2926,33 @@ var src_default = {
           return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
       }
+      async function detectCountry(ip) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3e3);
+          const resp = await fetch("http://ip-api.com/json/" + ip + "?fields=countryCode,country,regionName,city,isp,org,as", {
+            signal: controller.signal,
+            cf: { resolveTimeout: 2e3 }
+          });
+          clearTimeout(timeout);
+          if (!resp.ok)
+            return null;
+          const data2 = await resp.json();
+          if (data2.countryCode) {
+            return {
+              country: data2.countryCode,
+              // ISO code: IR, US, DE, etc.
+              countryName: data2.country,
+              // Full name
+              city: data2.city || "",
+              isp: data2.isp || data2.org || data2.as || ""
+            };
+          }
+        } catch (e) {
+          console.error("GeoIP error for", ip, e.message);
+        }
+        return null;
+      }
       if (path === "/api/proxyip/fetch" && request.method === "POST") {
         try {
           const sources = [
@@ -2823,10 +2984,27 @@ var src_default = {
             }
           }
           let inserted = 0;
+          const geoCache = /* @__PURE__ */ new Map();
           for (const item of validIPs) {
             try {
+              const existing = await env.DB.prepare("SELECT 1 FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).first();
+              if (existing)
+                continue;
+              let geo = geoCache.get(item.ip);
+              if (!geo) {
+                geo = await detectCountry(item.ip);
+                geoCache.set(item.ip, geo);
+                await new Promise((r) => setTimeout(r, 1400));
+              }
               await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                        ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, "", "", "", Date.now()).run();
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(
+                item.ip,
+                item.port,
+                geo?.country || "",
+                geo?.city || "",
+                geo?.isp || "",
+                Date.now()
+              ).run();
               inserted++;
             } catch (e) {
             }
@@ -2848,8 +3026,21 @@ var src_default = {
             const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
             if (match) {
               try {
+                const ip = match[1];
+                const port = parseInt(match[2]);
+                let geo = { country: "", city: "", isp: "" };
+                try {
+                  const geoResp = await fetch("http://ip-api.com/json/" + ip + "?fields=countryCode,country,regionName,city,isp,org,as", { cf: { resolveTimeout: 2e3 } });
+                  if (geoResp.ok) {
+                    const geoData = await geoResp.json();
+                    if (geoData.countryCode) {
+                      geo = { country: geoData.countryCode, city: geoData.city || "", isp: geoData.isp || geoData.org || geoData.as || "" };
+                    }
+                  }
+                } catch (e) {
+                }
                 await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                          ON CONFLICT(ip, port) DO NOTHING`).bind(match[1], parseInt(match[2]), "", "", "", Date.now()).run();
+                                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, port, geo.country, geo.city, geo.isp, Date.now()).run();
                 inserted++;
               } catch (e) {
               }
@@ -2872,6 +3063,27 @@ var src_default = {
           }
         }
         return new Response(JSON.stringify({ ok: true, deleted }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (path === "/api/proxyip/detect-countries" && request.method === "POST") {
+        if (!env.DB)
+          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+        const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+        let updated = 0;
+        for (const item of dbResults) {
+          try {
+            const geoResp = await fetch("http://ip-api.com/json/" + item.ip + "?fields=countryCode,country,regionName,city,isp,org,as", { cf: { resolveTimeout: 2e3 } });
+            if (geoResp.ok) {
+              const geoData = await geoResp.json();
+              if (geoData.countryCode) {
+                await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geoData.countryCode, geoData.city || "", geoData.isp || geoData.org || geoData.as || "", item.ip, item.port).run();
+                updated++;
+              }
+            }
+            await new Promise((r) => setTimeout(r, 1400));
+          } catch (e) {
+          }
+        }
+        return new Response(JSON.stringify({ ok: true, updated }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (path.endsWith("/sub")) {
         const parts = path.split("/");

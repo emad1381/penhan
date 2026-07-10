@@ -395,78 +395,139 @@ export default {
                 }
               }
 
-              if (path === '/api/proxyip/fetch' && request.method === 'POST') {
-                // Fetch from public sources like CMliu/GitHub
-                try {
-                  const sources = [
-                    'https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt',
-                    'https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt',
-                  ];
+              async function detectCountry(ip) {
+                                            // Use ip-api.com (free, 45 req/min, no API key needed)
+                                            // Returns: { countryCode, country, regionName, city, isp, org, as, query }
+                                            try {
+                                              const controller = new AbortController();
+                                              const timeout = setTimeout(() => controller.abort(), 3000);
+                                              const resp = await fetch('http://ip-api.com/json/' + ip + '?fields=countryCode,country,regionName,city,isp,org,as', {
+                                                signal: controller.signal,
+                                                cf: { resolveTimeout: 2000 }
+                                              });
+                                              clearTimeout(timeout);
+                                              if (!resp.ok) return null;
+                                              const data = await resp.json();
+                                              if (data.countryCode) {
+                                                return {
+                                                  country: data.countryCode,      // ISO code: IR, US, DE, etc.
+                                                  countryName: data.country,      // Full name
+                                                  city: data.city || '',
+                                                  isp: data.isp || data.org || data.as || ''
+                                                };
+                                              }
+                                            } catch(e) { console.error('GeoIP error for', ip, e.message); }
+                                            return null;
+                                          }
+
+                            if (path === '/api/proxyip/fetch' && request.method === 'POST') {
+                              // Fetch from public sources like CMliu/GitHub + auto-detect country
+                              try {
+                                const sources = [
+                                  'https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt',
+                                  'https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt',
+                                ];
           
-                  let allIPs = [];
-                  for (const source of sources) {
-                    try {
-                      const resp = await fetch(source);
-                      if (resp.ok) {
-                        const text = await resp.text();
-                        const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-                        allIPs.push(...lines);
-                      }
-                    } catch(e) { console.error('Failed to fetch from', source, e); }
-                  }
+                                let allIPs = [];
+                                for (const source of sources) {
+                                  try {
+                                    const resp = await fetch(source);
+                                    if (resp.ok) {
+                                      const text = await resp.text();
+                                      const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+                                      allIPs.push(...lines);
+                                    }
+                                  } catch(e) { console.error('Failed to fetch from', source, e); }
+                                }
           
-                  // Parse IPs
-                  const validIPs = [];
-                  for (const line of allIPs) {
-                    const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
-                    if (match) {
-                      validIPs.push({
-                        ip: match[1],
-                        port: parseInt(match[2]) || 443,
-                        remark: match[3] || ''
-                      });
-                    }
-                  }
+                                // Parse IPs
+                                const validIPs = [];
+                                for (const line of allIPs) {
+                                  const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
+                                  if (match) {
+                                    validIPs.push({
+                                      ip: match[1],
+                                      port: parseInt(match[2]) || 443,
+                                      remark: match[3] || ''
+                                    });
+                                  }
+                                }
           
-                  // Insert into DB
-                  let inserted = 0;
-                  for (const item of validIPs) {
-                    try {
-                      await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                        ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, '', '', '', Date.now()).run();
-                      inserted++;
-                    } catch(e) {}
-                  }
+                                // Insert into DB with country detection (batch with rate limiting)
+                                let inserted = 0;
+                                const geoCache = new Map(); // Cache to avoid duplicate API calls for same IP
+                  
+                                for (const item of validIPs) {
+                                  try {
+                                    // Check if already exists
+                                    const existing = await env.DB.prepare('SELECT 1 FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port).first();
+                                    if (existing) continue;
+                      
+                                    // Detect country (with caching)
+                                    let geo = geoCache.get(item.ip);
+                                    if (!geo) {
+                                      geo = await detectCountry(item.ip);
+                                      geoCache.set(item.ip, geo);
+                                      // Small delay to respect rate limit (45 req/min = ~1.3s between reqs)
+                                      await new Promise(r => setTimeout(r, 1400));
+                                    }
+                      
+                                    await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(
+                                        item.ip, 
+                                        item.port, 
+                                        geo?.country || '', 
+                                        geo?.city || '', 
+                                        geo?.isp || '', 
+                                        Date.now()
+                                    ).run();
+                                    inserted++;
+                                  } catch(e) {}
+                                }
           
-                  return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                } catch(e) {
-                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
-                }
-              }
+                                return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                              } catch(e) {
+                                return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                              }
+                            }
 
               if (path === '/api/proxyip/import' && request.method === 'POST') {
-                const b = await request.json();
-                const { text, format } = b;
-                if (!text) return new Response(JSON.stringify({ok: false, error: 'Text is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+                              const b = await request.json();
+                              const { text, format } = b;
+                              if (!text) return new Response(JSON.stringify({ok: false, error: 'Text is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+       
+                              let lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+                              let inserted = 0;
         
-                let lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-                let inserted = 0;
-        
-                if (format === 'ip:port') {
-                  for (const line of lines) {
-                    const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
-                    if (match) {
-                      try {
-                        await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                          ON CONFLICT(ip, port) DO NOTHING`).bind(match[1], parseInt(match[2]), '', '', '', Date.now()).run();
-                        inserted++;
-                      } catch(e) {}
-                    }
-                  }
-                }
-        
-                return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
-              }
+                              if (format === 'ip:port') {
+                                for (const line of lines) {
+                                  const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
+                                  if (match) {
+                                    try {
+                                      const ip = match[1];
+                                      const port = parseInt(match[2]);
+                                      // Auto-detect country for imported IPs
+                                      let geo = { country: '', city: '', isp: '' };
+                                                                            try {
+                                                                              const geoResp = await fetch('http://ip-api.com/json/' + ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
+                                                                              if (geoResp.ok) {
+                                                                                const geoData = await geoResp.json();
+                                                                                if (geoData.countryCode) {
+                                                                                  geo = { country: geoData.countryCode, city: geoData.city || '', isp: geoData.isp || geoData.org || geoData.as || '' };
+                                                                                }
+                                                                              }
+                                                                            } catch(e) {}
+                        
+                                      await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, port, geo.country, geo.city, geo.isp, Date.now()).run();
+                                      inserted++;
+                                    } catch(e) {}
+                                  }
+                                }
+                              }
+       
+                              return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                            }
 
               if (path === '/api/proxyip/bulk-delete' && request.method === 'POST') {
                 const b = await request.json();
@@ -482,8 +543,34 @@ export default {
                 }
         
                 return new Response(JSON.stringify({ok: true, deleted}), {status: 200, headers: {'Content-Type': 'application/json'}});
-              }
-      if (path.endsWith('/sub')) {
+                              }
+
+                              // Bulk detect country for existing IPs
+                              if (path === '/api/proxyip/detect-countries' && request.method === 'POST') {
+                                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+                
+                                const { results: dbResults } = await env.DB.prepare('SELECT * FROM proxyip WHERE country = \'\' OR country IS NULL').all();
+                
+                                let updated = 0;
+                                for (const item of dbResults) {
+                                  try {
+                                    const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
+                                    if (geoResp.ok) {
+                                      const geoData = await geoResp.json();
+                                      if (geoData.countryCode) {
+                                        await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                          .bind(geoData.countryCode, geoData.city || '', geoData.isp || geoData.org || geoData.as || '', item.ip, item.port).run();
+                                        updated++;
+                                      }
+                                    }
+                                    // Rate limit: 45 req/min = ~1.3s delay
+                                    await new Promise(r => setTimeout(r, 1400));
+                                  } catch(e) {}
+                                }
+                
+                                return new Response(JSON.stringify({ok: true, updated}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                              }
+                      if (path.endsWith('/sub')) {
          const parts = path.split('/');
          const subId = parts[1] === 'sub' ? parts[2] : parts[1];
          const users = await getAllUsers(env);
