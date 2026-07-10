@@ -308,9 +308,17 @@ export default {
                 const { ip, port, country, city, isp } = b;
                 if (!ip) return new Response(JSON.stringify({ok: false, error: 'IP is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
                 const p = parseInt(b.port) || 443;
+                let geoCountry = (b.country || '').trim();
+                let geoCity = (b.city || '').trim();
+                let geoIsp = (b.isp || '').trim();
+                // Auto-detect when country left blank and IP is a real IPv4
+                if (!geoCountry && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+                  const g = await detectCountry(ip);
+                  if (g) { geoCountry = g.country; geoCity = geoCity || g.city; geoIsp = geoIsp || g.isp; }
+                }
                 try {
                   await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, b.country || '', b.city || '', b.isp || '', Date.now()).run();
+                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, geoCountry, geoCity, geoIsp, Date.now()).run();
                   return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
                 } catch(e) {
                   return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
@@ -420,6 +428,43 @@ export default {
                                             return null;
                                           }
 
+              // Batch GeoIP via ip-api.com /batch (up to 100 IPs per request, 15 req/min).
+              // Dramatically faster than per-IP lookups. Returns Map<ip, {country, city, isp}>.
+              async function batchDetectCountries(ips) {
+                const out = new Map();
+                if (!ips.length) return out;
+                for (let i = 0; i < ips.length; i += 100) {
+                  const chunk = ips.slice(i, i + 100);
+                  try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 8000);
+                    const resp = await fetch('http://ip-api.com/batch?fields=status,countryCode,country,city,isp,org,as,query', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(chunk),
+                      signal: controller.signal,
+                    });
+                    clearTimeout(timeout);
+                    if (!resp.ok) continue;
+                    const arr = await resp.json();
+                    if (Array.isArray(arr)) {
+                      for (const d of arr) {
+                        if (d && d.status === 'success' && d.countryCode) {
+                          out.set(d.query, {
+                            country: d.countryCode,
+                            city: d.city || '',
+                            isp: d.isp || d.org || d.as || '',
+                          });
+                        }
+                      }
+                    }
+                  } catch(e) { console.error('Batch GeoIP error:', e.message); }
+                  // 15 batch req/min → ~4s between chunks (only when >100 IPs)
+                  if (i + 100 < ips.length) await new Promise(r => setTimeout(r, 4200));
+                }
+                return out;
+              }
+
                             if (path === '/api/proxyip/fetch' && request.method === 'POST') {
                               // Fetch from public sources like CMliu/GitHub + auto-detect country
                               try {
@@ -452,39 +497,37 @@ export default {
                                     });
                                   }
                                 }
-          
-                                // Insert into DB with country detection (batch with rate limiting)
+
+                                // Cap to keep within Worker limits; the rest can be fetched again.
+                                const MAX_FETCH = 300;
+                                const toInsert = validIPs.slice(0, MAX_FETCH);
+
+                                // 1) Insert immediately (fast, no per-IP geo wait)
                                 let inserted = 0;
-                                const geoCache = new Map(); // Cache to avoid duplicate API calls for same IP
-                  
-                                for (const item of validIPs) {
+                                for (const item of toInsert) {
                                   try {
-                                    // Check if already exists
                                     const existing = await env.DB.prepare('SELECT 1 FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port).first();
                                     if (existing) continue;
-                      
-                                    // Detect country (with caching)
-                                    let geo = geoCache.get(item.ip);
-                                    if (!geo) {
-                                      geo = await detectCountry(item.ip);
-                                      geoCache.set(item.ip, geo);
-                                      // Small delay to respect rate limit (45 req/min = ~1.3s between reqs)
-                                      await new Promise(r => setTimeout(r, 1400));
-                                    }
-                      
-                                    await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                                      ON CONFLICT(ip, port) DO NOTHING`).bind(
-                                        item.ip, 
-                                        item.port, 
-                                        geo?.country || '', 
-                                        geo?.city || '', 
-                                        geo?.isp || '', 
-                                        Date.now()
-                                    ).run();
+                                    await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
                                     inserted++;
                                   } catch(e) {}
                                 }
-          
+
+                                // 2) Batch-detect countries and update
+                                try {
+                                  const ipList = [...new Set(toInsert.map(p => p.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+                                  const geoMap = await batchDetectCountries(ipList);
+                                  for (const item of toInsert) {
+                                    const geo = geoMap.get(item.ip);
+                                    if (!geo) continue;
+                                    try {
+                                      await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                        .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+                                    } catch(e) {}
+                                  }
+                                } catch(e) {}
+
                                 return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
                               } catch(e) {
                                 return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
@@ -495,37 +538,42 @@ export default {
                               const b = await request.json();
                               const { text, format } = b;
                               if (!text) return new Response(JSON.stringify({ok: false, error: 'Text is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
-       
+
                               let lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-                              let inserted = 0;
-        
-                              if (format === 'ip:port') {
-                                for (const line of lines) {
-                                  const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
-                                  if (match) {
-                                    try {
-                                      const ip = match[1];
-                                      const port = parseInt(match[2]);
-                                      // Auto-detect country for imported IPs
-                                      let geo = { country: '', city: '', isp: '' };
-                                                                            try {
-                                                                              const geoResp = await fetch('http://ip-api.com/json/' + ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
-                                                                              if (geoResp.ok) {
-                                                                                const geoData = await geoResp.json();
-                                                                                if (geoData.countryCode) {
-                                                                                  geo = { country: geoData.countryCode, city: geoData.city || '', isp: geoData.isp || geoData.org || geoData.as || '' };
-                                                                                }
-                                                                              }
-                                                                            } catch(e) {}
-                        
-                                      await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, port, geo.country, geo.city, geo.isp, Date.now()).run();
-                                      inserted++;
-                                    } catch(e) {}
-                                  }
+
+                              // 1) Parse all lines up-front
+                              const parsed = [];
+                              for (const line of lines) {
+                                const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/) || line.match(/^([\d\.]+)$/);
+                                if (match) {
+                                  parsed.push({ ip: match[1], port: parseInt(match[2]) || 443 });
                                 }
                               }
-       
+
+                              // 2) Insert immediately (no per-IP geo wait → fast)
+                              let inserted = 0;
+                              for (const item of parsed) {
+                                try {
+                                  await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
+                                  inserted++;
+                                } catch(e) {}
+                              }
+
+                              // 3) Batch-detect countries for the freshly imported IPs and update
+                              try {
+                                const ipList = [...new Set(parsed.map(p => p.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+                                const geoMap = await batchDetectCountries(ipList);
+                                for (const item of parsed) {
+                                  const geo = geoMap.get(item.ip);
+                                  if (!geo) continue;
+                                  try {
+                                    await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                      .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+                                  } catch(e) {}
+                                }
+                              } catch(e) {}
+
                               return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
                             }
 
@@ -545,29 +593,30 @@ export default {
                 return new Response(JSON.stringify({ok: true, deleted}), {status: 200, headers: {'Content-Type': 'application/json'}});
                               }
 
-                              // Bulk detect country for existing IPs
+                              // Bulk detect country for existing IPs (uses fast batch endpoint)
                               if (path === '/api/proxyip/detect-countries' && request.method === 'POST') {
                                 if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
-                
-                                const { results: dbResults } = await env.DB.prepare('SELECT * FROM proxyip WHERE country = \'\' OR country IS NULL').all();
-                
+
+                                const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+                                if (!dbResults.length) {
+                                  return new Response(JSON.stringify({ok: true, updated: 0}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                                }
+
+                                // Only real IPv4 addresses can be geo-looked-up in batch; skip hostnames.
+                                const ipList = [...new Set(dbResults.map(r => r.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+                                const geoMap = await batchDetectCountries(ipList);
+
                                 let updated = 0;
                                 for (const item of dbResults) {
+                                  const geo = geoMap.get(item.ip);
+                                  if (!geo) continue;
                                   try {
-                                    const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
-                                    if (geoResp.ok) {
-                                      const geoData = await geoResp.json();
-                                      if (geoData.countryCode) {
-                                        await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
-                                          .bind(geoData.countryCode, geoData.city || '', geoData.isp || geoData.org || geoData.as || '', item.ip, item.port).run();
-                                        updated++;
-                                      }
-                                    }
-                                    // Rate limit: 45 req/min = ~1.3s delay
-                                    await new Promise(r => setTimeout(r, 1400));
+                                    await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                      .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+                                    updated++;
                                   } catch(e) {}
                                 }
-                
+
                                 return new Response(JSON.stringify({ok: true, updated}), {status: 200, headers: {'Content-Type': 'application/json'}});
                               }
                       if (path.endsWith('/sub')) {

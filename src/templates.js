@@ -864,7 +864,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     <div id="page-proxyip" class="page">
       <div class="header">
         <h2 class="title">مدیریت Proxy IP</h2>
-        <button class="btn" onclick="openModal('proxyip-add-modal')">+ افزودن Proxy IP</button>
+        <button class="btn" onclick="openProxyIPAddModal()">+ افزودن Proxy IP</button>
       </div>
 
       <!-- Stats Cards -->
@@ -915,7 +915,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
                       🌍 تشخیص کشورها
                     </button>
                     <div style="flex:1"></div>
-                    <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+                    <button class="btn" onclick="openProxyIPImportModal()" style="display:flex; align-items:center; gap:6px;">
                       📥 وارد کردن لیست
                     </button>
                   </div>
@@ -1025,6 +1025,63 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <!-- Add Proxy IP Modal -->
+  <div class="modal-overlay" id="proxyip-add-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="proxyip-add-modal-title">افزودن Proxy IP جدید</h3>
+        <div class="modal-close" onclick="closeModal('proxyip-add-modal')">&times;</div>
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:2">
+          <label>آی‌پی یا هاست</label>
+          <input type="text" id="pi-ip" class="form-control" placeholder="مثال: 1.2.3.4">
+        </div>
+        <div style="flex:1">
+          <label>پورت</label>
+          <input type="number" id="pi-port" class="form-control" value="443">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>کشور (کد دو حرفی، اختیاری — خالی بذارید تا خودکار تشخیص داده شود)</label>
+        <input type="text" id="pi-country" class="form-control" placeholder="مثال: DE" maxlength="2" style="text-transform:uppercase">
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:1">
+          <label>شهر (اختیاری)</label>
+          <input type="text" id="pi-city" class="form-control" placeholder="Frankfurt">
+        </div>
+        <div style="flex:1">
+          <label>ISP (اختیاری)</label>
+          <input type="text" id="pi-isp" class="form-control" placeholder="Hetzner">
+        </div>
+      </div>
+      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveProxyIP()">ذخیره</button>
+    </div>
+  </div>
+
+  <!-- Import Proxy IP Modal -->
+  <div class="modal-overlay" id="proxyip-import-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>وارد کردن لیست Proxy IP</h3>
+        <div class="modal-close" onclick="closeModal('proxyip-import-modal')">&times;</div>
+      </div>
+      <div class="form-group">
+        <label>فرمت</label>
+        <select id="pi-import-format" class="form-control">
+          <option value="ip:port">ip:port (هر خط یک آی‌پی)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>لیست آی‌پی‌ها (هر خط یکی، پشتیبانی از <code>#توضیح</code>)</label>
+        <textarea id="pi-import-text" class="form-control" rows="8" placeholder="1.2.3.4:443&#10;5.6.7.8:8443 # آلمان"></textarea>
+      </div>
+      <div class="desc" style="font-size:12px; color:var(--muted); margin-bottom:12px;">پس از وارد کردن، کشورِ آی‌پی‌ها خودکار تشخیص داده می‌شود.</div>
+      <button class="btn" style="width:100%;" onclick="importProxyIP()">وارد کردن</button>
+    </div>
+  </div>
+
   <script>
     const basePath = '/api';
 
@@ -1033,6 +1090,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
       document.getElementById('page-' + page).classList.add('active');
       event.currentTarget.classList.add('active');
+      if (page === 'proxyip') loadProxyIP();
     }
 
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -1282,6 +1340,32 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     let proxyIPData = [];
     let proxyIPSelectedRows = new Set();
 
+    // Universal country-code → flag emoji (regional indicator symbols)
+    function countryToFlag(cc) {
+      if (!cc || cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '🌍';
+      const A = 0x1F1E6;
+      const up = cc.toUpperCase();
+      return String.fromCodePoint(A + up.charCodeAt(0) - 65, A + up.charCodeAt(1) - 65);
+    }
+
+    // Persian names for the most common proxy-IP countries (fallback = code)
+    const COUNTRY_NAMES_FA = {
+      IR: 'ایران', US: 'آمریکا', DE: 'آلمان', NL: 'هلند', FR: 'فرانسه',
+      GB: 'انگلستان', SG: 'سنگاپور', JP: 'ژاپن', TR: 'ترکیه', CA: 'کانادا',
+      FI: 'فنلاند', SE: 'سوئد', RU: 'روسیه', PL: 'لهستان', CH: 'سوئیس',
+      AT: 'اتریش', IT: 'ایتالیا', ES: 'اسپانیا', AE: 'امارات', IN: 'هند',
+      HK: 'هنگ‌کنگ', KR: 'کره جنوبی', AU: 'استرالیا', BR: 'برزیل', CN: 'چین',
+      UA: 'اوکراین', RO: 'رومانی', CZ: 'چک', BE: 'بلژیک', DK: 'دانمارک',
+      NO: 'نروژ', IE: 'ایرلند', LU: 'لوکزامبورگ', LT: 'لیتوانی', LV: 'لتونی',
+      EE: 'استونی', BG: 'بلغارستان', HU: 'مجارستان', PT: 'پرتغال', GR: 'یونان',
+      IL: 'اسرائیل', SA: 'عربستان', QA: 'قطر', TW: 'تایوان', TH: 'تایلند',
+      VN: 'ویتنام', ID: 'اندونزی', MY: 'مالزی', PH: 'فیلیپین', ZA: 'آفریقای جنوبی'
+    };
+    function countryName(cc) {
+      if (!cc) return '—';
+      return COUNTRY_NAMES_FA[cc.toUpperCase()] || cc.toUpperCase();
+    }
+
     async function loadProxyIP() {
       try {
         const res = await fetch(basePath + '/proxyip');
@@ -1322,17 +1406,20 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
 
       tbody.innerHTML = filtered.map(p => {
         const statusClass = p.status === 'active' ? 'green' : (p.status === 'slow' ? 'yellow' : 'red');
-        const statusText = p.status === 'active' ? '✅ فعال' : (p.status === 'slow' ? '🐢 کند' : '❌ مرده');
-        const countryFlag = p.country === 'IR' ? '🇮🇷' : p.country === 'DE' ? '🇩🇪' : p.country === 'US' ? '🇺🇸' : p.country === 'NL' ? '🇳🇱' : p.country === 'FR' ? '🇫🇷' : p.country === 'SG' ? '🇸🇬' : p.country === 'JP' ? '🇯🇵' : p.country === 'TR' ? '🇹🇷' : '🌍';
+        const statusText = p.status === 'active' ? '✅ فعال' : (p.status === 'slow' ? '🐢 کند' : (p.status === 'unknown' ? '❔ نامشخص' : '❌ مرده'));
+        const flag = countryToFlag(p.country);
+        const cname = countryName(p.country);
+        const loc = p.city ? cname + ' · ' + p.city : cname;
         const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '—';
-        
+        const checked = proxyIPSelectedRows.has(p.ip + ':' + p.port) ? 'checked' : '';
+
         return \`<tr>
-          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" onchange="toggleProxyIPSelection(this)"></td>
-          <td style="font-family:monospace; font-size:13px;">\${p.ip}:\${p.port}</td>
+          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" \${checked} onchange="toggleProxyIPSelection(this)"></td>
+          <td style="font-family:monospace; font-size:13px;">\${p.ip}</td>
           <td>\${p.port}</td>
-          <td>\${countryFlag} \${p.city || '—'}</td>
-          <td>\${p.isp || '—'}</td>
-          <td style="font-family:monospace;">\${p.ping || '—'}</td>
+          <td><span style="font-size:16px;">\${flag}</span> \${loc}</td>
+          <td style="font-size:12px; color:var(--muted);">\${p.isp || '—'}</td>
+          <td style="font-family:monospace;">\${p.ping != null ? p.ping : '—'}</td>
           <td><span class="badge \${statusClass}">\${statusText}</span></td>
           <td style="font-size:12px; color:var(--muted);">\${lastCheck}</td>
           <td>
@@ -1343,6 +1430,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           </td>
         </tr>\`;
       }).join('');
+      updateSelectionToolbar();
     }
 
     function filterProxyIP() {
@@ -1358,7 +1446,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       try {
         const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           await loadProxyIP();
         } else {
           alert('خطا: ' + (data.error || 'نامشخص'));
@@ -1380,7 +1468,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           alert(\`✅ تست موفق! پینگ: \${data.ping} ms\`);
           loadProxyIP();
         } else {
@@ -1400,8 +1488,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           try {
             const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
             const data = await res.json();
-            if (data.success) {
-              alert('✅ ${data.count} آی‌پی جدید دریافت شد');
+            if (data.ok) {
+              alert('✅ ' + (data.count || 0) + ' آی‌پی جدید دریافت شد');
               loadProxyIP();
             } else {
               alert('خطا: ' + (data.error || 'نامشخص'));
@@ -1420,47 +1508,16 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           btn.disabled = true;
 
           try {
-            // Get IPs that don't have country yet
-            const res = await fetch(basePath + '/proxyip');
+            // Detection runs on the Worker (browser can't reach http-only ip-api due to
+            // mixed-content/CORS). Backend uses ip-api batch endpoint → fast, up to 100/req.
+            const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
             const data = await res.json();
-            const ipsWithoutCountry = (data.proxyip || []).filter(p => !p.country || p.country === '');
-        
-            if (ipsWithoutCountry.length === 0) {
-              alert('✅ همه آی‌پی‌ها کشور دارند');
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              return;
+            if (data.ok) {
+              alert('✅ کشورِ ' + (data.updated || 0) + ' آی‌پی تشخیص داده شد');
+              loadProxyIP();
+            } else {
+              alert('خطا: ' + (data.error || 'نامشخص'));
             }
-
-            let detected = 0;
-            for (const item of ipsWithoutCountry) {
-              try {
-                const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
-                if (geoResp.ok) {
-                  const geoData = await geoResp.json();
-                  if (geoData.countryCode) {
-                    // Update in DB
-                    await fetch(basePath + '/proxyip', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        ip: item.ip, 
-                        port: item.port,
-                        country: geoData.countryCode,
-                        city: geoData.city || '',
-                        isp: geoData.isp || geoData.org || geoData.as || ''
-                      })
-                    });
-                    detected++;
-                  }
-                }
-                // Rate limit: 45 req/min = ~1.3s delay
-                await new Promise(r => setTimeout(r, 1400));
-              } catch(e) { console.error('GeoIP error for', item.ip, e); }
-            }
-
-            alert('✅ ' + detected + ' آی‌پی کشورشان تشخیص داده شد');
-            loadProxyIP();
           } catch (e) {
             alert('خطا: ' + e.message);
           }
@@ -1561,7 +1618,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port, country, city, isp })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           closeModal('proxyip-add-modal');
           loadProxyIP();
         } else {
@@ -1574,7 +1631,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
 
     async function deleteProxyIP(ip, port) {
       if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را حذف کنید؟\`)) return;
-      
+
       try {
         const res = await fetch(basePath + '/proxyip', {
           method: 'DELETE',
@@ -1582,7 +1639,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port })
         });
         const data = await res.json();
-        if (data.success) loadProxyIP();
+        if (data.ok) loadProxyIP();
         else alert('خطا: ' + (data.error || 'نامشخص'));
       } catch (e) {
         alert('خطا: ' + e.message);
@@ -1608,9 +1665,9 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ text, format })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           closeModal('proxyip-import-modal');
-          alert('✅ \${data.count} آی‌پی وارد شد');
+          alert('✅ ' + (data.count || 0) + ' آی‌پی وارد شد');
           loadProxyIP();
         } else {
           alert('خطا: ' + (data.error || 'نامشخص'));
@@ -1636,7 +1693,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ips })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           proxyIPSelectedRows.clear();
           loadProxyIP();
         } else {

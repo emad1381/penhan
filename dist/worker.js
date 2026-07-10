@@ -1778,7 +1778,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     <div id="page-proxyip" class="page">
       <div class="header">
         <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</h2>
-        <button class="btn" onclick="openModal('proxyip-add-modal')">+ \u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP</button>
+        <button class="btn" onclick="openProxyIPAddModal()">+ \u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP</button>
       </div>
 
       <!-- Stats Cards -->
@@ -1829,7 +1829,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
                       \u{1F30D} \u062A\u0634\u062E\u06CC\u0635 \u06A9\u0634\u0648\u0631\u0647\u0627
                     </button>
                     <div style="flex:1"></div>
-                    <button class="btn" onclick="openModal('proxyip-import-modal')" style="display:flex; align-items:center; gap:6px;">
+                    <button class="btn" onclick="openProxyIPImportModal()" style="display:flex; align-items:center; gap:6px;">
                       \u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A
                     </button>
                   </div>
@@ -1939,6 +1939,63 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <!-- Add Proxy IP Modal -->
+  <div class="modal-overlay" id="proxyip-add-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="proxyip-add-modal-title">\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F</h3>
+        <div class="modal-close" onclick="closeModal('proxyip-add-modal')">&times;</div>
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:2">
+          <label>\u0622\u06CC\u200C\u067E\u06CC \u06CC\u0627 \u0647\u0627\u0633\u062A</label>
+          <input type="text" id="pi-ip" class="form-control" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
+        </div>
+        <div style="flex:1">
+          <label>\u067E\u0648\u0631\u062A</label>
+          <input type="number" id="pi-port" class="form-control" value="443">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>\u06A9\u0634\u0648\u0631 (\u06A9\u062F \u062F\u0648 \u062D\u0631\u0641\u06CC\u060C \u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2014 \u062E\u0627\u0644\u06CC \u0628\u0630\u0627\u0631\u06CC\u062F \u062A\u0627 \u062E\u0648\u062F\u06A9\u0627\u0631 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u0648\u062F)</label>
+        <input type="text" id="pi-country" class="form-control" placeholder="\u0645\u062B\u0627\u0644: DE" maxlength="2" style="text-transform:uppercase">
+      </div>
+      <div class="form-group" style="display:flex; gap:8px;">
+        <div style="flex:1">
+          <label>\u0634\u0647\u0631 (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
+          <input type="text" id="pi-city" class="form-control" placeholder="Frankfurt">
+        </div>
+        <div style="flex:1">
+          <label>ISP (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
+          <input type="text" id="pi-isp" class="form-control" placeholder="Hetzner">
+        </div>
+      </div>
+      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveProxyIP()">\u0630\u062E\u06CC\u0631\u0647</button>
+    </div>
+  </div>
+
+  <!-- Import Proxy IP Modal -->
+  <div class="modal-overlay" id="proxyip-import-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A Proxy IP</h3>
+        <div class="modal-close" onclick="closeModal('proxyip-import-modal')">&times;</div>
+      </div>
+      <div class="form-group">
+        <label>\u0641\u0631\u0645\u062A</label>
+        <select id="pi-import-format" class="form-control">
+          <option value="ip:port">ip:port (\u0647\u0631 \u062E\u0637 \u06CC\u06A9 \u0622\u06CC\u200C\u067E\u06CC)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>\u0644\u06CC\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 (\u0647\u0631 \u062E\u0637 \u06CC\u06A9\u06CC\u060C \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u0627\u0632 <code>#\u062A\u0648\u0636\u06CC\u062D</code>)</label>
+        <textarea id="pi-import-text" class="form-control" rows="8" placeholder="1.2.3.4:443&#10;5.6.7.8:8443 # \u0622\u0644\u0645\u0627\u0646"></textarea>
+      </div>
+      <div class="desc" style="font-size:12px; color:var(--muted); margin-bottom:12px;">\u067E\u0633 \u0627\u0632 \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646\u060C \u06A9\u0634\u0648\u0631\u0650 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u062E\u0648\u062F\u06A9\u0627\u0631 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F.</div>
+      <button class="btn" style="width:100%;" onclick="importProxyIP()">\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646</button>
+    </div>
+  </div>
+
   <script>
     const basePath = '/api';
 
@@ -1947,6 +2004,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
       document.getElementById('page-' + page).classList.add('active');
       event.currentTarget.classList.add('active');
+      if (page === 'proxyip') loadProxyIP();
     }
 
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -2196,6 +2254,32 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     let proxyIPData = [];
     let proxyIPSelectedRows = new Set();
 
+    // Universal country-code \u2192 flag emoji (regional indicator symbols)
+    function countryToFlag(cc) {
+      if (!cc || cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '\u{1F30D}';
+      const A = 0x1F1E6;
+      const up = cc.toUpperCase();
+      return String.fromCodePoint(A + up.charCodeAt(0) - 65, A + up.charCodeAt(1) - 65);
+    }
+
+    // Persian names for the most common proxy-IP countries (fallback = code)
+    const COUNTRY_NAMES_FA = {
+      IR: '\u0627\u06CC\u0631\u0627\u0646', US: '\u0622\u0645\u0631\u06CC\u06A9\u0627', DE: '\u0622\u0644\u0645\u0627\u0646', NL: '\u0647\u0644\u0646\u062F', FR: '\u0641\u0631\u0627\u0646\u0633\u0647',
+      GB: '\u0627\u0646\u06AF\u0644\u0633\u062A\u0627\u0646', SG: '\u0633\u0646\u06AF\u0627\u067E\u0648\u0631', JP: '\u0698\u0627\u067E\u0646', TR: '\u062A\u0631\u06A9\u06CC\u0647', CA: '\u06A9\u0627\u0646\u0627\u062F\u0627',
+      FI: '\u0641\u0646\u0644\u0627\u0646\u062F', SE: '\u0633\u0648\u0626\u062F', RU: '\u0631\u0648\u0633\u06CC\u0647', PL: '\u0644\u0647\u0633\u062A\u0627\u0646', CH: '\u0633\u0648\u0626\u06CC\u0633',
+      AT: '\u0627\u062A\u0631\u06CC\u0634', IT: '\u0627\u06CC\u062A\u0627\u0644\u06CC\u0627', ES: '\u0627\u0633\u067E\u0627\u0646\u06CC\u0627', AE: '\u0627\u0645\u0627\u0631\u0627\u062A', IN: '\u0647\u0646\u062F',
+      HK: '\u0647\u0646\u06AF\u200C\u06A9\u0646\u06AF', KR: '\u06A9\u0631\u0647 \u062C\u0646\u0648\u0628\u06CC', AU: '\u0627\u0633\u062A\u0631\u0627\u0644\u06CC\u0627', BR: '\u0628\u0631\u0632\u06CC\u0644', CN: '\u0686\u06CC\u0646',
+      UA: '\u0627\u0648\u06A9\u0631\u0627\u06CC\u0646', RO: '\u0631\u0648\u0645\u0627\u0646\u06CC', CZ: '\u0686\u06A9', BE: '\u0628\u0644\u0698\u06CC\u06A9', DK: '\u062F\u0627\u0646\u0645\u0627\u0631\u06A9',
+      NO: '\u0646\u0631\u0648\u0698', IE: '\u0627\u06CC\u0631\u0644\u0646\u062F', LU: '\u0644\u0648\u06A9\u0632\u0627\u0645\u0628\u0648\u0631\u06AF', LT: '\u0644\u06CC\u062A\u0648\u0627\u0646\u06CC', LV: '\u0644\u062A\u0648\u0646\u06CC',
+      EE: '\u0627\u0633\u062A\u0648\u0646\u06CC', BG: '\u0628\u0644\u063A\u0627\u0631\u0633\u062A\u0627\u0646', HU: '\u0645\u062C\u0627\u0631\u0633\u062A\u0627\u0646', PT: '\u067E\u0631\u062A\u063A\u0627\u0644', GR: '\u06CC\u0648\u0646\u0627\u0646',
+      IL: '\u0627\u0633\u0631\u0627\u0626\u06CC\u0644', SA: '\u0639\u0631\u0628\u0633\u062A\u0627\u0646', QA: '\u0642\u0637\u0631', TW: '\u062A\u0627\u06CC\u0648\u0627\u0646', TH: '\u062A\u0627\u06CC\u0644\u0646\u062F',
+      VN: '\u0648\u06CC\u062A\u0646\u0627\u0645', ID: '\u0627\u0646\u062F\u0648\u0646\u0632\u06CC', MY: '\u0645\u0627\u0644\u0632\u06CC', PH: '\u0641\u06CC\u0644\u06CC\u067E\u06CC\u0646', ZA: '\u0622\u0641\u0631\u06CC\u0642\u0627\u06CC \u062C\u0646\u0648\u0628\u06CC'
+    };
+    function countryName(cc) {
+      if (!cc) return '\u2014';
+      return COUNTRY_NAMES_FA[cc.toUpperCase()] || cc.toUpperCase();
+    }
+
     async function loadProxyIP() {
       try {
         const res = await fetch(basePath + '/proxyip');
@@ -2236,17 +2320,20 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
 
       tbody.innerHTML = filtered.map(p => {
         const statusClass = p.status === 'active' ? 'green' : (p.status === 'slow' ? 'yellow' : 'red');
-        const statusText = p.status === 'active' ? '\u2705 \u0641\u0639\u0627\u0644' : (p.status === 'slow' ? '\u{1F422} \u06A9\u0646\u062F' : '\u274C \u0645\u0631\u062F\u0647');
-        const countryFlag = p.country === 'IR' ? '\u{1F1EE}\u{1F1F7}' : p.country === 'DE' ? '\u{1F1E9}\u{1F1EA}' : p.country === 'US' ? '\u{1F1FA}\u{1F1F8}' : p.country === 'NL' ? '\u{1F1F3}\u{1F1F1}' : p.country === 'FR' ? '\u{1F1EB}\u{1F1F7}' : p.country === 'SG' ? '\u{1F1F8}\u{1F1EC}' : p.country === 'JP' ? '\u{1F1EF}\u{1F1F5}' : p.country === 'TR' ? '\u{1F1F9}\u{1F1F7}' : '\u{1F30D}';
+        const statusText = p.status === 'active' ? '\u2705 \u0641\u0639\u0627\u0644' : (p.status === 'slow' ? '\u{1F422} \u06A9\u0646\u062F' : (p.status === 'unknown' ? '\u2754 \u0646\u0627\u0645\u0634\u062E\u0635' : '\u274C \u0645\u0631\u062F\u0647'));
+        const flag = countryToFlag(p.country);
+        const cname = countryName(p.country);
+        const loc = p.city ? cname + ' \xB7 ' + p.city : cname;
         const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '\u2014';
-        
+        const checked = proxyIPSelectedRows.has(p.ip + ':' + p.port) ? 'checked' : '';
+
         return \`<tr>
-          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" onchange="toggleProxyIPSelection(this)"></td>
-          <td style="font-family:monospace; font-size:13px;">\${p.ip}:\${p.port}</td>
+          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" \${checked} onchange="toggleProxyIPSelection(this)"></td>
+          <td style="font-family:monospace; font-size:13px;">\${p.ip}</td>
           <td>\${p.port}</td>
-          <td>\${countryFlag} \${p.city || '\u2014'}</td>
-          <td>\${p.isp || '\u2014'}</td>
-          <td style="font-family:monospace;">\${p.ping || '\u2014'}</td>
+          <td><span style="font-size:16px;">\${flag}</span> \${loc}</td>
+          <td style="font-size:12px; color:var(--muted);">\${p.isp || '\u2014'}</td>
+          <td style="font-family:monospace;">\${p.ping != null ? p.ping : '\u2014'}</td>
           <td><span class="badge \${statusClass}">\${statusText}</span></td>
           <td style="font-size:12px; color:var(--muted);">\${lastCheck}</td>
           <td>
@@ -2257,6 +2344,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           </td>
         </tr>\`;
       }).join('');
+      updateSelectionToolbar();
     }
 
     function filterProxyIP() {
@@ -2272,7 +2360,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       try {
         const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           await loadProxyIP();
         } else {
           alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
@@ -2294,7 +2382,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           alert(\`\u2705 \u062A\u0633\u062A \u0645\u0648\u0641\u0642! \u067E\u06CC\u0646\u06AF: \${data.ping} ms\`);
           loadProxyIP();
         } else {
@@ -2314,8 +2402,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           try {
             const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
             const data = await res.json();
-            if (data.success) {
-              alert('\u2705 ${data.count} \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
+            if (data.ok) {
+              alert('\u2705 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
               loadProxyIP();
             } else {
               alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
@@ -2334,47 +2422,16 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           btn.disabled = true;
 
           try {
-            // Get IPs that don't have country yet
-            const res = await fetch(basePath + '/proxyip');
+            // Detection runs on the Worker (browser can't reach http-only ip-api due to
+            // mixed-content/CORS). Backend uses ip-api batch endpoint \u2192 fast, up to 100/req.
+            const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
             const data = await res.json();
-            const ipsWithoutCountry = (data.proxyip || []).filter(p => !p.country || p.country === '');
-        
-            if (ipsWithoutCountry.length === 0) {
-              alert('\u2705 \u0647\u0645\u0647 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u06A9\u0634\u0648\u0631 \u062F\u0627\u0631\u0646\u062F');
-              btn.innerHTML = originalText;
-              btn.disabled = false;
-              return;
+            if (data.ok) {
+              alert('\u2705 \u06A9\u0634\u0648\u0631\u0650 ' + (data.updated || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F');
+              loadProxyIP();
+            } else {
+              alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
             }
-
-            let detected = 0;
-            for (const item of ipsWithoutCountry) {
-              try {
-                const geoResp = await fetch('http://ip-api.com/json/' + item.ip + '?fields=countryCode,country,regionName,city,isp,org,as', { cf: { resolveTimeout: 2000 } });
-                if (geoResp.ok) {
-                  const geoData = await geoResp.json();
-                  if (geoData.countryCode) {
-                    // Update in DB
-                    await fetch(basePath + '/proxyip', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        ip: item.ip, 
-                        port: item.port,
-                        country: geoData.countryCode,
-                        city: geoData.city || '',
-                        isp: geoData.isp || geoData.org || geoData.as || ''
-                      })
-                    });
-                    detected++;
-                  }
-                }
-                // Rate limit: 45 req/min = ~1.3s delay
-                await new Promise(r => setTimeout(r, 1400));
-              } catch(e) { console.error('GeoIP error for', item.ip, e); }
-            }
-
-            alert('\u2705 ' + detected + ' \u0622\u06CC\u200C\u067E\u06CC \u06A9\u0634\u0648\u0631\u0634\u0627\u0646 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F');
-            loadProxyIP();
           } catch (e) {
             alert('\u062E\u0637\u0627: ' + e.message);
           }
@@ -2475,7 +2532,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port, country, city, isp })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           closeModal('proxyip-add-modal');
           loadProxyIP();
         } else {
@@ -2488,7 +2545,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
 
     async function deleteProxyIP(ip, port) {
       if (!confirm(\`\u0622\u06CC\u0627 \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u06CC\u062F \${ip}:\${port} \u0631\u0627 \u062D\u0630\u0641 \u06A9\u0646\u06CC\u062F\u061F\`)) return;
-      
+
       try {
         const res = await fetch(basePath + '/proxyip', {
           method: 'DELETE',
@@ -2496,7 +2553,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ip, port })
         });
         const data = await res.json();
-        if (data.success) loadProxyIP();
+        if (data.ok) loadProxyIP();
         else alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
       } catch (e) {
         alert('\u062E\u0637\u0627: ' + e.message);
@@ -2522,9 +2579,9 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ text, format })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           closeModal('proxyip-import-modal');
-          alert('\u2705 \${data.count} \u0622\u06CC\u200C\u067E\u06CC \u0648\u0627\u0631\u062F \u0634\u062F');
+          alert('\u2705 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u0648\u0627\u0631\u062F \u0634\u062F');
           loadProxyIP();
         } else {
           alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
@@ -2550,7 +2607,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           body: JSON.stringify({ ips })
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.ok) {
           proxyIPSelectedRows.clear();
           loadProxyIP();
         } else {
@@ -2849,9 +2906,20 @@ var src_default = {
         if (!ip)
           return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
         const p = parseInt(b.port) || 443;
+        let geoCountry = (b.country || "").trim();
+        let geoCity = (b.city || "").trim();
+        let geoIsp = (b.isp || "").trim();
+        if (!geoCountry && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+          const g = await detectCountry(ip);
+          if (g) {
+            geoCountry = g.country;
+            geoCity = geoCity || g.city;
+            geoIsp = geoIsp || g.isp;
+          }
+        }
         try {
           await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, b.country || "", b.city || "", b.isp || "", Date.now()).run();
+                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, geoCountry, geoCity, geoIsp, Date.now()).run();
           return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
         } catch (e) {
           return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
@@ -2937,21 +3005,59 @@ var src_default = {
           clearTimeout(timeout);
           if (!resp.ok)
             return null;
-          const data2 = await resp.json();
-          if (data2.countryCode) {
+          const data = await resp.json();
+          if (data.countryCode) {
             return {
-              country: data2.countryCode,
+              country: data.countryCode,
               // ISO code: IR, US, DE, etc.
-              countryName: data2.country,
+              countryName: data.country,
               // Full name
-              city: data2.city || "",
-              isp: data2.isp || data2.org || data2.as || ""
+              city: data.city || "",
+              isp: data.isp || data.org || data.as || ""
             };
           }
         } catch (e) {
           console.error("GeoIP error for", ip, e.message);
         }
         return null;
+      }
+      async function batchDetectCountries(ips) {
+        const out = /* @__PURE__ */ new Map();
+        if (!ips.length)
+          return out;
+        for (let i = 0; i < ips.length; i += 100) {
+          const chunk = ips.slice(i, i + 100);
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8e3);
+            const resp = await fetch("http://ip-api.com/batch?fields=status,countryCode,country,city,isp,org,as,query", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(chunk),
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!resp.ok)
+              continue;
+            const arr = await resp.json();
+            if (Array.isArray(arr)) {
+              for (const d of arr) {
+                if (d && d.status === "success" && d.countryCode) {
+                  out.set(d.query, {
+                    country: d.countryCode,
+                    city: d.city || "",
+                    isp: d.isp || d.org || d.as || ""
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Batch GeoIP error:", e.message);
+          }
+          if (i + 100 < ips.length)
+            await new Promise((r) => setTimeout(r, 4200));
+        }
+        return out;
       }
       if (path === "/api/proxyip/fetch" && request.method === "POST") {
         try {
@@ -2983,31 +3089,33 @@ var src_default = {
               });
             }
           }
+          const MAX_FETCH = 300;
+          const toInsert = validIPs.slice(0, MAX_FETCH);
           let inserted = 0;
-          const geoCache = /* @__PURE__ */ new Map();
-          for (const item of validIPs) {
+          for (const item of toInsert) {
             try {
               const existing = await env.DB.prepare("SELECT 1 FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).first();
               if (existing)
                 continue;
-              let geo = geoCache.get(item.ip);
-              if (!geo) {
-                geo = await detectCountry(item.ip);
-                geoCache.set(item.ip, geo);
-                await new Promise((r) => setTimeout(r, 1400));
-              }
-              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                                      ON CONFLICT(ip, port) DO NOTHING`).bind(
-                item.ip,
-                item.port,
-                geo?.country || "",
-                geo?.city || "",
-                geo?.isp || "",
-                Date.now()
-              ).run();
+              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
               inserted++;
             } catch (e) {
             }
+          }
+          try {
+            const ipList = [...new Set(toInsert.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+            const geoMap = await batchDetectCountries(ipList);
+            for (const item of toInsert) {
+              const geo = geoMap.get(item.ip);
+              if (!geo)
+                continue;
+              try {
+                await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+              } catch (e) {
+              }
+            }
+          } catch (e) {
           }
           return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
         } catch (e) {
@@ -3020,32 +3128,35 @@ var src_default = {
         if (!text)
           return new Response(JSON.stringify({ ok: false, error: "Text is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
         let lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+        const parsed = [];
+        for (const line of lines) {
+          const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/) || line.match(/^([\d\.]+)$/);
+          if (match) {
+            parsed.push({ ip: match[1], port: parseInt(match[2]) || 443 });
+          }
+        }
         let inserted = 0;
-        if (format === "ip:port") {
-          for (const line of lines) {
-            const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/);
-            if (match) {
-              try {
-                const ip = match[1];
-                const port = parseInt(match[2]);
-                let geo = { country: "", city: "", isp: "" };
-                try {
-                  const geoResp = await fetch("http://ip-api.com/json/" + ip + "?fields=countryCode,country,regionName,city,isp,org,as", { cf: { resolveTimeout: 2e3 } });
-                  if (geoResp.ok) {
-                    const geoData = await geoResp.json();
-                    if (geoData.countryCode) {
-                      geo = { country: geoData.countryCode, city: geoData.city || "", isp: geoData.isp || geoData.org || geoData.as || "" };
-                    }
-                  }
-                } catch (e) {
-                }
-                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, port, geo.country, geo.city, geo.isp, Date.now()).run();
-                inserted++;
-              } catch (e) {
-              }
+        for (const item of parsed) {
+          try {
+            await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
+            inserted++;
+          } catch (e) {
+          }
+        }
+        try {
+          const ipList = [...new Set(parsed.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+          const geoMap = await batchDetectCountries(ipList);
+          for (const item of parsed) {
+            const geo = geoMap.get(item.ip);
+            if (!geo)
+              continue;
+            try {
+              await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+            } catch (e) {
             }
           }
+        } catch (e) {
         }
         return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
@@ -3068,18 +3179,19 @@ var src_default = {
         if (!env.DB)
           return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
         const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+        if (!dbResults.length) {
+          return new Response(JSON.stringify({ ok: true, updated: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        const ipList = [...new Set(dbResults.map((r) => r.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+        const geoMap = await batchDetectCountries(ipList);
         let updated = 0;
         for (const item of dbResults) {
+          const geo = geoMap.get(item.ip);
+          if (!geo)
+            continue;
           try {
-            const geoResp = await fetch("http://ip-api.com/json/" + item.ip + "?fields=countryCode,country,regionName,city,isp,org,as", { cf: { resolveTimeout: 2e3 } });
-            if (geoResp.ok) {
-              const geoData = await geoResp.json();
-              if (geoData.countryCode) {
-                await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geoData.countryCode, geoData.city || "", geoData.isp || geoData.org || geoData.as || "", item.ip, item.port).run();
-                updated++;
-              }
-            }
-            await new Promise((r) => setTimeout(r, 1400));
+            await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+            updated++;
           } catch (e) {
           }
         }
