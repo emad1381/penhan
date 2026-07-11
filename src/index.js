@@ -413,41 +413,8 @@ export default {
                               return new Response(JSON.stringify({ok: true, tested, active}), {status: 200, headers: {'Content-Type': 'application/json'}});
                             }
 
-              // Fetch datacenter-specific proxy IPs the cmliu way: resolve
-              // `{colo}.{domain}` via DoH using THIS worker's edge colo.
-              if (path === '/api/proxyip/colo' && request.method === 'POST') {
-                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
-                let domain = '';
-                try { const b = await request.json(); domain = (b.domain || '').trim(); } catch(e) {}
-                if (!domain) domain = (await getSettingD1(env, 'colo_domain')) || '';
-                if (!domain) return new Response(JSON.stringify({ok: false, error: 'domain is required (e.g. proxyip.example.com)'}), {status: 400, headers: {'Content-Type': 'application/json'}});
-
-                // Persist last-used domain for convenience.
-                await setSettingD1(env, 'colo_domain', domain);
-
-                const colo = (request.cf && request.cf.colo) ? String(request.cf.colo) : '';
-                try {
-                  const ips = await fetchColoProxyIPs(domain, colo);
-                  if (!ips.length) {
-                    return new Response(JSON.stringify({ok: false, error: `no A records for ${colo ? colo.toLowerCase()+'.' : ''}${domain}`, colo}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                  }
-                  let inserted = 0;
-                  for (const ip of ips) {
-                    try {
-                      await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, 443, '', '', ?, 'unknown', ?)
-                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, `colo:${colo}`, Date.now()).run();
-                      inserted++;
-                    } catch(e) {}
-                  }
-                  proxyPoolCache = null;
-                  return new Response(JSON.stringify({ok: true, colo, count: inserted, found: ips.length}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                } catch(e) {
-                  return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
-                }
-              }
-
-
               if (path === '/api/proxyip/test' && request.method === 'POST') {
+
                 if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
                 const b = await request.json();
                 const { ip, port } = b;
@@ -541,13 +508,24 @@ export default {
               }
 
                             if (path === '/api/proxyip/fetch' && request.method === 'POST') {
-                              // Fetch from public sources like CMliu/GitHub + auto-detect country
+                              // Fetch from public sources (CMliu/GitHub) AND auto-resolve the
+                              // ProxyIP hosts behind THIS worker's edge datacenter (colo) via DoH.
+                              // No manual domain needed — colo is detected from request.cf.colo.
                               try {
+                                const colo = (request.cf && request.cf.colo) ? String(request.cf.colo) : '';
+
+                                // Static text lists of proxy IPs
                                 const sources = [
                                   'https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt',
                                   'https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt',
                                 ];
-          
+                                // Domains that serve colo-specific ProxyIPs as A records:
+                                // `{colo}.{domain}` resolves to IPs local to that datacenter.
+                                const coloDomains = [
+                                  'proxyip.cmliu.com',
+                                  'proxyip.fxxk.dedyn.io',
+                                ];
+
                                 let allIPs = [];
                                 for (const source of sources) {
                                   try {
@@ -559,7 +537,16 @@ export default {
                                     }
                                   } catch(e) { console.error('Failed to fetch from', source, e); }
                                 }
-          
+
+                                // colo-based resolve: pull IPs local to this worker's datacenter
+                                let coloCount = 0;
+                                for (const d of coloDomains) {
+                                  try {
+                                    const coloIPs = await fetchColoProxyIPs(d, colo);
+                                    for (const cip of coloIPs) { allIPs.push(cip); coloCount++; }
+                                  } catch(e) { console.error('colo resolve failed for', d, e); }
+                                }
+
                                 // Parse IPs
                                 const validIPs = [];
                                 for (const line of allIPs) {
@@ -576,6 +563,7 @@ export default {
                                 // Cap to keep within Worker limits; the rest can be fetched again.
                                 const MAX_FETCH = 300;
                                 const toInsert = validIPs.slice(0, MAX_FETCH);
+
 
                                 // 1) Insert immediately (fast, no per-IP geo wait)
                                 let inserted = 0;

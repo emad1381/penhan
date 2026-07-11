@@ -1000,8 +1000,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <span class="sep"></span>
         <button class="pip-chip" onclick="refreshAllProxyIP()">🔄 بروزرسانی همه</button>
         <button class="pip-chip" onclick="fetchProxyIPFromSources()">☁️ دریافت از منابع</button>
-        <button class="pip-chip" onclick="openColoModal()">📡 دریافت بر اساس colo</button>
         <button class="pip-chip" onclick="detectCountriesForIPs()">🌍 تشخیص کشورها</button>
+
 
         <span class="spacer"></span>
         <button class="pip-chip solid" onclick="openProxyIPImportModal()">📥 وارد کردن لیست</button>
@@ -1166,25 +1166,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
-  <!-- Colo Fetch Modal -->
-  <div class="modal-overlay" id="proxyip-colo-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>📡 دریافت Proxy IP بر اساس دیتاسنتر (colo)</h3>
-        <div class="modal-close" onclick="closeModal('proxyip-colo-modal')">&times;</div>
-      </div>
-      <div class="desc" style="font-size:13px; color:var(--muted); line-height:1.9; margin-bottom:14px;">
-        این قابلیت مثل موتور cmliu کار می‌کند: دامنه‌ای که رکوردهای proxyip را بر اساس نزدیک‌ترین دیتاسنتر کلادفلر (colo) سرو می‌کند وارد کنید. ورکر با DoH رکورد <code>{colo}.دامنه</code> را resolve کرده و آی‌پی‌های همان دیتاسنتر را اضافه می‌کند.
-      </div>
-      <div class="form-group">
-        <label>دامنه colo</label>
-        <input type="text" id="pi-colo-domain" class="form-control" placeholder="مثال: proxyip.cmliu.com" style="direction:ltr;">
-      </div>
-      <button class="btn" style="width:100%;" onclick="getColoProxyIP()">دریافت</button>
-    </div>
-  </div>
-
   <!-- Toast container -->
+
   <div class="pip-toasts" id="pip-toasts"></div>
 
 
@@ -1848,41 +1831,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
 
 
-    // Colo-based fetch (cmliu-style): resolve {colo}.domain via DoH on the Worker
-    function openColoModal() {
-      openModal('proxyip-colo-modal');
-    }
-
-    async function getColoProxyIP() {
-      const domain = document.getElementById('pi-colo-domain').value.trim();
-      if (!domain) { showToast('دامنه را وارد کنید', 'err'); return; }
-      const btn = event.target.closest('button');
-      const original = btn.innerHTML;
-      btn.innerHTML = '<span class="pip-spinner"></span> در حال دریافت...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch(basePath + '/proxyip/colo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          closeModal('proxyip-colo-modal');
-          showToast('دیتاسنتر ' + (data.colo || '?') + ' · ' + (data.count || 0) + ' آی‌پی جدید افزوده شد', 'ok');
-          loadProxyIP();
-        } else {
-          showToast('خطا: ' + (data.error || 'نامشخص'), 'err');
-        }
-      } catch (e) {
-        showToast('خطا: ' + e.message, 'err');
-      }
-      btn.innerHTML = original;
-      btn.disabled = false;
-    }
-
 // Init
+
     loadUsers();
     loadTokens();
     loadCfMetrics();

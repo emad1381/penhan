@@ -2027,8 +2027,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <span class="sep"></span>
         <button class="pip-chip" onclick="refreshAllProxyIP()">\u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647</button>
         <button class="pip-chip" onclick="fetchProxyIPFromSources()">\u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639</button>
-        <button class="pip-chip" onclick="openColoModal()">\u{1F4E1} \u062F\u0631\u06CC\u0627\u0641\u062A \u0628\u0631 \u0627\u0633\u0627\u0633 colo</button>
         <button class="pip-chip" onclick="detectCountriesForIPs()">\u{1F30D} \u062A\u0634\u062E\u06CC\u0635 \u06A9\u0634\u0648\u0631\u0647\u0627</button>
+
 
         <span class="spacer"></span>
         <button class="pip-chip solid" onclick="openProxyIPImportModal()">\u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A</button>
@@ -2193,25 +2193,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
-  <!-- Colo Fetch Modal -->
-  <div class="modal-overlay" id="proxyip-colo-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>\u{1F4E1} \u062F\u0631\u06CC\u0627\u0641\u062A Proxy IP \u0628\u0631 \u0627\u0633\u0627\u0633 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 (colo)</h3>
-        <div class="modal-close" onclick="closeModal('proxyip-colo-modal')">&times;</div>
-      </div>
-      <div class="desc" style="font-size:13px; color:var(--muted); line-height:1.9; margin-bottom:14px;">
-        \u0627\u06CC\u0646 \u0642\u0627\u0628\u0644\u06CC\u062A \u0645\u062B\u0644 \u0645\u0648\u062A\u0648\u0631 cmliu \u06A9\u0627\u0631 \u0645\u06CC\u200C\u06A9\u0646\u062F: \u062F\u0627\u0645\u0646\u0647\u200C\u0627\u06CC \u06A9\u0647 \u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC proxyip \u0631\u0627 \u0628\u0631 \u0627\u0633\u0627\u0633 \u0646\u0632\u062F\u06CC\u06A9\u200C\u062A\u0631\u06CC\u0646 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 (colo) \u0633\u0631\u0648 \u0645\u06CC\u200C\u06A9\u0646\u062F \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F. \u0648\u0631\u06A9\u0631 \u0628\u0627 DoH \u0631\u06A9\u0648\u0631\u062F <code>{colo}.\u062F\u0627\u0645\u0646\u0647</code> \u0631\u0627 resolve \u06A9\u0631\u062F\u0647 \u0648 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0647\u0645\u0627\u0646 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 \u0631\u0627 \u0627\u0636\u0627\u0641\u0647 \u0645\u06CC\u200C\u06A9\u0646\u062F.
-      </div>
-      <div class="form-group">
-        <label>\u062F\u0627\u0645\u0646\u0647 colo</label>
-        <input type="text" id="pi-colo-domain" class="form-control" placeholder="\u0645\u062B\u0627\u0644: proxyip.cmliu.com" style="direction:ltr;">
-      </div>
-      <button class="btn" style="width:100%;" onclick="getColoProxyIP()">\u062F\u0631\u06CC\u0627\u0641\u062A</button>
-    </div>
-  </div>
-
   <!-- Toast container -->
+
   <div class="pip-toasts" id="pip-toasts"></div>
 
 
@@ -2875,41 +2858,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
 
 
-    // Colo-based fetch (cmliu-style): resolve {colo}.domain via DoH on the Worker
-    function openColoModal() {
-      openModal('proxyip-colo-modal');
-    }
-
-    async function getColoProxyIP() {
-      const domain = document.getElementById('pi-colo-domain').value.trim();
-      if (!domain) { showToast('\u062F\u0627\u0645\u0646\u0647 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F', 'err'); return; }
-      const btn = event.target.closest('button');
-      const original = btn.innerHTML;
-      btn.innerHTML = '<span class="pip-spinner"></span> \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch(basePath + '/proxyip/colo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          closeModal('proxyip-colo-modal');
-          showToast('\u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 ' + (data.colo || '?') + ' \xB7 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u0627\u0641\u0632\u0648\u062F\u0647 \u0634\u062F', 'ok');
-          loadProxyIP();
-        } else {
-          showToast('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
-        }
-      } catch (e) {
-        showToast('\u062E\u0637\u0627: ' + e.message, 'err');
-      }
-      btn.innerHTML = original;
-      btn.disabled = false;
-    }
-
 // Init
+
     loadUsers();
     loadTokens();
     loadCfMetrics();
@@ -3289,41 +3239,6 @@ var src_default = {
           proxyPoolCache = null;
           return new Response(JSON.stringify({ ok: true, tested, active }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
-        if (path === "/api/proxyip/colo" && request.method === "POST") {
-          if (!env.DB)
-            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-          let domain = "";
-          try {
-            const b = await request.json();
-            domain = (b.domain || "").trim();
-          } catch (e) {
-          }
-          if (!domain)
-            domain = await getSettingD1(env, "colo_domain") || "";
-          if (!domain)
-            return new Response(JSON.stringify({ ok: false, error: "domain is required (e.g. proxyip.example.com)" }), { status: 400, headers: { "Content-Type": "application/json" } });
-          await setSettingD1(env, "colo_domain", domain);
-          const colo = request.cf && request.cf.colo ? String(request.cf.colo) : "";
-          try {
-            const ips = await fetchColoProxyIPs(domain, colo);
-            if (!ips.length) {
-              return new Response(JSON.stringify({ ok: false, error: `no A records for ${colo ? colo.toLowerCase() + "." : ""}${domain}`, colo }), { status: 200, headers: { "Content-Type": "application/json" } });
-            }
-            let inserted = 0;
-            for (const ip of ips) {
-              try {
-                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, 443, '', '', ?, 'unknown', ?)
-                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, `colo:${colo}`, Date.now()).run();
-                inserted++;
-              } catch (e) {
-              }
-            }
-            proxyPoolCache = null;
-            return new Response(JSON.stringify({ ok: true, colo, count: inserted, found: ips.length }), { status: 200, headers: { "Content-Type": "application/json" } });
-          } catch (e) {
-            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
-          }
-        }
         if (path === "/api/proxyip/test" && request.method === "POST") {
           if (!env.DB)
             return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
@@ -3416,9 +3331,14 @@ var src_default = {
         }
         if (path === "/api/proxyip/fetch" && request.method === "POST") {
           try {
+            const colo = request.cf && request.cf.colo ? String(request.cf.colo) : "";
             const sources = [
               "https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt",
               "https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt"
+            ];
+            const coloDomains = [
+              "proxyip.cmliu.com",
+              "proxyip.fxxk.dedyn.io"
             ];
             let allIPs = [];
             for (const source of sources) {
@@ -3431,6 +3351,18 @@ var src_default = {
                 }
               } catch (e) {
                 console.error("Failed to fetch from", source, e);
+              }
+            }
+            let coloCount = 0;
+            for (const d of coloDomains) {
+              try {
+                const coloIPs = await fetchColoProxyIPs(d, colo);
+                for (const cip of coloIPs) {
+                  allIPs.push(cip);
+                  coloCount++;
+                }
+              } catch (e) {
+                console.error("colo resolve failed for", d, e);
               }
             }
             const validIPs = [];
