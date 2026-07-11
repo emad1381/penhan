@@ -1702,7 +1702,23 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .pip-check:indeterminate::after { content:'\u2013'; position:absolute; top:50%; left:50%; transform:translate(-50%,-58%); color:#fff; font-size:13px; font-weight:900; }
     .pip-empty { text-align:center; padding:56px 20px; color:var(--muted); }
     .pip-empty .big { font-size:40px; opacity:.4; margin-bottom:12px; }
+    .pip-act.spin { pointer-events:none; opacity:.7; }
+    .pip-act.spin::after { content:''; }
+    @keyframes pipspin { to { transform:rotate(360deg); } }
+    .pip-spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.2); border-top-color:var(--primary); border-radius:50%; animation:pipspin .6s linear infinite; }
+
+    /* Toast notifications */
+    .pip-toasts { position:fixed; bottom:24px; left:24px; display:flex; flex-direction:column; gap:10px; z-index:9999; }
+    .pip-toast { display:flex; align-items:center; gap:10px; min-width:240px; max-width:360px; padding:13px 16px; border-radius:12px; background:var(--surface); border:1px solid var(--border); box-shadow:0 12px 30px -8px rgba(0,0,0,0.6); font-size:13px; font-weight:600; color:var(--text); animation:toastIn .25s cubic-bezier(.16,1,.3,1); }
+    .pip-toast.ok { border-color:rgba(16,185,129,0.4); }
+    .pip-toast.err { border-color:rgba(239,68,68,0.4); }
+    .pip-toast.info { border-color:rgba(139,92,246,0.4); }
+    .pip-toast .tico { font-size:16px; }
+    @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .pip-toast.out { animation:toastOut .25s forwards; }
+    @keyframes toastOut { to { opacity:0; transform:translateX(-20px); } }
   </style>
+
 
 </head>
 <body>
@@ -1845,11 +1861,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         </div>
       </div>
     </div>
-    
-  </div>
 
-      <!-- Proxy IP Manager Page -->
+    <!-- Proxy IP Manager Page -->
     <div id="page-proxyip" class="page">
+
       <div class="header">
         <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</h2>
         <button class="btn" onclick="openProxyIPAddModal()">+ \u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP</button>
@@ -2063,8 +2078,28 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <!-- Toast container -->
+  <div class="pip-toasts" id="pip-toasts"></div>
+
   <script>
     const basePath = '/api';
+
+    // Non-blocking toast notification
+    function showToast(msg, type) {
+      type = type || 'info';
+      const wrap = document.getElementById('pip-toasts');
+      if (!wrap) return;
+      const ico = type === 'ok' ? '\u2705' : (type === 'err' ? '\u274C' : '\u2139\uFE0F');
+      const el = document.createElement('div');
+      el.className = 'pip-toast ' + type;
+      el.innerHTML = '<span class="tico">' + ico + '</span><span>' + msg + '</span>';
+      wrap.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 260);
+      }, 3200);
+    }
+
 
     function nav(page) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2409,7 +2444,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           <td><span class="pip-date">\${lastCheck}</span></td>
           <td>
             <div style="display:flex; gap:8px; justify-content:center;">
-              <button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP('\${p.ip}', \${p.port})">\u26A1</button>
+              <button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP('\${p.ip}', \${p.port}, event)">\u26A1</button>
+
               <button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP('\${p.ip}', \${p.port})">\u{1F5D1}\uFE0F</button>
             </div>
           </td>
@@ -2444,9 +2480,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       btn.disabled = false;
     }
 
-    async function testProxyIP(ip, port) {
-      if (!confirm(\`\u0622\u06CC\u0627 \u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u06CC\u062F \${ip}:\${port} \u0631\u0627 \u062A\u0633\u062A \u06A9\u0646\u06CC\u062F\u061F\`)) return;
-      
+    async function testProxyIP(ip, port, ev) {
+      // Inline spinner on the clicked button (no blocking confirm/alert)
+      const btn = ev && ev.target ? ev.target.closest('button') : null;
+      let original = null;
+      if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="pip-spinner"></span>'; }
+
       try {
         const res = await fetch(basePath + '/proxyip/test', {
           method: 'POST',
@@ -2455,15 +2494,25 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         });
         const data = await res.json();
         if (data.ok) {
-          alert(\`\u2705 \u062A\u0633\u062A \u0645\u0648\u0641\u0642! \u067E\u06CC\u0646\u06AF: \${data.ping} ms\`);
-          loadProxyIP();
+          showToast(ip + ' \u0641\u0639\u0627\u0644 \u0627\u0633\u062A \xB7 \u067E\u06CC\u0646\u06AF ' + data.ping + 'ms', 'ok');
+          // Update just this row locally, then re-render (fast, no full reload flicker)
+          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
+          if (item) { item.status = data.status || 'active'; item.ping = data.ping; item.last_check = Date.now(); }
+          renderProxyIPTable();
+          updateProxyIPStats();
         } else {
-          alert('\u274C \u062A\u0633\u062A \u0646\u0627\u0645\u0648\u0641\u0642: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+          showToast(ip + ' \u067E\u0627\u0633\u062E \u0646\u062F\u0627\u062F: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
+          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
+          if (item) { item.status = 'dead'; item.last_check = Date.now(); }
+          renderProxyIPTable();
+          updateProxyIPStats();
         }
       } catch (e) {
-        alert('\u062E\u0637\u0627: ' + e.message);
+        showToast('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A ' + ip + ': ' + e.message, 'err');
+        if (btn && original !== null) { btn.classList.remove('spin'); btn.innerHTML = original; }
       }
     }
+
 
     async function fetchProxyIPFromSources() {
           const btn = event.target.closest('button');

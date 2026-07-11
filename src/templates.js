@@ -785,7 +785,23 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .pip-check:indeterminate::after { content:'–'; position:absolute; top:50%; left:50%; transform:translate(-50%,-58%); color:#fff; font-size:13px; font-weight:900; }
     .pip-empty { text-align:center; padding:56px 20px; color:var(--muted); }
     .pip-empty .big { font-size:40px; opacity:.4; margin-bottom:12px; }
+    .pip-act.spin { pointer-events:none; opacity:.7; }
+    .pip-act.spin::after { content:''; }
+    @keyframes pipspin { to { transform:rotate(360deg); } }
+    .pip-spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.2); border-top-color:var(--primary); border-radius:50%; animation:pipspin .6s linear infinite; }
+
+    /* Toast notifications */
+    .pip-toasts { position:fixed; bottom:24px; left:24px; display:flex; flex-direction:column; gap:10px; z-index:9999; }
+    .pip-toast { display:flex; align-items:center; gap:10px; min-width:240px; max-width:360px; padding:13px 16px; border-radius:12px; background:var(--surface); border:1px solid var(--border); box-shadow:0 12px 30px -8px rgba(0,0,0,0.6); font-size:13px; font-weight:600; color:var(--text); animation:toastIn .25s cubic-bezier(.16,1,.3,1); }
+    .pip-toast.ok { border-color:rgba(16,185,129,0.4); }
+    .pip-toast.err { border-color:rgba(239,68,68,0.4); }
+    .pip-toast.info { border-color:rgba(139,92,246,0.4); }
+    .pip-toast .tico { font-size:16px; }
+    @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .pip-toast.out { animation:toastOut .25s forwards; }
+    @keyframes toastOut { to { opacity:0; transform:translateX(-20px); } }
   </style>
+
 
 </head>
 <body>
@@ -931,11 +947,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         </div>
       </div>
     </div>
-    
-  </div>
 
-      <!-- Proxy IP Manager Page -->
+    <!-- Proxy IP Manager Page -->
     <div id="page-proxyip" class="page">
+
       <div class="header">
         <h2 class="title">مدیریت Proxy IP</h2>
         <button class="btn" onclick="openProxyIPAddModal()">+ افزودن Proxy IP</button>
@@ -1149,8 +1164,28 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <!-- Toast container -->
+  <div class="pip-toasts" id="pip-toasts"></div>
+
   <script>
     const basePath = '/api';
+
+    // Non-blocking toast notification
+    function showToast(msg, type) {
+      type = type || 'info';
+      const wrap = document.getElementById('pip-toasts');
+      if (!wrap) return;
+      const ico = type === 'ok' ? '✅' : (type === 'err' ? '❌' : 'ℹ️');
+      const el = document.createElement('div');
+      el.className = 'pip-toast ' + type;
+      el.innerHTML = '<span class="tico">' + ico + '</span><span>' + msg + '</span>';
+      wrap.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 260);
+      }, 3200);
+    }
+
 
     function nav(page) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1495,7 +1530,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           <td><span class="pip-date">\${lastCheck}</span></td>
           <td>
             <div style="display:flex; gap:8px; justify-content:center;">
-              <button class="pip-act" title="تست اتصال" onclick="testProxyIP('\${p.ip}', \${p.port})">⚡</button>
+              <button class="pip-act" title="تست اتصال" onclick="testProxyIP('\${p.ip}', \${p.port}, event)">⚡</button>
+
               <button class="pip-act del" title="حذف" onclick="deleteProxyIP('\${p.ip}', \${p.port})">🗑️</button>
             </div>
           </td>
@@ -1530,9 +1566,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       btn.disabled = false;
     }
 
-    async function testProxyIP(ip, port) {
-      if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را تست کنید؟\`)) return;
-      
+    async function testProxyIP(ip, port, ev) {
+      // Inline spinner on the clicked button (no blocking confirm/alert)
+      const btn = ev && ev.target ? ev.target.closest('button') : null;
+      let original = null;
+      if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="pip-spinner"></span>'; }
+
       try {
         const res = await fetch(basePath + '/proxyip/test', {
           method: 'POST',
@@ -1541,15 +1580,25 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         });
         const data = await res.json();
         if (data.ok) {
-          alert(\`✅ تست موفق! پینگ: \${data.ping} ms\`);
-          loadProxyIP();
+          showToast(ip + ' فعال است · پینگ ' + data.ping + 'ms', 'ok');
+          // Update just this row locally, then re-render (fast, no full reload flicker)
+          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
+          if (item) { item.status = data.status || 'active'; item.ping = data.ping; item.last_check = Date.now(); }
+          renderProxyIPTable();
+          updateProxyIPStats();
         } else {
-          alert('❌ تست ناموفق: ' + (data.error || 'نامشخص'));
+          showToast(ip + ' پاسخ نداد: ' + (data.error || 'نامشخص'), 'err');
+          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
+          if (item) { item.status = 'dead'; item.last_check = Date.now(); }
+          renderProxyIPTable();
+          updateProxyIPStats();
         }
       } catch (e) {
-        alert('خطا: ' + e.message);
+        showToast('خطا در تست ' + ip + ': ' + e.message, 'err');
+        if (btn && original !== null) { btn.classList.remove('spin'); btn.innerHTML = original; }
       }
     }
+
 
     async function fetchProxyIPFromSources() {
           const btn = event.target.closest('button');
