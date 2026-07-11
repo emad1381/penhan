@@ -1024,6 +1024,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
               <th style="width:46px; text-align:center;">
                 <input type="checkbox" class="pip-check" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="انتخاب/لغو همه">
               </th>
+              <th style="width:50px; text-align:center;">#</th>
               <th>آی‌پی / هاست</th>
               <th>پورت</th>
               <th>موقعیت</th>
@@ -1035,7 +1036,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             </tr>
           </thead>
           <tbody id="proxyip-tbody">
-            <tr><td colspan="9" class="pip-empty">در حال دریافت...</td></tr>
+            <tr><td colspan="10" class="pip-empty">در حال دریافت...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1482,7 +1483,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         updateProxyIPStats();
       } catch (e) {
         console.error(e);
-        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted);">خطا در بارگذاری: ' + e.message + '</td></tr>';
+        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:var(--muted);">خطا در بارگذاری: ' + e.message + '</td></tr>';
       }
     }
 
@@ -1506,12 +1507,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="pip-empty"><div class="big">🌐</div>هیچ Proxy IPی یافت نشد</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="pip-empty"><div class="big">🌐</div>هیچ Proxy IPی یافت نشد</td></tr>';
         updateSelectionToolbar();
         return;
       }
 
-      tbody.innerHTML = filtered.map(p => {
+      tbody.innerHTML = filtered.map((p, idx) => {
         const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
         const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
         const flag = countryToFlag(p.country);
@@ -1523,23 +1524,23 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
         const pingTxt = p.ping != null ? p.ping + ' ms' : '—';
 
-        return \`<tr class="\${isSel ? 'sel' : ''}">
-          <td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)"></td>
-          <td><span class="pip-ip">\${p.ip}</span></td>
-          <td><span class="pip-port">\${p.port}</span></td>
-          <td><span class="pip-loc"><span class="flag">\${flag}</span> \${loc}</span></td>
-          <td><span class="pip-isp" title="\${p.isp || ''}">\${p.isp || '—'}</span></td>
-          <td><span class="pip-ping \${pingCls}">\${pingTxt}</span></td>
-          <td><span class="pip-badge \${st}"><span class="pip-dot"></span>\${stText}</span></td>
-          <td><span class="pip-date">\${lastCheck}</span></td>
-          <td>
-            <div style="display:flex; gap:8px; justify-content:center;">
-              <button class="pip-act" title="تست اتصال" onclick="testProxyIP('\${p.ip}', \${p.port}, event)">⚡</button>
-
-              <button class="pip-act del" title="حذف" onclick="deleteProxyIP('\${p.ip}', \${p.port})">🗑️</button>
-            </div>
-          </td>
-        </tr>\`;
+        return '<tr class="' + (isSel ? 'sel' : '') + '">' +
+          '<td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)"></td>' +
+          '<td style="text-align:center; color:var(--muted); font-size:12px; font-weight:bold;">' + (idx + 1) + '</td>' +
+          '<td><span class="pip-ip">' + p.ip + '</span></td>' +
+          '<td><span class="pip-port">' + p.port + '</span></td>' +
+          '<td><span class="pip-loc"><span class="flag">' + flag + '</span> ' + loc + '</span></td>' +
+          '<td><span class="pip-isp" title="' + (p.isp || '') + '">' + (p.isp || '—') + '</span></td>' +
+          '<td><span class="pip-ping ' + pingCls + '">' + pingTxt + '</span></td>' +
+          '<td><span class="pip-badge ' + st + '"><span class="pip-dot"></span>' + stText + '</span></td>' +
+          '<td><span class="pip-date">' + lastCheck + '</span></td>' +
+          '<td>' +
+            '<div style="display:flex; gap:8px; justify-content:center;">' +
+              '<button class="pip-act" title="تست اتصال" onclick="testProxyIP(\'' + p.ip + '\', ' + p.port + ', event)">⚡</button>' +
+              '<button class="pip-act del" title="حذف" onclick="deleteProxyIP(\'' + p.ip + '\', ' + p.port + '\')">🗑️</button>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
       }).join('');
       updateSelectionToolbar();
     }

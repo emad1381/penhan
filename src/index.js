@@ -519,32 +519,39 @@ export default {
                                 const MAX_FETCH = 300;
                                 const toInsert = validIPs.slice(0, MAX_FETCH);
 
-
-                                // 1) Insert immediately (fast, no per-IP geo wait)
+                                // 1) Insert immediately (fast batch insert, no duplicate SELECT checks)
                                 let inserted = 0;
-                                for (const item of toInsert) {
-                                  try {
-                                    const existing = await env.DB.prepare('SELECT 1 FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port).first();
-                                    if (existing) continue;
-                                    await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
-                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
-                                    inserted++;
-                                  } catch(e) {}
-                                }
+                                try {
+                                  const insertStatements = toInsert.map(item => {
+                                    return env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now());
+                                  });
+                                  if (insertStatements.length > 0) {
+                                    const batchResults = await env.DB.batch(insertStatements);
+                                    inserted = batchResults.reduce((acc, curr) => {
+                                      const chg = curr.meta ? (curr.meta.changes || 0) : (curr.success !== false ? 1 : 0);
+                                      return acc + chg;
+                                    }, 0);
+                                  }
+                                } catch(e) { console.error("Batch insert error in fetch:", e.message); }
 
                                 // 2) Batch-detect countries and update
                                 try {
                                   const ipList = [...new Set(toInsert.map(p => p.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
                                   const geoMap = await batchDetectCountries(ipList);
+                                  const updateStatements = [];
                                   for (const item of toInsert) {
                                     const geo = geoMap.get(item.ip);
                                     if (!geo) continue;
-                                    try {
-                                      await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
-                                        .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-                                    } catch(e) {}
+                                    updateStatements.push(
+                                      env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                        .bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+                                    );
                                   }
-                                } catch(e) {}
+                                  if (updateStatements.length > 0) {
+                                    await env.DB.batch(updateStatements);
+                                  }
+                                } catch(e) { console.error("Batch update error in fetch:", e.message); }
 
                                 return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
                               } catch(e) {
@@ -568,29 +575,39 @@ export default {
                                 }
                               }
 
-                              // 2) Insert immediately (no per-IP geo wait → fast)
+                              // 2) Insert immediately (fast batch insert)
                               let inserted = 0;
-                              for (const item of parsed) {
-                                try {
-                                  await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
-                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
-                                  inserted++;
-                                } catch(e) {}
-                              }
+                              try {
+                                const insertStatements = parsed.map(item => {
+                                  return env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now());
+                                });
+                                if (insertStatements.length > 0) {
+                                  const batchResults = await env.DB.batch(insertStatements);
+                                  inserted = batchResults.reduce((acc, curr) => {
+                                    const chg = curr.meta ? (curr.meta.changes || 0) : (curr.success !== false ? 1 : 0);
+                                    return acc + chg;
+                                  }, 0);
+                                }
+                              } catch(e) { console.error("Batch insert error in import:", e.message); }
 
                               // 3) Batch-detect countries for the freshly imported IPs and update
                               try {
                                 const ipList = [...new Set(parsed.map(p => p.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
                                 const geoMap = await batchDetectCountries(ipList);
+                                const updateStatements = [];
                                 for (const item of parsed) {
                                   const geo = geoMap.get(item.ip);
                                   if (!geo) continue;
-                                  try {
-                                    await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
-                                      .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-                                  } catch(e) {}
+                                  updateStatements.push(
+                                    env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                                      .bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+                                  );
                                 }
-                              } catch(e) {}
+                                if (updateStatements.length > 0) {
+                                  await env.DB.batch(updateStatements);
+                                }
+                              } catch(e) { console.error("Batch update error in import:", e.message); }
 
                               return new Response(JSON.stringify({ok: true, count: inserted}), {status: 200, headers: {'Content-Type': 'application/json'}});
                             }
@@ -601,42 +618,57 @@ export default {
                 if (!Array.isArray(ips) || ips.length === 0) return new Response(JSON.stringify({ok: false, error: 'Invalid data'}), {status: 400, headers: {'Content-Type': 'application/json'}});
         
                 let deleted = 0;
-                for (const item of ips) {
-                  try {
-                    await env.DB.prepare('DELETE FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port).run();
-                    deleted++;
-                  } catch(e) {}
-                }
+                try {
+                  const deleteStatements = ips.map(item => {
+                    return env.DB.prepare('DELETE FROM proxyip WHERE ip = ? AND port = ?').bind(item.ip, item.port);
+                  });
+                  if (deleteStatements.length > 0) {
+                    const batchResults = await env.DB.batch(deleteStatements);
+                    deleted = batchResults.reduce((acc, curr) => {
+                      const chg = curr.meta ? (curr.meta.changes || 0) : (curr.success !== false ? 1 : 0);
+                      return acc + chg;
+                    }, 0);
+                  }
+                } catch(e) { console.error("Batch delete error:", e.message); }
         
                 return new Response(JSON.stringify({ok: true, deleted}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                              }
+              }
 
-                              // Bulk detect country for existing IPs (uses fast batch endpoint)
-                              if (path === '/api/proxyip/detect-countries' && request.method === 'POST') {
-                                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
+              // Bulk detect country for existing IPs (uses fast batch endpoint)
+              if (path === '/api/proxyip/detect-countries' && request.method === 'POST') {
+                if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
 
-                                const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
-                                if (!dbResults.length) {
-                                  return new Response(JSON.stringify({ok: true, updated: 0}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                                }
+                const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+                if (!dbResults.length) {
+                  return new Response(JSON.stringify({ok: true, updated: 0}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                }
 
-                                // Only real IPv4 addresses can be geo-looked-up in batch; skip hostnames.
-                                const ipList = [...new Set(dbResults.map(r => r.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
-                                const geoMap = await batchDetectCountries(ipList);
+                // Only real IPv4 addresses can be geo-looked-up in batch; skip hostnames.
+                const ipList = [...new Set(dbResults.map(r => r.ip).filter(ip => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+                const geoMap = await batchDetectCountries(ipList);
 
-                                let updated = 0;
-                                for (const item of dbResults) {
-                                  const geo = geoMap.get(item.ip);
-                                  if (!geo) continue;
-                                  try {
-                                    await env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
-                                      .bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-                                    updated++;
-                                  } catch(e) {}
-                                }
+                let updated = 0;
+                try {
+                  const updateStatements = [];
+                  for (const item of dbResults) {
+                    const geo = geoMap.get(item.ip);
+                    if (!geo) continue;
+                    updateStatements.push(
+                      env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
+                        .bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+                    );
+                  }
+                  if (updateStatements.length > 0) {
+                    const batchResults = await env.DB.batch(updateStatements);
+                    updated = batchResults.reduce((acc, curr) => {
+                      const chg = curr.meta ? (curr.meta.changes || 0) : (curr.success !== false ? 1 : 0);
+                      return acc + chg;
+                    }, 0);
+                  }
+                } catch(e) { console.error("Batch update error in detect-countries:", e.message); }
 
-                                return new Response(JSON.stringify({ok: true, updated}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                              }
+                return new Response(JSON.stringify({ok: true, updated}), {status: 200, headers: {'Content-Type': 'application/json'}});
+              }
 
         // Unmatched /api/ route
         return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});

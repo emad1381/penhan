@@ -1968,6 +1968,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
               <th style="width:46px; text-align:center;">
                 <input type="checkbox" class="pip-check" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="\u0627\u0646\u062A\u062E\u0627\u0628/\u0644\u063A\u0648 \u0647\u0645\u0647">
               </th>
+              <th style="width:50px; text-align:center;">#</th>
               <th>\u0622\u06CC\u200C\u067E\u06CC / \u0647\u0627\u0633\u062A</th>
               <th>\u067E\u0648\u0631\u062A</th>
               <th>\u0645\u0648\u0642\u0639\u06CC\u062A</th>
@@ -1979,7 +1980,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             </tr>
           </thead>
           <tbody id="proxyip-tbody">
-            <tr><td colspan="9" class="pip-empty">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
+            <tr><td colspan="10" class="pip-empty">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
           </tbody>
         </table>
       </div>
@@ -2426,7 +2427,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         updateProxyIPStats();
       } catch (e) {
         console.error(e);
-        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted);">\u062E\u0637\u0627 \u062F\u0631 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC: ' + e.message + '</td></tr>';
+        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:var(--muted);">\u062E\u0637\u0627 \u062F\u0631 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC: ' + e.message + '</td></tr>';
       }
     }
 
@@ -2450,12 +2451,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="pip-empty"><div class="big">\u{1F310}</div>\u0647\u06CC\u0686 Proxy IP\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="pip-empty"><div class="big">\u{1F310}</div>\u0647\u06CC\u0686 Proxy IP\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
         updateSelectionToolbar();
         return;
       }
 
-      tbody.innerHTML = filtered.map(p => {
+      tbody.innerHTML = filtered.map((p, idx) => {
         const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
         const stText = p.status === 'active' ? '\u0641\u0639\u0627\u0644' : (p.status === 'slow' ? '\u06A9\u0646\u062F' : (p.status === 'unknown' ? '\u0646\u0627\u0645\u0634\u062E\u0635' : '\u0645\u0631\u062F\u0647'));
         const flag = countryToFlag(p.country);
@@ -2467,23 +2468,23 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
         const pingTxt = p.ping != null ? p.ping + ' ms' : '\u2014';
 
-        return \`<tr class="\${isSel ? 'sel' : ''}">
-          <td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)"></td>
-          <td><span class="pip-ip">\${p.ip}</span></td>
-          <td><span class="pip-port">\${p.port}</span></td>
-          <td><span class="pip-loc"><span class="flag">\${flag}</span> \${loc}</span></td>
-          <td><span class="pip-isp" title="\${p.isp || ''}">\${p.isp || '\u2014'}</span></td>
-          <td><span class="pip-ping \${pingCls}">\${pingTxt}</span></td>
-          <td><span class="pip-badge \${st}"><span class="pip-dot"></span>\${stText}</span></td>
-          <td><span class="pip-date">\${lastCheck}</span></td>
-          <td>
-            <div style="display:flex; gap:8px; justify-content:center;">
-              <button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP('\${p.ip}', \${p.port}, event)">\u26A1</button>
-
-              <button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP('\${p.ip}', \${p.port})">\u{1F5D1}\uFE0F</button>
-            </div>
-          </td>
-        </tr>\`;
+        return '<tr class="' + (isSel ? 'sel' : '') + '">' +
+          '<td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)"></td>' +
+          '<td style="text-align:center; color:var(--muted); font-size:12px; font-weight:bold;">' + (idx + 1) + '</td>' +
+          '<td><span class="pip-ip">' + p.ip + '</span></td>' +
+          '<td><span class="pip-port">' + p.port + '</span></td>' +
+          '<td><span class="pip-loc"><span class="flag">' + flag + '</span> ' + loc + '</span></td>' +
+          '<td><span class="pip-isp" title="' + (p.isp || '') + '">' + (p.isp || '\u2014') + '</span></td>' +
+          '<td><span class="pip-ping ' + pingCls + '">' + pingTxt + '</span></td>' +
+          '<td><span class="pip-badge ' + st + '"><span class="pip-dot"></span>' + stText + '</span></td>' +
+          '<td><span class="pip-date">' + lastCheck + '</span></td>' +
+          '<td>' +
+            '<div style="display:flex; gap:8px; justify-content:center;">' +
+              '<button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP('' + p.ip + '', ' + p.port + ', event)">\u26A1</button>' +
+              '<button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP('' + p.ip + '', ' + p.port + '')">\u{1F5D1}\uFE0F</button>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
       }).join('');
       updateSelectionToolbar();
     }
@@ -3295,30 +3296,38 @@ var src_default = {
             const MAX_FETCH = 300;
             const toInsert = validIPs.slice(0, MAX_FETCH);
             let inserted = 0;
-            for (const item of toInsert) {
-              try {
-                const existing = await env.DB.prepare("SELECT 1 FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).first();
-                if (existing)
-                  continue;
-                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
-                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
-                inserted++;
-              } catch (e) {
+            try {
+              const insertStatements = toInsert.map((item) => {
+                return env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                      ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now());
+              });
+              if (insertStatements.length > 0) {
+                const batchResults = await env.DB.batch(insertStatements);
+                inserted = batchResults.reduce((acc, curr) => {
+                  const chg = curr.meta ? curr.meta.changes || 0 : curr.success !== false ? 1 : 0;
+                  return acc + chg;
+                }, 0);
               }
+            } catch (e) {
+              console.error("Batch insert error in fetch:", e.message);
             }
             try {
               const ipList = [...new Set(toInsert.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
               const geoMap = await batchDetectCountries(ipList);
+              const updateStatements = [];
               for (const item of toInsert) {
                 const geo = geoMap.get(item.ip);
                 if (!geo)
                   continue;
-                try {
-                  await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-                } catch (e) {
-                }
+                updateStatements.push(
+                  env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+                );
+              }
+              if (updateStatements.length > 0) {
+                await env.DB.batch(updateStatements);
               }
             } catch (e) {
+              console.error("Batch update error in fetch:", e.message);
             }
             return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
           } catch (e) {
@@ -3339,27 +3348,38 @@ var src_default = {
             }
           }
           let inserted = 0;
-          for (const item of parsed) {
-            try {
-              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
-                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
-              inserted++;
-            } catch (e) {
+          try {
+            const insertStatements = parsed.map((item) => {
+              return env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now());
+            });
+            if (insertStatements.length > 0) {
+              const batchResults = await env.DB.batch(insertStatements);
+              inserted = batchResults.reduce((acc, curr) => {
+                const chg = curr.meta ? curr.meta.changes || 0 : curr.success !== false ? 1 : 0;
+                return acc + chg;
+              }, 0);
             }
+          } catch (e) {
+            console.error("Batch insert error in import:", e.message);
           }
           try {
             const ipList = [...new Set(parsed.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
             const geoMap = await batchDetectCountries(ipList);
+            const updateStatements = [];
             for (const item of parsed) {
               const geo = geoMap.get(item.ip);
               if (!geo)
                 continue;
-              try {
-                await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-              } catch (e) {
-              }
+              updateStatements.push(
+                env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+              );
+            }
+            if (updateStatements.length > 0) {
+              await env.DB.batch(updateStatements);
             }
           } catch (e) {
+            console.error("Batch update error in import:", e.message);
           }
           return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
@@ -3369,12 +3389,19 @@ var src_default = {
           if (!Array.isArray(ips) || ips.length === 0)
             return new Response(JSON.stringify({ ok: false, error: "Invalid data" }), { status: 400, headers: { "Content-Type": "application/json" } });
           let deleted = 0;
-          for (const item of ips) {
-            try {
-              await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).run();
-              deleted++;
-            } catch (e) {
+          try {
+            const deleteStatements = ips.map((item) => {
+              return env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port);
+            });
+            if (deleteStatements.length > 0) {
+              const batchResults = await env.DB.batch(deleteStatements);
+              deleted = batchResults.reduce((acc, curr) => {
+                const chg = curr.meta ? curr.meta.changes || 0 : curr.success !== false ? 1 : 0;
+                return acc + chg;
+              }, 0);
             }
+          } catch (e) {
+            console.error("Batch delete error:", e.message);
           }
           return new Response(JSON.stringify({ ok: true, deleted }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
@@ -3388,15 +3415,25 @@ var src_default = {
           const ipList = [...new Set(dbResults.map((r) => r.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
           const geoMap = await batchDetectCountries(ipList);
           let updated = 0;
-          for (const item of dbResults) {
-            const geo = geoMap.get(item.ip);
-            if (!geo)
-              continue;
-            try {
-              await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-              updated++;
-            } catch (e) {
+          try {
+            const updateStatements = [];
+            for (const item of dbResults) {
+              const geo = geoMap.get(item.ip);
+              if (!geo)
+                continue;
+              updateStatements.push(
+                env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port)
+              );
             }
+            if (updateStatements.length > 0) {
+              const batchResults = await env.DB.batch(updateStatements);
+              updated = batchResults.reduce((acc, curr) => {
+                const chg = curr.meta ? curr.meta.changes || 0 : curr.success !== false ? 1 : 0;
+                return acc + chg;
+              }, 0);
+            }
+          } catch (e) {
+            console.error("Batch update error in detect-countries:", e.message);
           }
           return new Response(JSON.stringify({ ok: true, updated }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
