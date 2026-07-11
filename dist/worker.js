@@ -1,6 +1,119 @@
 // src/helpers.js
+import { connect } from "cloudflare:sockets";
 var WS_READY_STATE_OPEN = 1;
 var WS_READY_STATE_CLOSING = 2;
+async function dohResolveA(name, doh = "https://cloudflare-dns.com/dns-query") {
+  try {
+    const resp = await fetch(`${doh}?name=${encodeURIComponent(name)}&type=A`, {
+      headers: { accept: "application/dns-json" },
+      cf: { cacheTtl: 60 }
+    });
+    if (!resp.ok)
+      return [];
+    const data = await resp.json();
+    if (!data || !Array.isArray(data.Answer))
+      return [];
+    return data.Answer.filter((a) => a.type === 1 && a.data).map((a) => a.data.trim());
+  } catch (e) {
+    return [];
+  }
+}
+async function fetchColoProxyIPs(domain, colo) {
+  const d = String(domain || "").trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0];
+  if (!d)
+    return [];
+  const out = [];
+  if (colo) {
+    const host = `${String(colo).toLowerCase()}.${d}`;
+    out.push(...await dohResolveA(host));
+  }
+  if (out.length === 0)
+    out.push(...await dohResolveA(d));
+  return [...new Set(out)];
+}
+async function checkProxyIP(ip, port = 443, timeoutMs = 5e3) {
+  const p = parseInt(port) || 443;
+  const start = Date.now();
+  const TRACE_HOST = "speed.cloudflare.com";
+  let socket = null;
+  try {
+    socket = connect({ hostname: ip, port: p }, { secureTransport: "on", allowHalfOpen: false });
+    const writer = socket.writable.getWriter();
+    await writer.write(new TextEncoder().encode(
+      `GET /cdn-cgi/trace HTTP/1.1\r
+Host: ${TRACE_HOST}\r
+User-Agent: Mozilla/5.0\r
+Connection: close\r
+\r
+`
+    ));
+    writer.releaseLock();
+    const reader = socket.readable.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const remaining = deadline - Date.now();
+      const { value, done } = await Promise.race([
+        reader.read(),
+        new Promise((res) => setTimeout(() => res({ value: void 0, done: true }), remaining))
+      ]);
+      if (done)
+        break;
+      if (value)
+        buf += decoder.decode(value, { stream: true });
+      if (buf.includes("loc=") && buf.includes("colo="))
+        break;
+      if (buf.length > 16384)
+        break;
+    }
+    try {
+      reader.releaseLock();
+    } catch (e) {
+    }
+    try {
+      await socket.close();
+    } catch (e) {
+    }
+    socket = null;
+    const ping = Date.now() - start;
+    const loc = buf.match(/loc=([A-Za-z]{2})/);
+    const colo = buf.match(/colo=([A-Za-z]{3})/);
+    const tip = buf.match(/[\r\n]ip=([0-9a-fA-F:.]+)/);
+    if (loc || buf.includes("cf-ray") || buf.startsWith("HTTP/")) {
+      return {
+        success: true,
+        ping,
+        country: loc ? loc[1].toUpperCase() : "",
+        colo: colo ? colo[1].toUpperCase() : "",
+        ip: tip ? tip[1] : ip
+      };
+    }
+  } catch (e) {
+    try {
+      if (socket)
+        await socket.close();
+    } catch (er) {
+    }
+    socket = null;
+  }
+  try {
+    const t0 = Date.now();
+    const s2 = connect({ hostname: ip, port: p }, { secureTransport: "off", allowHalfOpen: false });
+    await Promise.race([
+      s2.opened,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("connect timeout")), timeoutMs))
+    ]);
+    const ping = Date.now() - t0;
+    try {
+      await s2.close();
+    } catch (e) {
+    }
+    return { success: true, ping, country: "", colo: "", ip, degraded: true };
+  } catch (e2) {
+    return { success: false, ping: null, error: e2.message || "unreachable" };
+  }
+}
 function parseProxyIps(proxyIpString) {
   if (!proxyIpString || typeof proxyIpString !== "string")
     return [];
@@ -357,7 +470,7 @@ async function updateUsageD1(env, uuid, bytes) {
 }
 
 // src/vless.js
-import { connect } from "cloudflare:sockets";
+import { connect as connect2 } from "cloudflare:sockets";
 async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
   let isVlessHeaderSent = false;
   const transformStream = new TransformStream({
@@ -447,7 +560,7 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log, onUp
 }
 async function handleTCPOutBound(remoteSocketWrapper, userConnId, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, proxyIP, log, onDownload) {
   async function connectAndWrite(address, port) {
-    const tcpSocket = connect({ hostname: address, port });
+    const tcpSocket = connect2({ hostname: address, port });
     remoteSocketWrapper.value = tcpSocket;
     log("connected to " + address + ":" + port);
     const writer = tcpSocket.writable.getWriter();
@@ -730,7 +843,7 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
 }
 
 // src/trojan.js
-import { connect as connect2 } from "cloudflare:sockets";
+import { connect as connect3 } from "cloudflare:sockets";
 function processTrojanHeader(buffer, trojanPasswordHash) {
   if (buffer.byteLength < 56 + 2 + 1 + 1 + 2 + 2) {
     return { hasError: true, message: "invalid data length" };
@@ -1914,7 +2027,9 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <span class="sep"></span>
         <button class="pip-chip" onclick="refreshAllProxyIP()">\u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647</button>
         <button class="pip-chip" onclick="fetchProxyIPFromSources()">\u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639</button>
+        <button class="pip-chip" onclick="openColoModal()">\u{1F4E1} \u062F\u0631\u06CC\u0627\u0641\u062A \u0628\u0631 \u0627\u0633\u0627\u0633 colo</button>
         <button class="pip-chip" onclick="detectCountriesForIPs()">\u{1F30D} \u062A\u0634\u062E\u06CC\u0635 \u06A9\u0634\u0648\u0631\u0647\u0627</button>
+
         <span class="spacer"></span>
         <button class="pip-chip solid" onclick="openProxyIPImportModal()">\u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A</button>
       </div>
@@ -2078,8 +2193,27 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <!-- Colo Fetch Modal -->
+  <div class="modal-overlay" id="proxyip-colo-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>\u{1F4E1} \u062F\u0631\u06CC\u0627\u0641\u062A Proxy IP \u0628\u0631 \u0627\u0633\u0627\u0633 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 (colo)</h3>
+        <div class="modal-close" onclick="closeModal('proxyip-colo-modal')">&times;</div>
+      </div>
+      <div class="desc" style="font-size:13px; color:var(--muted); line-height:1.9; margin-bottom:14px;">
+        \u0627\u06CC\u0646 \u0642\u0627\u0628\u0644\u06CC\u062A \u0645\u062B\u0644 \u0645\u0648\u062A\u0648\u0631 cmliu \u06A9\u0627\u0631 \u0645\u06CC\u200C\u06A9\u0646\u062F: \u062F\u0627\u0645\u0646\u0647\u200C\u0627\u06CC \u06A9\u0647 \u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC proxyip \u0631\u0627 \u0628\u0631 \u0627\u0633\u0627\u0633 \u0646\u0632\u062F\u06CC\u06A9\u200C\u062A\u0631\u06CC\u0646 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 (colo) \u0633\u0631\u0648 \u0645\u06CC\u200C\u06A9\u0646\u062F \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F. \u0648\u0631\u06A9\u0631 \u0628\u0627 DoH \u0631\u06A9\u0648\u0631\u062F <code>{colo}.\u062F\u0627\u0645\u0646\u0647</code> \u0631\u0627 resolve \u06A9\u0631\u062F\u0647 \u0648 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0647\u0645\u0627\u0646 \u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 \u0631\u0627 \u0627\u0636\u0627\u0641\u0647 \u0645\u06CC\u200C\u06A9\u0646\u062F.
+      </div>
+      <div class="form-group">
+        <label>\u062F\u0627\u0645\u0646\u0647 colo</label>
+        <input type="text" id="pi-colo-domain" class="form-control" placeholder="\u0645\u062B\u0627\u0644: proxyip.cmliu.com" style="direction:ltr;">
+      </div>
+      <button class="btn" style="width:100%;" onclick="getColoProxyIP()">\u062F\u0631\u06CC\u0627\u0641\u062A</button>
+    </div>
+  </div>
+
   <!-- Toast container -->
   <div class="pip-toasts" id="pip-toasts"></div>
+
 
   <script>
     const basePath = '/api';
@@ -2741,10 +2875,45 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
 
 
+    // Colo-based fetch (cmliu-style): resolve {colo}.domain via DoH on the Worker
+    function openColoModal() {
+      openModal('proxyip-colo-modal');
+    }
+
+    async function getColoProxyIP() {
+      const domain = document.getElementById('pi-colo-domain').value.trim();
+      if (!domain) { showToast('\u062F\u0627\u0645\u0646\u0647 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F', 'err'); return; }
+      const btn = event.target.closest('button');
+      const original = btn.innerHTML;
+      btn.innerHTML = '<span class="pip-spinner"></span> \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(basePath + '/proxyip/colo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeModal('proxyip-colo-modal');
+          showToast('\u062F\u06CC\u062A\u0627\u0633\u0646\u062A\u0631 ' + (data.colo || '?') + ' \xB7 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u0627\u0641\u0632\u0648\u062F\u0647 \u0634\u062F', 'ok');
+          loadProxyIP();
+        } else {
+          showToast('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
+        }
+      } catch (e) {
+        showToast('\u062E\u0637\u0627: ' + e.message, 'err');
+      }
+      btn.innerHTML = original;
+      btn.disabled = false;
+    }
+
 // Init
     loadUsers();
     loadTokens();
     loadCfMetrics();
+
   <\/script>
 </body>
 </html>`;
@@ -3093,29 +3262,67 @@ var src_default = {
           if (!env.DB)
             return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
           const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip").all();
-          const testPromises = dbResults.map(async (p) => {
-            try {
-              const start = Date.now();
-              const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 5e3);
-              const resp = await fetch(`https://${p.ip}:${p.port}/cdn-cgi/trace`, {
-                method: "GET",
-                signal: controller.signal,
-                cf: { resolveTimeout: 3e3 }
-              });
-              clearTimeout(timeout);
-              const ping = Date.now() - start;
-              const status = resp.ok ? "active" : "dead";
-              return { ip: p.ip, port: p.port, ping, status };
-            } catch (e) {
-              return { ip: p.ip, port: p.port, ping: null, status: "dead" };
+          const BATCH = 20;
+          const MAX = 200;
+          const targets = dbResults.slice(0, MAX);
+          let tested = 0, active = 0;
+          for (let i = 0; i < targets.length; i += BATCH) {
+            const wave = targets.slice(i, i + BATCH);
+            const results = await Promise.all(wave.map(async (p) => {
+              const r = await checkProxyIP(p.ip, p.port, 5e3);
+              if (!r.success)
+                return { ip: p.ip, port: p.port, ping: null, status: "dead", country: "" };
+              const status = r.ping == null ? "dead" : r.ping < 800 ? "active" : "slow";
+              return { ip: p.ip, port: p.port, ping: r.ping, status, country: r.country || "" };
+            }));
+            for (const r of results) {
+              tested++;
+              if (r.status === "active")
+                active++;
+              if (r.country) {
+                await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, r.country, Date.now(), r.ip, r.port).run();
+              } else {
+                await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
+              }
             }
-          });
-          const testResults = await Promise.all(testPromises);
-          for (const r of testResults) {
-            await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
           }
-          return new Response(JSON.stringify({ ok: true, tested: testResults.length }), { status: 200, headers: { "Content-Type": "application/json" } });
+          proxyPoolCache = null;
+          return new Response(JSON.stringify({ ok: true, tested, active }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/proxyip/colo" && request.method === "POST") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          let domain = "";
+          try {
+            const b = await request.json();
+            domain = (b.domain || "").trim();
+          } catch (e) {
+          }
+          if (!domain)
+            domain = await getSettingD1(env, "colo_domain") || "";
+          if (!domain)
+            return new Response(JSON.stringify({ ok: false, error: "domain is required (e.g. proxyip.example.com)" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          await setSettingD1(env, "colo_domain", domain);
+          const colo = request.cf && request.cf.colo ? String(request.cf.colo) : "";
+          try {
+            const ips = await fetchColoProxyIPs(domain, colo);
+            if (!ips.length) {
+              return new Response(JSON.stringify({ ok: false, error: `no A records for ${colo ? colo.toLowerCase() + "." : ""}${domain}`, colo }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }
+            let inserted = 0;
+            for (const ip of ips) {
+              try {
+                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, 443, '', '', ?, 'unknown', ?)
+                        ON CONFLICT(ip, port) DO NOTHING`).bind(ip, `colo:${colo}`, Date.now()).run();
+                inserted++;
+              } catch (e) {
+              }
+            }
+            proxyPoolCache = null;
+            return new Response(JSON.stringify({ ok: true, colo, count: inserted, found: ips.length }), { status: 200, headers: { "Content-Type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+          }
         }
         if (path === "/api/proxyip/test" && request.method === "POST") {
           if (!env.DB)
@@ -3126,19 +3333,18 @@ var src_default = {
             return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
           const p = parseInt(port) || 443;
           try {
-            const start = Date.now();
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5e3);
-            const resp = await fetch(`https://${ip}:${p}/cdn-cgi/trace`, {
-              method: "GET",
-              signal: controller.signal,
-              cf: { resolveTimeout: 3e3 }
-            });
-            clearTimeout(timeout);
-            const ping = Date.now() - start;
-            const status = resp.ok ? "active" : "dead";
-            await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, ping, Date.now(), ip, p).run();
-            return new Response(JSON.stringify({ ok: true, ping, status }), { status: 200, headers: { "Content-Type": "application/json" } });
+            const r = await checkProxyIP(ip, p, 5e3);
+            if (!r.success) {
+              await env.DB.prepare(`UPDATE proxyip SET status = 'dead', ping = NULL, last_check = ? WHERE ip = ? AND port = ?`).bind(Date.now(), ip, p).run();
+              return new Response(JSON.stringify({ ok: false, status: "dead", error: r.error || "unreachable" }), { status: 200, headers: { "Content-Type": "application/json" } });
+            }
+            const status = r.ping == null ? "dead" : r.ping < 800 ? "active" : "slow";
+            if (r.country) {
+              await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, r.ping, r.country, Date.now(), ip, p).run();
+            } else {
+              await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, r.ping, Date.now(), ip, p).run();
+            }
+            return new Response(JSON.stringify({ ok: true, ping: r.ping, status, country: r.country || "", colo: r.colo || "" }), { status: 200, headers: { "Content-Type": "application/json" } });
           } catch (e) {
             return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
           }

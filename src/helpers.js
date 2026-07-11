@@ -1,7 +1,124 @@
 // Utility helpers for the Penhan Worker
+import { connect } from 'cloudflare:sockets';
 
 export const WS_READY_STATE_OPEN = 1;
 export const WS_READY_STATE_CLOSING = 2;
+
+// ============ ProxyIP Health-Check & Colo Engine (cmliu-style) ============
+// Inspired by cmliu/edgetunnel: connect a raw socket to the proxy IP, do TLS,
+// request /cdn-cgi/trace and parse `loc=` (country) + `colo=` instantly — no
+// external GeoIP API needed. Falls back to a plain-TCP reachability probe.
+
+/**
+ * DNS-over-HTTPS A-record resolver via Cloudflare (JSON API).
+ * Returns an array of IPv4 strings.
+ */
+async function dohResolveA(name, doh = 'https://cloudflare-dns.com/dns-query') {
+  try {
+    const resp = await fetch(`${doh}?name=${encodeURIComponent(name)}&type=A`, {
+      headers: { accept: 'application/dns-json' },
+      cf: { cacheTtl: 60 },
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!data || !Array.isArray(data.Answer)) return [];
+    return data.Answer.filter(a => a.type === 1 && a.data).map(a => a.data.trim());
+  } catch (e) { return []; }
+}
+
+/**
+ * Fetch datacenter-specific proxy IPs the cmliu way:
+ * resolve `{colo}.{domain}` (e.g. `fra.proxyip.example.com`) via DoH.
+ * Falls back to the bare domain when the colo-specific host has no records.
+ * @returns {Promise<string[]>} unique list of IPs
+ */
+async function fetchColoProxyIPs(domain, colo) {
+  const d = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+  if (!d) return [];
+  const out = [];
+  if (colo) {
+    const host = `${String(colo).toLowerCase()}.${d}`;
+    out.push(...await dohResolveA(host));
+  }
+  if (out.length === 0) out.push(...await dohResolveA(d));
+  return [...new Set(out)];
+}
+
+/**
+ * Health-check a single proxy IP.
+ * 1) Opens a TLS socket to ip:port and sends `GET /cdn-cgi/trace`.
+ *    On success returns { success, ping, country (loc=), colo, ip }.
+ * 2) If TLS/trace fails, falls back to a plain-TCP connect to measure
+ *    reachability (returns success with degraded=true, no country).
+ * @returns {Promise<{success:boolean, ping:number|null, country?:string, colo?:string, ip?:string, degraded?:boolean, error?:string}>}
+ */
+async function checkProxyIP(ip, port = 443, timeoutMs = 5000) {
+  const p = parseInt(port) || 443;
+  const start = Date.now();
+  const TRACE_HOST = 'speed.cloudflare.com';
+  let socket = null;
+
+  // --- Attempt 1: TLS + /cdn-cgi/trace (gets ping AND country instantly) ---
+  try {
+    socket = connect({ hostname: ip, port: p }, { secureTransport: 'on', allowHalfOpen: false });
+    const writer = socket.writable.getWriter();
+    await writer.write(new TextEncoder().encode(
+      `GET /cdn-cgi/trace HTTP/1.1\r\nHost: ${TRACE_HOST}\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n`
+    ));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const remaining = deadline - Date.now();
+      const { value, done } = await Promise.race([
+        reader.read(),
+        new Promise(res => setTimeout(() => res({ value: undefined, done: true }), remaining)),
+      ]);
+      if (done) break;
+      if (value) buf += decoder.decode(value, { stream: true });
+      if (buf.includes('loc=') && buf.includes('colo=')) break;
+      if (buf.length > 16384) break;
+    }
+    try { reader.releaseLock(); } catch (e) {}
+    try { await socket.close(); } catch (e) {}
+    socket = null;
+
+    const ping = Date.now() - start;
+    const loc = buf.match(/loc=([A-Za-z]{2})/);
+    const colo = buf.match(/colo=([A-Za-z]{3})/);
+    const tip = buf.match(/[\r\n]ip=([0-9a-fA-F:.]+)/);
+    if (loc || buf.includes('cf-ray') || buf.startsWith('HTTP/')) {
+      return {
+        success: true, ping,
+        country: loc ? loc[1].toUpperCase() : '',
+        colo: colo ? colo[1].toUpperCase() : '',
+        ip: tip ? tip[1] : ip,
+      };
+    }
+  } catch (e) {
+    try { if (socket) await socket.close(); } catch (er) {}
+    socket = null;
+  }
+
+  // --- Attempt 2: plain-TCP reachability probe (ping only) ---
+  try {
+    const t0 = Date.now();
+    const s2 = connect({ hostname: ip, port: p }, { secureTransport: 'off', allowHalfOpen: false });
+    await Promise.race([
+      s2.opened,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('connect timeout')), timeoutMs)),
+    ]);
+    const ping = Date.now() - t0;
+    try { await s2.close(); } catch (e) {}
+    return { success: true, ping, country: '', colo: '', ip, degraded: true };
+  } catch (e2) {
+    return { success: false, ping: null, error: e2.message || 'unreachable' };
+  }
+}
+
 
 // ============ ProxyIP Engine (multi-ProxyIP with fallback) ============
 
@@ -432,5 +549,7 @@ export {
   setupD1Schema, getUserFromD1, updateUsageD1, getSettingD1, setSettingD1,
   parseProxyIps, pickRandomProxyIp, pickNextProxyIp, tryConnectWithFallback,
   trackConnectionStart, trackConnectionEnd, getActiveConnectionCount,
-  checkMasterAuth
+  checkMasterAuth, checkProxyIP, fetchColoProxyIPs, dohResolveA
 };
+
+
