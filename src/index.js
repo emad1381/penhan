@@ -32,6 +32,34 @@ async function getAllTokens(env) {
   } catch(e) { return []; }
 }
 
+// ============ Proxy IP Pool (fallback engine) ============
+// Cached list of usable proxy IPs from the managed pool. Prefers 'active'
+// entries; falls back to any known entry if none have been tested yet.
+let proxyPoolCache = null;
+let proxyPoolCacheTime = 0;
+
+async function getProxyPoolString(env) {
+  if (!env.DB) return '';
+  if (proxyPoolCache !== null && Date.now() - proxyPoolCacheTime < 30000) return proxyPoolCache;
+  try {
+    let { results } = await env.DB.prepare(
+      "SELECT ip, port FROM proxyip WHERE status = 'active' ORDER BY ping ASC LIMIT 50"
+    ).all();
+    if (!results || results.length === 0) {
+      ({ results } = await env.DB.prepare(
+        "SELECT ip, port FROM proxyip ORDER BY last_check DESC LIMIT 50"
+      ).all());
+    }
+    const str = (results || [])
+      .map(r => (r.port && r.port !== 443) ? `${r.ip}:${r.port}` : `${r.ip}`)
+      .join('\n');
+    proxyPoolCache = str;
+    proxyPoolCacheTime = Date.now();
+    return str;
+  } catch (e) { return proxyPoolCache || ''; }
+}
+
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -83,12 +111,16 @@ export default {
 
       if (upgradeHeader === 'websocket') {
         const decodedPath = decodeURIComponent(path).toLowerCase();
+        // Fallback engine: user proxy_ip → global default → managed active pool
+        const pool = await getProxyPoolString(env);
+        const effectiveProxyIP = [currentProxyIPRaw, pool].filter(Boolean).join('\n');
         if (decodedPath.includes('trojan-ws') || decodedPath.includes('trojan')) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
+          return await trojanOverWSHandler(request, authenticate, effectiveProxyIP, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
+          return await vlessOverWSHandler(request, authenticate, effectiveProxyIP, onUsage);
         }
       }
+
 
       const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
 
@@ -292,11 +324,15 @@ export default {
           }
         }
         
-        return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});
+              // ============ Proxy IP API ============
+              // Invalidate the fallback pool cache on any mutating proxyip call
+              if (path.startsWith('/api/proxyip') && request.method !== 'GET') {
+                proxyPoolCache = null;
               }
 
-              // ============ Proxy IP API ============
               if (path === '/api/proxyip' && request.method === 'GET') {
+
+
                 if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
                 const { results } = await env.DB.prepare('SELECT * FROM proxyip ORDER BY status DESC, ping ASC').all();
                 return new Response(JSON.stringify({ok: true, proxyip: results}), {status: 200, headers: {'Content-Type': 'application/json'}});
@@ -619,7 +655,13 @@ export default {
 
                                 return new Response(JSON.stringify({ok: true, updated}), {status: 200, headers: {'Content-Type': 'application/json'}});
                               }
-                      if (path.endsWith('/sub')) {
+
+        // Unmatched /api/ route
+        return new Response(JSON.stringify({ok: false, error: 'Not Found'}), {status: 404, headers: {'Content-Type': 'application/json'}});
+      }
+
+      if (path.endsWith('/sub')) {
+
          const parts = path.split('/');
          const subId = parts[1] === 'sub' ? parts[2] : parts[1];
          const users = await getAllUsers(env);

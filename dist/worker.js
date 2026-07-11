@@ -2656,6 +2656,30 @@ async function getAllTokens(env) {
     return [];
   }
 }
+var proxyPoolCache = null;
+var proxyPoolCacheTime = 0;
+async function getProxyPoolString(env) {
+  if (!env.DB)
+    return "";
+  if (proxyPoolCache !== null && Date.now() - proxyPoolCacheTime < 3e4)
+    return proxyPoolCache;
+  try {
+    let { results } = await env.DB.prepare(
+      "SELECT ip, port FROM proxyip WHERE status = 'active' ORDER BY ping ASC LIMIT 50"
+    ).all();
+    if (!results || results.length === 0) {
+      ({ results } = await env.DB.prepare(
+        "SELECT ip, port FROM proxyip ORDER BY last_check DESC LIMIT 50"
+      ).all());
+    }
+    const str = (results || []).map((r) => r.port && r.port !== 443 ? `${r.ip}:${r.port}` : `${r.ip}`).join("\n");
+    proxyPoolCache = str;
+    proxyPoolCacheTime = Date.now();
+    return str;
+  } catch (e) {
+    return proxyPoolCache || "";
+  }
+}
 var src_default = {
   async fetch(request, env, ctx) {
     try {
@@ -2703,10 +2727,12 @@ var src_default = {
       };
       if (upgradeHeader === "websocket") {
         const decodedPath = decodeURIComponent(path).toLowerCase();
+        const pool = await getProxyPoolString(env);
+        const effectiveProxyIP = [currentProxyIPRaw, pool].filter(Boolean).join("\n");
         if (decodedPath.includes("trojan-ws") || decodedPath.includes("trojan")) {
-          return await trojanOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
+          return await trojanOverWSHandler(request, authenticate, effectiveProxyIP, onUsage);
         } else {
-          return await vlessOverWSHandler(request, authenticate, currentProxyIPRaw, onUsage);
+          return await vlessOverWSHandler(request, authenticate, effectiveProxyIP, onUsage);
         }
       }
       const isSetupComplete = !!currentPanelPass && !!currentAdminUUID && !!env.DB;
@@ -2890,66 +2916,98 @@ var src_default = {
             return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
         }
-        return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/api/proxyip" && request.method === "GET") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const { results } = await env.DB.prepare("SELECT * FROM proxyip ORDER BY status DESC, ping ASC").all();
-        return new Response(JSON.stringify({ ok: true, proxyip: results }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/api/proxyip" && request.method === "POST") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const b = await request.json();
-        const { ip, port, country, city, isp } = b;
-        if (!ip)
-          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        const p = parseInt(b.port) || 443;
-        let geoCountry = (b.country || "").trim();
-        let geoCity = (b.city || "").trim();
-        let geoIsp = (b.isp || "").trim();
-        if (!geoCountry && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
-          const g = await detectCountry(ip);
-          if (g) {
-            geoCountry = g.country;
-            geoCity = geoCity || g.city;
-            geoIsp = geoIsp || g.isp;
+        if (path.startsWith("/api/proxyip") && request.method !== "GET") {
+          proxyPoolCache = null;
+        }
+        if (path === "/api/proxyip" && request.method === "GET") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const { results } = await env.DB.prepare("SELECT * FROM proxyip ORDER BY status DESC, ping ASC").all();
+          return new Response(JSON.stringify({ ok: true, proxyip: results }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (path === "/api/proxyip" && request.method === "POST") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const b = await request.json();
+          const { ip, port, country, city, isp } = b;
+          if (!ip)
+            return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          const p = parseInt(b.port) || 443;
+          let geoCountry = (b.country || "").trim();
+          let geoCity = (b.city || "").trim();
+          let geoIsp = (b.isp || "").trim();
+          if (!geoCountry && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+            const g = await detectCountry(ip);
+            if (g) {
+              geoCountry = g.country;
+              geoCity = geoCity || g.city;
+              geoIsp = geoIsp || g.isp;
+            }
+          }
+          try {
+            await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
+                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, geoCountry, geoCity, geoIsp, Date.now()).run();
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
           }
         }
-        try {
-          await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, ?, ?, ?, 'unknown', ?)
-                    ON CONFLICT(ip, port) DO UPDATE SET country=excluded.country, city=excluded.city, isp=excluded.isp`).bind(ip, p, geoCountry, geoCity, geoIsp, Date.now()).run();
-          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        if (path === "/api/proxyip" && request.method === "DELETE") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const b = await request.json();
+          const { ip, port } = b;
+          if (!ip)
+            return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          const p = parseInt(port) || 443;
+          try {
+            await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(ip, p).run();
+            return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+          }
         }
-      }
-      if (path === "/api/proxyip" && request.method === "DELETE") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const b = await request.json();
-        const { ip, port } = b;
-        if (!ip)
-          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        const p = parseInt(port) || 443;
-        try {
-          await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(ip, p).run();
-          return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        if (path === "/api/proxyip/refresh" && request.method === "POST") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip").all();
+          const testPromises = dbResults.map(async (p) => {
+            try {
+              const start = Date.now();
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 5e3);
+              const resp = await fetch(`https://${p.ip}:${p.port}/cdn-cgi/trace`, {
+                method: "GET",
+                signal: controller.signal,
+                cf: { resolveTimeout: 3e3 }
+              });
+              clearTimeout(timeout);
+              const ping = Date.now() - start;
+              const status = resp.ok ? "active" : "dead";
+              return { ip: p.ip, port: p.port, ping, status };
+            } catch (e) {
+              return { ip: p.ip, port: p.port, ping: null, status: "dead" };
+            }
+          });
+          const testResults = await Promise.all(testPromises);
+          for (const r of testResults) {
+            await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
+          }
+          return new Response(JSON.stringify({ ok: true, tested: testResults.length }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
-      }
-      if (path === "/api/proxyip/refresh" && request.method === "POST") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip").all();
-        const testPromises = dbResults.map(async (p) => {
+        if (path === "/api/proxyip/test" && request.method === "POST") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const b = await request.json();
+          const { ip, port } = b;
+          if (!ip)
+            return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          const p = parseInt(port) || 443;
           try {
             const start = Date.now();
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 5e3);
-            const resp = await fetch(`https://${p.ip}:${p.port}/cdn-cgi/trace`, {
+            const resp = await fetch(`https://${ip}:${p}/cdn-cgi/trace`, {
               method: "GET",
               signal: controller.signal,
               cf: { resolveTimeout: 3e3 }
@@ -2957,156 +3015,166 @@ var src_default = {
             clearTimeout(timeout);
             const ping = Date.now() - start;
             const status = resp.ok ? "active" : "dead";
-            return { ip: p.ip, port: p.port, ping, status };
+            await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, ping, Date.now(), ip, p).run();
+            return new Response(JSON.stringify({ ok: true, ping, status }), { status: 200, headers: { "Content-Type": "application/json" } });
           } catch (e) {
-            return { ip: p.ip, port: p.port, ping: null, status: "dead" };
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
           }
-        });
-        const testResults = await Promise.all(testPromises);
-        for (const r of testResults) {
-          await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
         }
-        return new Response(JSON.stringify({ ok: true, tested: testResults.length }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/api/proxyip/test" && request.method === "POST") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const b = await request.json();
-        const { ip, port } = b;
-        if (!ip)
-          return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        const p = parseInt(port) || 443;
-        try {
-          const start = Date.now();
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 5e3);
-          const resp = await fetch(`https://${ip}:${p}/cdn-cgi/trace`, {
-            method: "GET",
-            signal: controller.signal,
-            cf: { resolveTimeout: 3e3 }
-          });
-          clearTimeout(timeout);
-          const ping = Date.now() - start;
-          const status = resp.ok ? "active" : "dead";
-          await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, ping, Date.now(), ip, p).run();
-          return new Response(JSON.stringify({ ok: true, ping, status }), { status: 200, headers: { "Content-Type": "application/json" } });
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
-        }
-      }
-      async function detectCountry(ip) {
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3e3);
-          const resp = await fetch("http://ip-api.com/json/" + ip + "?fields=countryCode,country,regionName,city,isp,org,as", {
-            signal: controller.signal,
-            cf: { resolveTimeout: 2e3 }
-          });
-          clearTimeout(timeout);
-          if (!resp.ok)
-            return null;
-          const data = await resp.json();
-          if (data.countryCode) {
-            return {
-              country: data.countryCode,
-              // ISO code: IR, US, DE, etc.
-              countryName: data.country,
-              // Full name
-              city: data.city || "",
-              isp: data.isp || data.org || data.as || ""
-            };
-          }
-        } catch (e) {
-          console.error("GeoIP error for", ip, e.message);
-        }
-        return null;
-      }
-      async function batchDetectCountries(ips) {
-        const out = /* @__PURE__ */ new Map();
-        if (!ips.length)
-          return out;
-        for (let i = 0; i < ips.length; i += 100) {
-          const chunk = ips.slice(i, i + 100);
+        async function detectCountry(ip) {
           try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8e3);
-            const resp = await fetch("http://ip-api.com/batch?fields=status,countryCode,country,city,isp,org,as,query", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(chunk),
-              signal: controller.signal
+            const timeout = setTimeout(() => controller.abort(), 3e3);
+            const resp = await fetch("http://ip-api.com/json/" + ip + "?fields=countryCode,country,regionName,city,isp,org,as", {
+              signal: controller.signal,
+              cf: { resolveTimeout: 2e3 }
             });
             clearTimeout(timeout);
             if (!resp.ok)
-              continue;
-            const arr = await resp.json();
-            if (Array.isArray(arr)) {
-              for (const d of arr) {
-                if (d && d.status === "success" && d.countryCode) {
-                  out.set(d.query, {
-                    country: d.countryCode,
-                    city: d.city || "",
-                    isp: d.isp || d.org || d.as || ""
-                  });
-                }
-              }
+              return null;
+            const data = await resp.json();
+            if (data.countryCode) {
+              return {
+                country: data.countryCode,
+                // ISO code: IR, US, DE, etc.
+                countryName: data.country,
+                // Full name
+                city: data.city || "",
+                isp: data.isp || data.org || data.as || ""
+              };
             }
           } catch (e) {
-            console.error("Batch GeoIP error:", e.message);
+            console.error("GeoIP error for", ip, e.message);
           }
-          if (i + 100 < ips.length)
-            await new Promise((r) => setTimeout(r, 4200));
+          return null;
         }
-        return out;
-      }
-      if (path === "/api/proxyip/fetch" && request.method === "POST") {
-        try {
-          const sources = [
-            "https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt",
-            "https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt"
-          ];
-          let allIPs = [];
-          for (const source of sources) {
+        async function batchDetectCountries(ips) {
+          const out = /* @__PURE__ */ new Map();
+          if (!ips.length)
+            return out;
+          for (let i = 0; i < ips.length; i += 100) {
+            const chunk = ips.slice(i, i + 100);
             try {
-              const resp = await fetch(source);
-              if (resp.ok) {
-                const text = await resp.text();
-                const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
-                allIPs.push(...lines);
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 8e3);
+              const resp = await fetch("http://ip-api.com/batch?fields=status,countryCode,country,city,isp,org,as,query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(chunk),
+                signal: controller.signal
+              });
+              clearTimeout(timeout);
+              if (!resp.ok)
+                continue;
+              const arr = await resp.json();
+              if (Array.isArray(arr)) {
+                for (const d of arr) {
+                  if (d && d.status === "success" && d.countryCode) {
+                    out.set(d.query, {
+                      country: d.countryCode,
+                      city: d.city || "",
+                      isp: d.isp || d.org || d.as || ""
+                    });
+                  }
+                }
               }
             } catch (e) {
-              console.error("Failed to fetch from", source, e);
+              console.error("Batch GeoIP error:", e.message);
             }
+            if (i + 100 < ips.length)
+              await new Promise((r) => setTimeout(r, 4200));
           }
-          const validIPs = [];
-          for (const line of allIPs) {
-            const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
-            if (match) {
-              validIPs.push({
-                ip: match[1],
-                port: parseInt(match[2]) || 443,
-                remark: match[3] || ""
-              });
+          return out;
+        }
+        if (path === "/api/proxyip/fetch" && request.method === "POST") {
+          try {
+            const sources = [
+              "https://raw.githubusercontent.com/cmliu/edgetunnel/main/proxyip.txt",
+              "https://raw.githubusercontent.com/cmliu/edgetunnel/main/CF-CIDR.txt"
+            ];
+            let allIPs = [];
+            for (const source of sources) {
+              try {
+                const resp = await fetch(source);
+                if (resp.ok) {
+                  const text = await resp.text();
+                  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+                  allIPs.push(...lines);
+                }
+              } catch (e) {
+                console.error("Failed to fetch from", source, e);
+              }
             }
-          }
-          const MAX_FETCH = 300;
-          const toInsert = validIPs.slice(0, MAX_FETCH);
-          let inserted = 0;
-          for (const item of toInsert) {
-            try {
-              const existing = await env.DB.prepare("SELECT 1 FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).first();
-              if (existing)
-                continue;
-              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+            const validIPs = [];
+            for (const line of allIPs) {
+              const match = line.match(/^([\d\.]+)(?::(\d+))?(?:\s*#\s*(.+))?$/);
+              if (match) {
+                validIPs.push({
+                  ip: match[1],
+                  port: parseInt(match[2]) || 443,
+                  remark: match[3] || ""
+                });
+              }
+            }
+            const MAX_FETCH = 300;
+            const toInsert = validIPs.slice(0, MAX_FETCH);
+            let inserted = 0;
+            for (const item of toInsert) {
+              try {
+                const existing = await env.DB.prepare("SELECT 1 FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).first();
+                if (existing)
+                  continue;
+                await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
                                       ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
+                inserted++;
+              } catch (e) {
+              }
+            }
+            try {
+              const ipList = [...new Set(toInsert.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+              const geoMap = await batchDetectCountries(ipList);
+              for (const item of toInsert) {
+                const geo = geoMap.get(item.ip);
+                if (!geo)
+                  continue;
+                try {
+                  await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+                } catch (e) {
+                }
+              }
+            } catch (e) {
+            }
+            return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+          }
+        }
+        if (path === "/api/proxyip/import" && request.method === "POST") {
+          const b = await request.json();
+          const { text, format } = b;
+          if (!text)
+            return new Response(JSON.stringify({ ok: false, error: "Text is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          let lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+          const parsed = [];
+          for (const line of lines) {
+            const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/) || line.match(/^([\d\.]+)$/);
+            if (match) {
+              parsed.push({ ip: match[1], port: parseInt(match[2]) || 443 });
+            }
+          }
+          let inserted = 0;
+          for (const item of parsed) {
+            try {
+              await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
+                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
               inserted++;
             } catch (e) {
             }
           }
           try {
-            const ipList = [...new Set(toInsert.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+            const ipList = [...new Set(parsed.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
             const geoMap = await batchDetectCountries(ipList);
-            for (const item of toInsert) {
+            for (const item of parsed) {
               const geo = geoMap.get(item.ip);
               if (!geo)
                 continue;
@@ -3118,84 +3186,45 @@ var src_default = {
           } catch (e) {
           }
           return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
-      }
-      if (path === "/api/proxyip/import" && request.method === "POST") {
-        const b = await request.json();
-        const { text, format } = b;
-        if (!text)
-          return new Response(JSON.stringify({ ok: false, error: "Text is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        let lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
-        const parsed = [];
-        for (const line of lines) {
-          const match = line.match(/^([\d\.]+):(\d+)(?:\s*#\s*(.+))?$/) || line.match(/^([\d\.]+)$/);
-          if (match) {
-            parsed.push({ ip: match[1], port: parseInt(match[2]) || 443 });
+        if (path === "/api/proxyip/bulk-delete" && request.method === "POST") {
+          const b = await request.json();
+          const { ips } = b;
+          if (!Array.isArray(ips) || ips.length === 0)
+            return new Response(JSON.stringify({ ok: false, error: "Invalid data" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          let deleted = 0;
+          for (const item of ips) {
+            try {
+              await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).run();
+              deleted++;
+            } catch (e) {
+            }
           }
+          return new Response(JSON.stringify({ ok: true, deleted }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
-        let inserted = 0;
-        for (const item of parsed) {
-          try {
-            await env.DB.prepare(`INSERT INTO proxyip (ip, port, country, city, isp, status, last_check) VALUES (?, ?, '', '', '', 'unknown', ?)
-                                    ON CONFLICT(ip, port) DO NOTHING`).bind(item.ip, item.port, Date.now()).run();
-            inserted++;
-          } catch (e) {
+        if (path === "/api/proxyip/detect-countries" && request.method === "POST") {
+          if (!env.DB)
+            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
+          const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+          if (!dbResults.length) {
+            return new Response(JSON.stringify({ ok: true, updated: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
-        }
-        try {
-          const ipList = [...new Set(parsed.map((p) => p.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
+          const ipList = [...new Set(dbResults.map((r) => r.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
           const geoMap = await batchDetectCountries(ipList);
-          for (const item of parsed) {
+          let updated = 0;
+          for (const item of dbResults) {
             const geo = geoMap.get(item.ip);
             if (!geo)
               continue;
             try {
               await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
+              updated++;
             } catch (e) {
             }
           }
-        } catch (e) {
+          return new Response(JSON.stringify({ ok: true, updated }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
-        return new Response(JSON.stringify({ ok: true, count: inserted }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/api/proxyip/bulk-delete" && request.method === "POST") {
-        const b = await request.json();
-        const { ips } = b;
-        if (!Array.isArray(ips) || ips.length === 0)
-          return new Response(JSON.stringify({ ok: false, error: "Invalid data" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        let deleted = 0;
-        for (const item of ips) {
-          try {
-            await env.DB.prepare("DELETE FROM proxyip WHERE ip = ? AND port = ?").bind(item.ip, item.port).run();
-            deleted++;
-          } catch (e) {
-          }
-        }
-        return new Response(JSON.stringify({ ok: true, deleted }), { status: 200, headers: { "Content-Type": "application/json" } });
-      }
-      if (path === "/api/proxyip/detect-countries" && request.method === "POST") {
-        if (!env.DB)
-          return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-        const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
-        if (!dbResults.length) {
-          return new Response(JSON.stringify({ ok: true, updated: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
-        }
-        const ipList = [...new Set(dbResults.map((r) => r.ip).filter((ip) => /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)))];
-        const geoMap = await batchDetectCountries(ipList);
-        let updated = 0;
-        for (const item of dbResults) {
-          const geo = geoMap.get(item.ip);
-          if (!geo)
-            continue;
-          try {
-            await env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port).run();
-            updated++;
-          } catch (e) {
-          }
-        }
-        return new Response(JSON.stringify({ ok: true, updated }), { status: 200, headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ ok: false, error: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
       }
       if (path.endsWith("/sub")) {
         const parts = path.split("/");
