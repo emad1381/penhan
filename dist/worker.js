@@ -964,200 +964,292 @@ Commercial support is available at
 }
 function loginPage(uuid, host) {
   return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #07070c;
-      --card-bg: rgba(18, 18, 30, 0.6);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #8b5cf6;
-      --accent-glow: rgba(139, 92, 246, 0.3);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --error: #ef4444;
-    }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
+<html class="dark" dir="rtl" lang="fa"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>\u067E\u0646\u0647\u0627\u0646 | \u0648\u0631\u0648\u062F \u0628\u0647 \u0633\u0627\u0645\u0627\u0646\u0647</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Vazirmatn & Plus Jakarta Sans -->
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"><\/script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary": "#ffb0cd",
+                    "on-primary": "#490080",
+                    "primary-fixed": "#f0dbff",
+                    "inverse-surface": "#e4e1ea",
+                    "on-primary-fixed-variant": "#6900b3",
+                    "surface-container": "#1f1f26",
+                    "primary-container": "#b76dff",
+                    "background": "#131319",
+                    "surface": "#131319",
+                    "on-surface-variant": "#cfc2d6",
+                    "on-secondary-fixed": "#3e0022",
+                    "tertiary-fixed": "#6ffbbe",
+                    "secondary-fixed-dim": "#ffb0cd",
+                    "inverse-on-surface": "#303037",
+                    "on-background": "#e4e1ea",
+                    "surface-tint": "#ddb7ff",
+                    "on-tertiary-container": "#00311f",
+                    "surface-variant": "#35343b",
+                    "on-tertiary-fixed": "#002113",
+                    "tertiary-fixed-dim": "#4edea3",
+                    "on-error-container": "#ffdad6",
+                    "secondary-fixed": "#ffd9e4",
+                    "surface-container-lowest": "#0e0e14",
+                    "surface-container-low": "#1b1b22",
+                    "on-secondary": "#640039",
+                    "on-surface": "#e4e1ea",
+                    "on-secondary-fixed-variant": "#8c0053",
+                    "primary": "#ddb7ff",
+                    "inverse-primary": "#842bd2",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "on-primary-container": "#400071",
+                    "outline": "#988d9f",
+                    "outline-variant": "#4d4354",
+                    "surface-dim": "#131319",
+                    "error-container": "#93000a",
+                    "on-error": "#690005",
+                    "tertiary": "#4edea3",
+                    "error": "#ffb4ab",
+                    "on-secondary-container": "#ffbad3",
+                    "tertiary-container": "#00a572",
+                    "surface-bright": "#393840",
+                    "on-tertiary": "#003824",
+                    "primary-fixed-dim": "#ddb7ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "vazir": ["Vazirmatn", "sans-serif"],
+                    "headline-lg": ["Plus Jakarta Sans", "Vazirmatn"],
+                    "headline-md": ["Plus Jakarta Sans", "Vazirmatn"],
+                    "body-lg": ["Inter", "Vazirmatn"],
+                    "label-md": ["Geist", "Vazirmatn"],
+                    "display-lg": ["Plus Jakarta Sans", "Vazirmatn"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    <\/script>
+<style>
+        body {
+            background-color: #131319;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Vazirmatn', sans-serif;
+        }
+        
+        .glass-panel {
+            background: rgba(25, 25, 32, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.02);
+        }
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      overflow-x: hidden;
-      position: relative;
-    }
+        .neon-glow-primary {
+            box-shadow: 0 0 20px rgba(221, 183, 255, 0.2);
+        }
 
-    body::before, body::after {
-      content: '';
-      position: absolute;
-      width: 300px;
-      height: 300px;
-      border-radius: 50%;
-      background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-      opacity: 0.15;
-      filter: blur(50px);
-      z-index: -1;
-    }
-    body::before { top: 15%; left: 15%; }
-    body::after { bottom: 15%; right: 15%; }
+        .neon-glow-error {
+            box-shadow: 0 0 30px rgba(255, 180, 171, 0.3);
+        }
 
-    .login-container {
-      width: 100%;
-      max-width: 400px;
-      background: var(--card-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 40px 30px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      text-align: center;
-      position: relative;
-      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
+        .input-focus-effect:focus-within .lock-icon {
+            color: #ddb7ff;
+            filter: drop-shadow(0 0 8px rgba(221, 183, 255, 0.8));
+            transition: all 0.3s ease;
+        }
 
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+        @keyframes pulse-loading {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.98); }
+        }
 
-    .icon-wrapper {
-      width: 72px;
-      height: 72px;
-      background: rgba(139, 92, 246, 0.1);
-      border: 1px solid rgba(139, 92, 246, 0.2);
-      border-radius: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 24px;
-      font-size: 32px;
-      color: var(--accent);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    }
+        .loading-pulse {
+            animation: pulse-loading 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
 
-    h1 {
-      font-size: 22px;
-      font-weight: 800;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, #a78bfa, #f472b6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
 
-    p.subtitle {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 30px;
-    }
+        .shake-error {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
 
-    .input-field {
-      width: 100%;
-      padding: 14px 16px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      color: var(--text);
-      font-size: 15px;
-      outline: none;
-      transition: all 0.3s ease;
-      text-align: center;
-      direction: ltr;
-      margin-bottom: 8px;
-    }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
 
-    .input-field:focus {
-      border-color: var(--accent);
-      background: rgba(139, 92, 246, 0.05);
-      box-shadow: 0 0 0 4px var(--accent-glow);
-    }
-
-    .error-msg {
-      font-size: 12px;
-      color: var(--error);
-      margin-bottom: 20px;
-      min-height: 18px;
-      transition: all 0.3s;
-      opacity: 0;
-    }
-
-    .error-msg.visible { opacity: 1; }
-
-    .btn-login {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #7c3aed, #db2777);
-      border: none;
-      border-radius: 14px;
-      color: white;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
-    }
-
-    .btn-login:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(124, 58, 237, 0.5);
-    }
-
-    .btn-login:active { transform: translateY(0); }
-
-    .toast {
-      position: fixed;
-      top: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-20px);
-      background: rgba(239, 68, 68, 0.9);
-      backdrop-filter: blur(8px);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 1000;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ddb7ff; border-radius: 10px; }
+    </style>
 </head>
-<body>
-  <div class="toast" id="toast"></div>
+<body class="bg-background text-on-background flex items-center justify-center h-screen w-screen relative overflow-hidden">
+<!-- Full Screen Background Shader -->
+<div class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
 
-  <div class="login-container">
-    <div class="icon-wrapper">\u{1F512}</div>
-    <h1>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</h1>
-    <p class="subtitle">\u0628\u0631\u0627\u06CC \u0648\u0631\u0648\u062F \u0628\u0647 \u0628\u062E\u0634 \u0645\u062F\u06CC\u0631\u06CC\u062A\u060C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F</p>
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = \`attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}\`;
+  const fs = \`precision highp float;
+varying vec2 v_texCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
+
+void main() {
+    vec2 uv = v_texCoord;
     
-    <input type="password" class="input-field" id="passInput" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" autofocus autocomplete="current-password">
-    <div class="error-msg" id="error"></div>
+    vec2 p1 = vec2(0.5 + 0.3 * sin(u_time * 0.4), 0.5 + 0.2 * cos(u_time * 0.5));
+    vec2 p2 = vec2(0.3 + 0.2 * cos(u_time * 0.3), 0.7 + 0.1 * sin(u_time * 0.6));
+    vec2 p3 = vec2(0.7 + 0.2 * sin(u_time * 0.5), 0.3 + 0.2 * cos(u_time * 0.4));
+    
+    vec3 col1 = vec3(0.658, 0.333, 0.968); // #a855f7 (Purple)
+    vec3 col2 = vec3(0.925, 0.282, 0.6);   // #ec4899 (Pink/Magenta)
+    vec3 col3 = vec3(0.062, 0.725, 0.505); // #10b981 (Cyan/Emerald)
+    
+    float d1 = length(uv - p1);
+    float d2 = length(uv - p2);
+    float d3 = length(uv - p3);
+    
+    float f1 = 0.5 / (1.0 + d1 * 5.0);
+    float f2 = 0.5 / (1.0 + d2 * 4.0);
+    float f3 = 0.5 / (1.0 + d3 * 6.0);
+    
+    vec3 aurora = (col1 * f1 + col2 * f2 + col3 * f3) * 0.4;
+    vec3 bg = vec3(0.02, 0.02, 0.04); // Deep dark background
+    
+    gl_FragColor = vec4(bg + aurora, 1.0);
+}\`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
 
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644</button>
-  </div>
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
 
-  <script>
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+<\/script>
+</div>
+<!-- Main Content Canvas -->
+<main class="relative z-10 w-full max-w-md px-6">
+<!-- Login Card -->
+<div class="glass-panel p-10 rounded-[2rem] flex flex-col items-center gap-8 transition-all duration-500 hover:border-white/20">
+<!-- Branding -->
+<div class="text-center">
+<h1 class="font-display-lg text-display-lg text-primary tracking-tighter mb-2">\u067E\u0646\u0647\u0627\u0646</h1>
+<p class="font-label-md text-label-md text-on-surface-variant uppercase tracking-widest opacity-60">Penhan \u2022 Deep Space Command</p>
+</div>
+<!-- Form -->
+<form class="w-full space-y-6" id="loginForm">
+<!-- Password with Glowing Icon -->
+<div class="space-y-2 input-focus-effect">
+<label class="font-label-md text-label-md text-on-surface-variant mr-1 block">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u067E\u0646\u0644</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute right-4 text-on-surface-variant/50 lock-icon transition-all duration-300" data-icon="lock">lock</span>
+<input class="w-full bg-white/5 border border-white/10 rounded-xl py-4 pr-12 pl-4 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-all text-body-md font-body-md" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" type="password" id="passInput" autofocus autocomplete="current-password"/>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary text-on-primary font-headline-md text-headline-md py-4 rounded-xl neon-glow-primary hover:scale-[1.02] active:scale-95 transition-all duration-300 flex items-center justify-center gap-3" type="submit" id="loginBtn">
+<span>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0644 \u0641\u0631\u0645\u0627\u0646\u062F\u0647\u06CC</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_back</span>
+</button>
+</form>
+</div>
+<!-- Footer Decoration -->
+<div class="mt-8 text-center">
+<p class="font-label-md text-label-md text-on-surface-variant opacity-30">ENCRYPTED END-TO-END CONNECTION ESTABLISHED</p>
+</div>
+</main>
+<!-- Floating Toast Notification -->
+<div class="fixed top-12 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 translate-y-[-20px] transition-all duration-500" id="toast">
+<div class="glass-panel border-error/30 neon-glow-error shake-error px-6 py-4 rounded-full flex items-center gap-4 text-error">
+<span class="material-symbols-outlined">error</span>
+<span class="font-body-md text-body-md font-bold" id="toast-text">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0634\u062A\u0628\u0627\u0647 \u0627\u0633\u062A</span>
+</div>
+</div>
+<!-- Interaction Script -->
+<script>
     const path = window.location.pathname;
     const bp = path.endsWith('/panel-login') ? path.slice(0, -12) : (path.endsWith('/') ? path.slice(0, -1) : path);
 
@@ -1165,16 +1257,14 @@ function loginPage(uuid, host) {
       const input = document.getElementById('passInput');
       const p = input.value.trim();
       const btn = document.getElementById('loginBtn');
-      const err = document.getElementById('error');
 
       if (!p) {
-        err.textContent = '\u274C \u0644\u0637\u0641\u0627\u064B \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F';
-        err.classList.add('visible');
+        showToast('\u274C \u0644\u0637\u0641\u0627\u064B \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0631\u0627 \u0648\u0627\u0631\u062F \u06A9\u0646\u06CC\u062F', 'error');
         return;
       }
 
-      err.classList.remove('visible');
-      btn.textContent = '\u062F\u0631 \u062D\u0627\u0644 \u0628\u0631\u0631\u0633\u06CC...';
+      btn.innerHTML = \`<div class="w-6 h-6 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin"></div>\`;
+      btn.classList.add('loading-pulse');
       btn.disabled = true;
 
       try {
@@ -1186,30 +1276,36 @@ function loginPage(uuid, host) {
         if (d.ok) {
           window.location.href = bp;
         } else {
-          err.textContent = '\u274C \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0634\u062A\u0628\u0627\u0647 \u0627\u0633\u062A';
-          err.classList.add('visible');
+          showToast('\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u0634\u062A\u0628\u0627\u0647 \u0627\u0633\u062A', 'error');
           input.value = '';
           input.focus();
         }
       } catch (e) {
-        showToast('\u274C \u062E\u0637\u0627 \u062F\u0631 \u0628\u0631\u0642\u0631\u0627\u0631\u06CC \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631');
+        showToast('\u062E\u0637\u0627 \u062F\u0631 \u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627 \u0633\u0631\u0648\u0631', 'error');
       } finally {
-        btn.textContent = '\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644';
+        btn.innerHTML = \`<span>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0644 \u0641\u0631\u0645\u0627\u0646\u062F\u0647\u06CC</span><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_back</span>\`;
+        btn.classList.remove('loading-pulse');
         btn.disabled = false;
       }
     }
 
-    document.getElementById('passInput').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        doLogin();
-      }
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      doLogin();
     });
 
-    function showToast(m) {
-      const t = document.getElementById('toast');
-      t.textContent = m;
-      t.classList.add('show');
-      setTimeout(function() { t.classList.remove('show'); }, 3000);
+    function showToast(msg, type) {
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toast-text');
+      toastText.textContent = msg;
+      
+      toast.classList.remove('opacity-0', 'translate-y-[-20px]');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-20px]');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3500);
     }
   <\/script>
 </body>
@@ -1217,136 +1313,412 @@ function loginPage(uuid, host) {
 }
 function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
   const allGood = hasD1 && hasPassword && hasUUID;
+  const dbBadge = hasD1 ? `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/30">
+      <span class="status-dot bg-tertiary status-pulse"></span>
+      <span class="text-tertiary text-sm font-bold">\u0645\u062A\u0635\u0644</span>
+    </div>` : `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-error/10 border border-error/30">
+      <span class="status-dot bg-error status-pulse" style="animation-name: pulse-red;"></span>
+      <span class="text-error text-sm font-bold">\u0642\u0637\u0639 \u0627\u062A\u0635\u0627\u0644</span>
+    </div>`;
+  const passBadge = hasPassword ? `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/30">
+      <span class="status-dot bg-tertiary status-pulse"></span>
+      <span class="text-tertiary text-sm font-bold">\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647</span>
+    </div>` : `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-error/10 border border-error/30">
+      <span class="status-dot bg-error status-pulse" style="animation-name: pulse-red;"></span>
+      <span class="text-error text-sm font-bold">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647</span>
+    </div>`;
+  const uuidBadge = hasUUID ? `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/30">
+      <span class="status-dot bg-tertiary status-pulse"></span>
+      <span class="text-tertiary text-sm font-bold">\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647</span>
+    </div>` : `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-error/10 border border-error/30">
+      <span class="status-dot bg-error status-pulse" style="animation-name: pulse-red;"></span>
+      <span class="text-error text-sm font-bold">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647</span>
+    </div>`;
+  const proxyIPBadge = currentProxyIP ? `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-tertiary/10 border border-tertiary/30">
+      <span class="status-dot bg-tertiary status-pulse"></span>
+      <span class="text-tertiary text-sm font-bold">\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647</span>
+    </div>` : `
+    <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/10 border border-secondary/30">
+      <span class="status-dot bg-secondary status-pulse-amber"></span>
+      <span class="text-secondary text-sm font-bold">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC</span>
+    </div>`;
   return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #07070e;
-      --card-bg: rgba(18, 18, 30, 0.45);
-      --border: rgba(255, 255, 255, 0.06);
-      --accent: #a855f7;
-      --accent-glow: rgba(168, 85, 247, 0.25);
-      --text: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --success: #10b981;
-      --error: #ef4444;
-      --warning: #f59e0b;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-x: hidden; position: relative; }
-    
-    .blob { position: absolute; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.12; filter: blur(80px); z-index: -1; pointer-events: none; }
-    .blob-1 { top: -10%; left: -10%; }
-    .blob-2 { bottom: -10%; right: -10%; }
-
-    .container { width: 100%; max-width: 650px; background: var(--card-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--border); border-radius: 32px; padding: 48px 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05); }
-    
-    .logo-area { text-align: center; margin-bottom: 32px; }
-    .logo-icon { font-size: 40px; margin-bottom: 12px; display: inline-block; animation: float 3s ease-in-out infinite; }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    
-    h1 { font-family: Vazirmatn, sans-serif; font-size: 26px; font-weight: 850; margin-bottom: 8px; text-align: center; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .subtitle { text-align: center; font-size: 14px; color: var(--text-muted); margin-bottom: 36px; line-height: 1.6; }
-    
-    .card-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
-    .variable-card { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border); border-radius: 20px; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
-    .variable-card:hover { border-color: rgba(168, 85, 247, 0.3); transform: translateY(-2px); }
-    
-    .card-details { flex: 1; padding-left: 20px; text-align: right; }
-    .card-title { font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .desc { font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
-    
-    .code { font-family: 'Outfit', monospace; font-size: 12px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); padding: 2px 8px; border-radius: 6px; color: #e9d5ff; white-space: nowrap; direction: ltr; display: inline-block; margin: 2px 0; }
-    .value-display { font-family: 'Outfit', monospace; font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: #cbd5e1; direction: ltr; display: inline-block; word-break: break-all; margin-top: 4px; }
-    
-    .badge { padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: 0.2s; }
-    .badge.ok { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
-    .badge.fail { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
-    .badge.info { background: rgba(168, 85, 247, 0.08); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.15); }
-    
-    .success-panel { background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 24px; padding: 28px; text-align: center; animation: pulseGlow 2s infinite alternate; }
-    @keyframes pulseGlow { 0% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.05); } 100% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); } }
-    .success-title { font-size: 18px; font-weight: 800; color: #34d399; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .success-desc { font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 20px; }
-    
-    .action-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; border: none; padding: 14px; border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer; transition: all 0.3s; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.3); }
-    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.45); }
-    
-    .warning-panel { text-align: center; padding: 16px; border-radius: 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 13px; font-weight: 500; line-height: 1.6; }
-  </style>
+<html class="dark" dir="rtl" lang="fa"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>\u067E\u0646\u0647\u0627\u0646 | \u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0627\u0648\u0644\u06CC\u0647</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"><\/script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=Inter:wght@100..900&amp;family=Plus+Jakarta+Sans:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #131319;
+            overflow: hidden;
+        }
+        .glass-card {
+            backdrop-filter: blur(24px);
+            background: rgba(31, 31, 38, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+        .neon-glow-purple {
+            box-shadow: 0 0 20px rgba(221, 183, 255, 0.3);
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .status-pulse {
+            animation: pulse-animation 2s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0px rgba(78, 222, 163, 0.4); }
+            100% { box-shadow: 0 0 0 10px rgba(78, 222, 163, 0); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0px rgba(255, 180, 171, 0.4); }
+            100% { box-shadow: 0 0 0 10px rgba(255, 180, 171, 0); }
+        }
+        .status-pulse-amber {
+            animation: pulse-amber 2s infinite;
+        }
+        @keyframes pulse-amber {
+            0% { box-shadow: 0 0 0 0px rgba(255, 176, 205, 0.4); }
+            100% { box-shadow: 0 0 0 10px rgba(255, 176, 205, 0); }
+        }
+        .slide-up-btn {
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .slide-up-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(170, 2, 102, 0.4);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#ffb0cd",
+                      "on-primary": "#490080",
+                      "primary-fixed": "#f0dbff",
+                      "inverse-surface": "#e4e1ea",
+                      "on-primary-fixed-variant": "#6900b3",
+                      "surface-container": "#1f1f26",
+                      "primary-container": "#b76dff",
+                      "background": "#131319",
+                      "surface": "#131319",
+                      "on-surface-variant": "#cfc2d6",
+                      "on-secondary-fixed": "#3e0022",
+                      "tertiary-fixed": "#6ffbbe",
+                      "secondary-fixed-dim": "#ffb0cd",
+                      "inverse-on-surface": "#303037",
+                      "on-background": "#e4e1ea",
+                      "surface-tint": "#ddb7ff",
+                      "on-tertiary-container": "#00311f",
+                      "surface-variant": "#35343b",
+                      "on-tertiary-fixed": "#002113",
+                      "tertiary-fixed-dim": "#4edea3",
+                      "on-error-container": "#ffdad6",
+                      "secondary-fixed": "#ffd9e4",
+                      "surface-container-lowest": "#0e0e14",
+                      "surface-container-low": "#1b1b22",
+                      "on-secondary": "#640039",
+                      "on-surface": "#e4e1ea",
+                      "on-secondary-fixed-variant": "#8c0053",
+                      "primary": "#ddb7ff",
+                      "inverse-primary": "#842bd2",
+                      "on-tertiary-fixed-variant": "#005236",
+                      "on-primary-container": "#400071",
+                      "outline": "#988d9f",
+                      "outline-variant": "#4d4354",
+                      "surface-dim": "#131319",
+                      "error-container": "#93000a",
+                      "on-error": "#690005",
+                      "tertiary": "#4edea3",
+                      "error": "#ffb4ab",
+                      "on-secondary-container": "#ffbad3",
+                      "tertiary-container": "#00a572",
+                      "surface-bright": "#393840",
+                      "on-tertiary": "#003824",
+                      "primary-fixed-dim": "#ddb7ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "1.5rem",
+                      "container_padding": "2rem",
+                      "stack_xs": "0.5rem",
+                      "stack_md": "1rem",
+                      "stack_lg": "2rem",
+                      "sidebar_width": "280px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Plus Jakarta Sans"],
+                      "headline-md": ["Plus Jakarta Sans"],
+                      "body-lg": ["Inter"],
+                      "label-md": ["Geist"],
+                      "code-sm": ["JetBrains Mono"],
+                      "headline-lg-mobile": ["Plus Jakarta Sans"],
+                      "body-md": ["Inter"],
+                      "display-lg": ["Plus Jakarta Sans"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "code-sm": ["13px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+              }
+            },
+          },
+        }
+    <\/script>
 </head>
-<body>
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
+<body class="flex items-center justify-center min-h-screen p-6 relative overflow-hidden">
+<!-- Background Shader -->
+<div class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
 
-  <div class="container">
-    <div class="logo-area">
-      <div class="logo-icon">\u{1F52E}</div>
-      <h1>\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u0646</h1>
-      <div class="subtitle">\u0628\u0631\u0627\u06CC \u0634\u0631\u0648\u0639 \u0628\u0647 \u06A9\u0627\u0631 \u067E\u0631\u0648\u06A9\u0633\u06CC\u060C \u0648\u0636\u0639\u06CC\u062A \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627 \u0631\u0627 \u0628\u0631\u0631\u0633\u06CC \u0648 \u062A\u0646\u0638\u06CC\u0645 \u06A9\u0646\u06CC\u062F.</div>
-    </div>
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
 
-    <div class="card-list">
-      <!-- Database Card -->
-      <div class="variable-card">
-        <div class="card-details">
-          <div class="card-title">\u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 Cloudflare D1</div>
-          <div class="desc">\u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0648 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645 \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A. \u0646\u0627\u0645 \u0628\u0627\u06CC\u0646\u062F\u06CC\u0646\u06AF \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 \u0631\u0627 \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u062F\u0642\u06CC\u0642\u0627\u064B <span class="code">DB</span> \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F.</div>
-        </div>
-        <div class="badge ${hasD1 ? "ok" : "fail"}">${hasD1 ? "\u0645\u062A\u0635\u0644 \u0634\u062F\u0647" : "\u0645\u062A\u0635\u0644 \u0646\u06CC\u0633\u062A"}</div>
-      </div>
-      
-      <!-- Password Card -->
-      <div class="variable-card">
-        <div class="card-details">
-          <div class="card-title">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0627\u062F\u0645\u06CC\u0646 <span class="code">PANEL_PASSWORD</span></div>
-          <div class="desc">\u062C\u0647\u062A \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0646\u0627\u0645 \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F (\u067E\u06CC\u0634\u0646\u0647\u0627\u062F \u0645\u06CC\u200C\u0634\u0648\u062F \u0622\u0646 \u0631\u0627 Encrypt \u06A9\u0646\u06CC\u062F).</div>
-        </div>
-        <div class="badge ${hasPassword ? "ok" : "fail"}">${hasPassword ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647"}</div>
-      </div>
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = \`attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}\`;
+  const fs = \`precision highp float;
+varying vec2 v_texCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
 
-      <!-- UUID Card -->
-      <div class="variable-card">
-        <div class="card-details">
-          <div class="card-title">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0627\u0631\u0628\u0631 <span class="code">UUID</span></div>
-          <div class="desc">\u0634\u0646\u0627\u0633\u0647 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 \u0633\u06CC\u0633\u062A\u0645. \u06CC\u06A9 \u0645\u062A\u063A\u06CC\u0631 \u0645\u062D\u06CC\u0637\u06CC \u0628\u0627 \u0646\u0627\u0645 <span class="code">UUID</span> \u062F\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 \u0628\u0633\u0627\u0632\u06CC\u062F.<br>${currentUUID ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="value-display">${currentUUID}</span>` : ""}</div>
-        </div>
-        <div class="badge ${hasUUID ? "ok" : "fail"}">${hasUUID ? "\u062A\u0646\u0638\u06CC\u0645 \u0634\u062F\u0647" : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647"}</div>
-      </div>
+void main() {
+    vec2 uv = v_texCoord;
+    
+    vec2 p1 = vec2(0.5 + 0.3 * sin(u_time * 0.4), 0.5 + 0.2 * cos(u_time * 0.5));
+    vec2 p2 = vec2(0.3 + 0.2 * cos(u_time * 0.3), 0.7 + 0.1 * sin(u_time * 0.6));
+    vec2 p3 = vec2(0.7 + 0.2 * sin(u_time * 0.5), 0.3 + 0.2 * cos(u_time * 0.4));
+    
+    vec3 col1 = vec3(0.658, 0.333, 0.968); // #a855f7 (Purple)
+    vec3 col2 = vec3(0.925, 0.282, 0.6);   // #ec4899 (Pink/Magenta)
+    vec3 col3 = vec3(0.062, 0.725, 0.505); // #10b981 (Cyan/Emerald)
+    
+    float d1 = length(uv - p1);
+    float d2 = length(uv - p2);
+    float d3 = length(uv - p3);
+    
+    float f1 = 0.5 / (1.0 + d1 * 5.0);
+    float f2 = 0.5 / (1.0 + d2 * 4.0);
+    float f3 = 0.5 / (1.0 + d3 * 6.0);
+    
+    vec3 aurora = (col1 * f1 + col2 * f2 + col3 * f3) * 0.4;
+    vec3 bg = vec3(0.02, 0.02, 0.04); // Deep dark background
+    
+    gl_FragColor = vec4(bg + aurora, 1.0);
+}\`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
 
-      <!-- Proxy IP Card -->
-      <div class="variable-card">
-        <div class="card-details">
-          <div class="card-title">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC <span class="code">PROXYIP</span></div>
-          <div class="desc">\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06CC\u0627 \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636. ${currentProxyIP ? `\u0645\u0642\u062F\u0627\u0631 \u0641\u0639\u0644\u06CC: <span class="value-display">${currentProxyIP}</span>` : "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647."}</div>
-        </div>
-        <div class="badge info">\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC</div>
-      </div>
-    </div>
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
 
-    ${allGood ? `
-    <div class="success-panel">
-      <div class="success-title">\u{1F389} \u0633\u06CC\u0633\u062A\u0645 \u06A9\u0627\u0645\u0644\u0627\u064B \u0622\u0645\u0627\u062F\u0647 \u0627\u0633\u062A!</div>
-      <div class="success-desc">\u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC\u200C\u0647\u0627 \u062A\u06A9\u0645\u06CC\u0644 \u0634\u062F. \u0627\u0632 \u0627\u06CC\u0646 \u067E\u0633 \u0628\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0646 \u0622\u062F\u0631\u0633 \u0648\u0631\u06A9\u0631\u060C \u0635\u0641\u062D\u0647 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 Nginx \u062C\u0647\u062A \u0627\u0633\u062A\u062A\u0627\u0631 \u0646\u0634\u0627\u0646 \u062F\u0627\u062F\u0647 \u062E\u0648\u0627\u0647\u062F \u0634\u062F.</div>
-      <button class="action-btn" onclick="window.location.href='/panel'">\u{1F6AA} \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</button>
-    </div>
-    ` : `
-    <div class="warning-panel">
-      \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0628\u0627\u0644\u0627 \u0631\u0627 \u0628\u0647 \u062F\u0631\u0633\u062A\u06CC \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0642\u0627\u0628\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F.
-    </div>
-    `}
-  </div>
-</body>
-</html>`;
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+<\/script>
+</div>
+<!-- Content Wrapper -->
+<main class="relative z-10 w-full max-w-xl">
+<div class="glass-card rounded-[2rem] p-10 md:p-14 overflow-hidden relative">
+<!-- Branding Header -->
+<div class="flex flex-col items-center mb-10 text-center">
+<div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary-container p-[1px] mb-6 shadow-2xl">
+<div class="w-full h-full bg-background rounded-2xl flex items-center justify-center">
+<span class="material-symbols-outlined text-4xl text-primary" data-icon="rocket_launch">rocket_launch</span>
+</div>
+</div>
+<h1 class="text-on-surface font-bold text-3xl mb-2">\u0631\u0627\u0647\u200C\u0627\u0646\u062F\u0627\u0632\u06CC \u0627\u0648\u0644\u06CC\u0647 \u0633\u06CC\u0633\u062A\u0645</h1>
+<p class="text-on-surface-variant font-label-md text-label-md opacity-70">Deep Space Command - Initial System Setup</p>
+</div>
+<!-- Setup Status List -->
+<div class="space-y-4 mb-12">
+<!-- Database Item -->
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="database">database</span>
+</div>
+<span class="text-on-surface font-medium">\u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631 (Cloudflare D1)</span>
+</div>
+${dbBadge}
+</div>
+<!-- Password Item -->
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="lock">lock</span>
+</div>
+<span class="text-on-surface font-medium">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u067E\u0646\u0644 (Panel Password)</span>
+</div>
+${passBadge}
+</div>
+<!-- Admin UUID Item -->
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-tertiary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary" data-icon="fingerprint">fingerprint</span>
+</div>
+<span class="text-on-surface font-medium">\u0634\u0646\u0627\u0633\u0647 \u0627\u062F\u0645\u06CC\u0646 (Admin UUID)</span>
+</div>
+${uuidBadge}
+</div>
+<!-- Proxy IP Item -->
+<div class="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary" data-icon="settings_ethernet">settings_ethernet</span>
+</div>
+<span class="text-on-surface font-medium opacity-60">\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC (Proxy IP)</span>
+</div>
+${proxyIPBadge}
+</div>
+</div>
+<!-- Footer Action -->
+<div class="pt-6 border-t border-white/10">
+${allGood ? `
+<button class="slide-up-btn w-full bg-gradient-to-l from-primary-container to-secondary-container text-on-primary-container font-bold py-4 rounded-2xl flex items-center justify-center gap-3 group" onclick="window.location.href='/panel'">
+<span>\u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A</span>
+<span class="material-symbols-outlined group-hover:translate-x-[-4px] transition-transform" data-icon="arrow_back">arrow_back</span>
+</button>
+` : `
+<div class="text-center py-4 px-6 rounded-xl bg-error/5 border border-error/20 text-error text-sm font-medium">
+  \u26A0\uFE0F \u062A\u0627 \u0632\u0645\u0627\u0646\u06CC \u06A9\u0647 \u062F\u06CC\u062A\u0627\u0628\u06CC\u0633 D1 \u0648 \u0645\u062A\u063A\u06CC\u0631\u0647\u0627\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0628\u0627\u0644\u0627 \u0631\u0627 \u0628\u0647 \u062F\u0631\u0633\u062A\u06CC \u062A\u0646\u0638\u06CC\u0645 \u0646\u06A9\u0646\u06CC\u062F\u060C \u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0642\u0627\u0628\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0646\u062E\u0648\u0627\u0647\u062F \u0628\u0648\u062F.
+</div>
+`}
+<div class="mt-8 flex justify-center items-center gap-6 text-on-surface-variant opacity-40 text-xs">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-base" data-icon="verified_user">verified_user</span>
+<span>Secure Connection</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-base" data-icon="shield">shield</span>
+<span>Orbit Guard Active</span>
+</div>
+</div>
+</div>
+<!-- Atmospheric Glows -->
+<div class="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-[80px]"></div>
+<div class="absolute -bottom-24 -left-24 w-48 h-48 bg-secondary/20 rounded-full blur-[80px]"></div>
+</div>
+<!-- Footer Meta -->
+<p class="text-center mt-8 text-on-surface-variant/40 text-xs font-label-md tracking-widest">
+            PENHAN DEEP SPACE COMMAND \xA9 2026 \u2022 SYSTEM INITIALIZATION COMPLETE
+        </p>
+</main>
+<script>
+        // Micro-interactions for button and status items
+        const btn = document.querySelector('.slide-up-btn');
+        if (btn) {
+          btn.addEventListener('mousedown', function() {
+              this.style.transform = 'scale(0.98)';
+          });
+          btn.addEventListener('mouseup', function() {
+              this.style.transform = 'scale(1) translateY(-4px)';
+          });
+        }
+
+        // Add subtle hover effect to cards
+        const items = document.querySelectorAll('.space-y-4 > div');
+        items.forEach(el => {
+          el.addEventListener('mouseenter', () => {
+            el.style.transform = 'translateY(-2px)';
+            el.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+          });
+          el.addEventListener('mouseleave', () => {
+            el.style.transform = 'translateY(0)';
+            el.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+          });
+        });
+      <\/script>
+    </body>
+    </html>`;
 }
 function subscriptionPage(hostname, user, vlessWS, trojanWS) {
+  if (typeof user === "string") {
+    user = { id: user, name: "\u06A9\u0627\u0631\u0628\u0631 \u0628\u062F\u0648\u0646 \u0646\u0627\u0645", limit_bytes: 0, used_bytes: 0, enabled: true, expiry_date: 0 };
+  }
   const subLink = `https://${hostname}/${user.id}/sub`;
   const name = user.name || "\u06A9\u0627\u0631\u0628\u0631 \u0628\u062F\u0648\u0646 \u0646\u0627\u0645";
   const limit = user.limit_bytes || 0;
@@ -1370,6 +1742,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   }
   let expiryAbsolute = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
   let expiryRelative = "\u221E";
+  let expiryPercent = 100;
   if (user.expiry_date > 0) {
     const d = new Date(user.expiry_date);
     const pad = (n) => n.toString().padStart(2, "0");
@@ -1377,6 +1750,7 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     const diff = user.expiry_date - Date.now();
     if (diff < 0) {
       expiryRelative = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
+      expiryPercent = 0;
     } else {
       const days = Math.floor(diff / (1e3 * 60 * 60 * 24));
       const hours = Math.floor(diff % (1e3 * 60 * 60 * 24) / (1e3 * 60 * 60));
@@ -1385,741 +1759,1309 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
       } else {
         expiryRelative = `${hours} \u0633\u0627\u0639\u062A \u062F\u06CC\u06AF\u0631`;
       }
+      expiryPercent = Math.min(100, Math.round(diff / (30 * 24 * 60 * 60 * 1e3) * 100));
     }
   }
   let statusClass = "active";
   let statusText = "\u0641\u0639\u0627\u0644";
-  let statusIcon = '<span style="font-size:10px;">\u25CF</span>';
+  let statusColorClass = "from-tertiary to-transparent";
+  let statusBadgeClass = "bg-tertiary text-on-tertiary neon-glow-success";
   if (!user.enabled) {
     statusClass = "banned";
     statusText = "\u0645\u0633\u062F\u0648\u062F \u0634\u062F\u0647";
-    statusIcon = '<span class="blink-icon" style="font-size:12px;">\u26A0\uFE0F</span>';
+    statusColorClass = "from-error to-transparent";
+    statusBadgeClass = "bg-error text-on-error neon-glow-error";
   } else if (limit > 0 && used >= limit) {
     statusClass = "disabled";
-    statusText = "\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644 (\u0627\u062A\u0645\u0627\u0645 \u062D\u062C\u0645)";
-    statusIcon = '<span class="blink-icon" style="font-size:10px;">\u25CF</span>';
+    statusText = "\u067E\u0627\u06CC\u0627\u0646 \u062D\u062C\u0645";
+    statusColorClass = "from-secondary to-transparent";
+    statusBadgeClass = "bg-secondary text-on-secondary neon-glow-error";
   } else if (user.expiry_date > 0 && Date.now() > user.expiry_date) {
     statusClass = "disabled";
-    statusText = "\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644 (\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647)";
-    statusIcon = '<span class="blink-icon" style="font-size:10px;">\u25CF</span>';
+    statusText = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
+    statusColorClass = "from-secondary to-transparent";
+    statusBadgeClass = "bg-secondary text-on-secondary neon-glow-error";
   }
   return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u067E\u0631\u0648\u0641\u0627\u06CC\u0644 \u0646\u0647\u0627\u0646 - ${name}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;800&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"><\/script>
-  <style>
-    :root {
-      --bg: #07070e;
-      --card-bg: rgba(18, 18, 30, 0.45);
-      --border: rgba(255, 255, 255, 0.06);
-      --accent: #8b5cf6;
-      --accent-glow: rgba(139, 92, 246, 0.2);
-      --text: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --success: #10b981;
-      --error: #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Vazirmatn, system-ui, -apple-system, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; overflow-x: hidden; position: relative; }
-    
-    .blob { position: absolute; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: 0.15; filter: blur(80px); z-index: -1; pointer-events: none; }
-    .blob-1 { top: 10%; left: 10%; }
-    
-    .container { width: 100%; max-width: 500px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 28px; padding: 40px 32px; backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); box-shadow: 0 30px 60px rgba(0,0,0,0.6); text-align: center; }
-    
-    .user-avatar { width: 64px; height: 64px; background: linear-gradient(135deg, #a855f7, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(168, 85, 247, 0.3); }
-    
-    h1 { font-size: 22px; margin-bottom: 6px; font-weight: 850; color: #fff; }
-    
-    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 32px; }
-    .status-badge.active { background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.15); }
-    .status-badge.disabled { background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.15); }
-    .status-badge.banned { background: rgba(245, 158, 11, 0.08); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.15); }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
-    .blink-icon { animation: blink 1s ease-in-out infinite; }
-    
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
-    .stat-card { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 18px; text-align: center; }
-    .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-    .stat-val { font-size: 15px; font-weight: 700; color: #fff; direction: ltr; margin-top: 8px; }
-    
-    .usage-container { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-bottom: 28px; text-align: right; }
-    .usage-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
-    .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 10px; margin-top: 12px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #a855f7, #ec4899); width: ${percent}%; border-radius: 10px; box-shadow: 0 0 10px rgba(168,85,247,0.5); }
-    
-    .config-card { background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 20px; padding: 18px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
-    .config-card:hover { border-color: rgba(168, 85, 247, 0.3); }
-    .config-info { text-align: right; }
-    .config-name { font-size: 14px; font-weight: 700; color: #fff; }
-    .config-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-    
-    .btn-copy { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); color: #c084fc; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-    .btn-copy:hover { background: var(--accent); color: white; border-color: var(--accent); }
+<html class="dark" dir="rtl" lang="fa"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>\u067E\u0646\u0647\u0627\u0646 | \u067E\u0646\u0644 \u06A9\u0627\u0631\u0628\u0631\u06CC - ${name}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"><\/script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"><\/script>
+<style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #131319;
+            overflow-x: hidden;
+            color: #e4e1ea;
+        }
 
-    .btn-qr { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-    .btn-qr:hover { background: var(--accent); border-color: var(--accent); color: white; }
-    
-    .btn-sub { width: 100%; padding: 16px; background: linear-gradient(135deg, #a855f7, #ec4899); border: none; border-radius: 16px; color: white; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 12px; box-shadow: 0 10px 25px rgba(168, 85, 247, 0.25); transition: 0.3s; }
-    .btn-sub:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(168, 85, 247, 0.4); }
+        .glass-panel {
+            background: rgba(31, 31, 38, 0.3);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
 
-    .btn-sub-qr { width: 100%; padding: 14px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 16px; color: #c084fc; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 12px; transition: 0.3s; }
-    .btn-sub-qr:hover { background: rgba(168, 85, 247, 0.15); transform: translateY(-1px); }
-  </style>
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(221, 183, 255, 0.1);
+        }
+
+        .neon-glow-primary {
+            box-shadow: 0 0 15px rgba(221, 183, 255, 0.4);
+        }
+
+        .neon-glow-success {
+            box-shadow: 0 0 15px rgba(78, 222, 163, 0.4);
+        }
+
+        .neon-glow-error {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .status-ring {
+            position: relative;
+        }
+
+        .status-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid ${statusClass === "active" ? "#4edea3" : "#ffb4ab"};
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #ddb7ff;
+            border-radius: 10px;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .farsi-nums {
+            font-feature-settings: "ss01", "ss02", "ss03", "ss04";
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#ffb0cd",
+                      "on-primary": "#490080",
+                      "primary-fixed": "#f0dbff",
+                      "inverse-surface": "#e4e1ea",
+                      "on-primary-fixed-variant": "#6900b3",
+                      "surface-container": "#1f1f26",
+                      "primary-container": "#b76dff",
+                      "background": "#131319",
+                      "surface": "#131319",
+                      "on-surface-variant": "#cfc2d6",
+                      "on-secondary-fixed": "#3e0022",
+                      "tertiary-fixed": "#6ffbbe",
+                      "secondary-fixed-dim": "#ffb0cd",
+                      "inverse-on-surface": "#303037",
+                      "on-background": "#e4e1ea",
+                      "surface-tint": "#ddb7ff",
+                      "on-tertiary-container": "#00311f",
+                      "surface-variant": "#35343b",
+                      "on-tertiary-fixed": "#002113",
+                      "tertiary-fixed-dim": "#4edea3",
+                      "on-error-container": "#ffdad6",
+                      "secondary-fixed": "#ffd9e4",
+                      "surface-container-lowest": "#0e0e14",
+                      "surface-container-low": "#1b1b22",
+                      "on-secondary": "#640039",
+                      "on-surface": "#e4e1ea",
+                      "on-secondary-fixed-variant": "#8c0053",
+                      "primary": "#ddb7ff",
+                      "inverse-primary": "#842bd2",
+                      "on-tertiary-fixed-variant": "#005236",
+                      "on-primary-container": "#400071",
+                      "outline": "#988d9f",
+                      "surface-container-highest": "#35343b",
+                      "surface-container-high": "#2a2930",
+                      "on-primary-fixed": "#2c0051",
+                      "secondary-container": "#aa0266",
+                      "outline-variant": "#4d4354",
+                      "surface-dim": "#131319",
+                      "error-container": "#93000a",
+                      "on-error": "#690005",
+                      "tertiary": "#4edea3",
+                      "error": "#ffb4ab",
+                      "on-secondary-container": "#ffbad3",
+                      "tertiary-container": "#00a572",
+                      "surface-bright": "#393840",
+                      "on-tertiary": "#003824",
+                      "primary-fixed-dim": "#ddb7ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "1.5rem",
+                      "container_padding": "2rem",
+                      "stack_xs": "0.5rem",
+                      "stack_md": "1rem",
+                      "stack_lg": "2rem",
+                      "sidebar_width": "280px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Plus Jakarta Sans", "Vazirmatn"],
+                      "headline-md": ["Plus Jakarta Sans", "Vazirmatn"],
+                      "body-lg": ["Inter", "Vazirmatn"],
+                      "label-md": ["Geist", "Vazirmatn"],
+                      "code-sm": ["JetBrains Mono"],
+                      "headline-lg-mobile": ["Plus Jakarta Sans", "Vazirmatn"],
+                      "body-md": ["Inter", "Vazirmatn"],
+                      "display-lg": ["Plus Jakarta Sans", "Vazirmatn"]
+              }
+            }
+          }
+        }
+    <\/script>
 </head>
-<body>
-  <div class="blob blob-1"></div>
-  
-  <div class="container">
-    <div class="user-avatar">\u{1F464}</div>
-    <h1>${name}</h1>
-    <div class="status-badge ${statusClass}">
-      ${statusIcon} ${statusText}
-    </div>
-    
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC</div>
-        <div class="stat-val" style="font-size:14px; direction:ltr;">${expiryAbsolute}</div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${expiryRelative}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">\u062A\u0631\u0627\u0641\u06CC\u06A9 \u0645\u0635\u0631\u0641\u06CC</div>
-        <div class="stat-val">${usageText}</div>
-      </div>
-    </div>
-    
-    ${limit > 0 ? `
-    <div class="usage-container">
-      <div class="usage-header">
-        <span style="color:var(--text-muted)">\u062F\u0631\u0635\u062F \u0645\u0635\u0631\u0641</span>
-        <span style="font-family: 'Outfit', sans-serif; font-weight:bold; color:#fff">${percent}%</span>
-      </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill"></div>
-      </div>
-    </div>
-    ` : ""}
-    
-    <!-- Config Cards -->
-    <div class="config-card">
-      <div class="config-info">
-        <div class="config-name">\u0627\u062A\u0635\u0627\u0644 VLESS WS</div>
-        <div class="config-desc">\u0645\u0646\u0627\u0633\u0628 \u0628\u0631\u0627\u06CC \u062A\u0645\u0627\u0645 \u0633\u06CC\u0633\u062A\u0645\u200C\u0639\u0627\u0645\u0644\u200C\u0647\u0627</div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-copy" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF VLESS \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
-        <button class="btn-qr" onclick="showQrModal('${vlessWS}', '\u0627\u062A\u0635\u0627\u0644 VLESS WS')" title="\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
-            <line x1="7" y1="7" x2="7" y2="7" />
-            <line x1="17" y1="7" x2="17" y2="7" />
-            <line x1="17" y1="17" x2="17" y2="17" />
-            <line x1="7" y1="17" x2="7" y2="17" />
-          </svg>
-        </button>
-      </div>
-    </div>
-    
-    <div class="config-card">
-      <div class="config-info">
-        <div class="config-name">\u0627\u062A\u0635\u0627\u0644 TROJAN WS</div>
-        <div class="config-desc">\u0633\u0627\u0632\u06AF\u0627\u0631 \u0628\u0627 \u06A9\u0644\u0627\u06CC\u0646\u062A\u200C\u0647\u0627\u06CC \u0645\u062D\u0628\u0648\u0628</div>
-      </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-copy" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF Trojan \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF</button>
-        <button class="btn-qr" onclick="showQrModal('${trojanWS}', '\u0627\u062A\u0635\u0627\u0644 TROJAN WS')" title="\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
-            <line x1="7" y1="7" x2="7" y2="7" />
-            <line x1="17" y1="7" x2="17" y2="7" />
-            <line x1="17" y1="17" x2="17" y2="17" />
-            <line x1="7" y1="17" x2="7" y2="17" />
-          </svg>
-        </button>
-      </div>
-    </div>
-    
-    <button class="btn-sub" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628 \u06A9\u067E\u06CC \u0634\u062F'))">\u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628 (Subscription Link)</button>
-    <button class="btn-sub-qr" onclick="showQrModal('${subLink}', '\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628')">\u0646\u0645\u0627\u06CC\u0634 QR \u06A9\u062F \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u0627\u06CC\u0628</button>
-  </div>
+<body class="min-h-screen relative overflow-y-auto custom-scrollbar">
+<!-- Background Shader -->
+<div class="fixed inset-0 w-full h-full -z-10 opacity-60" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
 
-  <!-- QR Modal -->
-  <div id="qr-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:none; justify-content:center; align-items:center; z-index:10000; transition:0.3s;" onclick="closeQrModal()">
-    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:28px; padding:28px 20px; max-width:320px; width:90%; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s; display:flex; flex-direction:column; align-items:center;" onclick="event.stopPropagation()">
-      <style>
-        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-      </style>
-      <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
-      <div style="background:#fff; padding:12px; border-radius:16px; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); direction:ltr;">
-        <canvas id="qr-canvas" style="display:block;"></canvas>
-      </div>
-      <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">\u0628\u0633\u062A\u0646</button>
-    </div>
-  </div>
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
 
-  <script>
-    let qrInstance = null;
-    function showQrModal(value, title) {
-      document.getElementById('qr-modal-title').textContent = title;
-      document.getElementById('qr-modal').style.display = 'flex';
-      if (!qrInstance) {
-        qrInstance = new QRious({
-          element: document.getElementById('qr-canvas'),
-          size: 240,
-          level: 'L'
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = \`attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}\`;
+  const fs = \`precision highp float;
+varying vec2 v_texCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
+
+void main() {
+    vec2 uv = v_texCoord;
+    
+    vec2 p1 = vec2(0.5 + 0.3 * sin(u_time * 0.4), 0.5 + 0.2 * cos(u_time * 0.5));
+    vec2 p2 = vec2(0.3 + 0.2 * cos(u_time * 0.3), 0.7 + 0.1 * sin(u_time * 0.6));
+    vec2 p3 = vec2(0.7 + 0.2 * sin(u_time * 0.5), 0.3 + 0.2 * cos(u_time * 0.4));
+    
+    vec3 col1 = vec3(0.658, 0.333, 0.968); // #a855f7 (Purple)
+    vec3 col2 = vec3(0.925, 0.282, 0.6);   // #ec4899 (Pink/Magenta)
+    vec3 col3 = vec3(0.062, 0.725, 0.505); // #10b981 (Cyan/Emerald)
+    
+    float d1 = length(uv - p1);
+    float d2 = length(uv - p2);
+    float d3 = length(uv - p3);
+    
+    float f1 = 0.5 / (1.0 + d1 * 5.0);
+    float f2 = 0.5 / (1.0 + d2 * 4.0);
+    float f3 = 0.5 / (1.0 + d3 * 6.0);
+    
+    vec3 aurora = (col1 * f1 + col2 * f2 + col3 * f3) * 0.4;
+    vec3 bg = vec3(0.02, 0.02, 0.04); // Deep dark background
+    
+    gl_FragColor = vec4(bg + aurora, 1.0);
+}\`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+<\/script>
+</div>
+<!-- Top Bar -->
+<header class="w-full h-20 px-gutter flex items-center justify-between sticky top-0 z-50 bg-background/20 backdrop-blur-md">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center neon-glow-primary">
+<span class="material-symbols-outlined text-on-primary-container">rocket_launch</span>
+</div>
+<div>
+<h1 class="text-primary font-headline-md text-2xl tracking-tight leading-tight">Penhan</h1>
+<p class="text-on-surface-variant text-xs opacity-70">Deep Space Command</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3 bg-white/5 rounded-full px-4 py-2 border border-white/10">
+<span class="text-on-surface font-label-md text-sm">${name}</span>
+<div class="w-8 h-8 rounded-full overflow-hidden status-ring">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXf8jzSr96FLJnNWvAqy1fiCKEkfkTdZCGRRnoGFf969YMhPV7MUJQxyWGmfkRe0ktEbIs2Dp-x11qSalOOgvZNQagYgWOGMrhs1H9_ZwzpYKi3gnjFbZp7t_yQQCV3OJ26XL51SwddJ3bViwjJxEsWbuce4-x_ehnPOlK0NC_smWBdkFwxmxyCla3hxV_Ew_7N6pXOhMHfkibcIZCqge7abGrGqaJZKiqPT1LCf0BIsx1pl1YOMiO2lsNL4ryBrPqhrpZZMnJbw"/>
+</div>
+</div>
+</div>
+</header>
+<main class="container mx-auto px-gutter py-8 max-w-6xl">
+<!-- Top Section: Bento Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+<!-- User Status Card -->
+<div class="glass-panel p-8 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group">
+<div class="absolute -top-12 -right-12 w-32 h-32 bg-tertiary/10 rounded-full blur-3xl group-hover:bg-tertiary/20 transition-all"></div>
+<div class="relative mb-6">
+<div class="w-32 h-32 rounded-full p-1 bg-gradient-to-tr ${statusColorClass} status-ring">
+<img class="w-full h-full rounded-full object-cover border-4 border-surface" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlvFEDkTAEU64SUSLm2Lh497mtd01iowj2c4VSPh2wR1Q3icTd07CJXgDZhggbkm7-eHsZ--Nc0sto8gTowXXOv2X-I8IkXFuTNOUaq8w7FrhvTLCOlLmY7dELqktWidhd1N-TA-BHJh75h-G4D5mcpS6p7NWhPhSQBcrRm6r_kq_SV0zvawvnsHVYVwQZ_PYLbQ2Dtx8lNYH-r6beXmaShZX8NJqv2hCq241SNGbALBnUrCKR0matkCb62b9TlChQEMdhg6p7JQ"/>
+</div>
+<div class="absolute bottom-1 right-1 ${statusBadgeClass} px-3 py-1 rounded-full text-xs font-bold">
+    ${statusText}
+</div>
+</div>
+<h2 class="text-on-surface font-headline-md text-xl mb-1">${name}</h2>
+<p class="text-on-surface-variant font-body-md text-sm opacity-80 mb-6" style="direction:ltr">#PX-${user.id.substring(0, 8)}</p>
+<div class="flex items-center gap-2 px-6 py-2 bg-tertiary/10 text-tertiary rounded-full border border-tertiary/20">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+<span class="text-xs font-bold">${user.enabled ? "\u0627\u0634\u062A\u0631\u0627\u06A9 \u0641\u0639\u0627\u0644" : "\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644"}</span>
+</div>
+</div>
+<!-- Gauges Section -->
+<div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Gauge 1: Expiry -->
+<div class="glass-panel p-6 rounded-3xl flex flex-col justify-between overflow-hidden relative">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="text-on-surface-variant text-sm font-label-md">\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC</p>
+<h3 class="text-on-surface font-headline-md text-xl farsi-nums mt-1">${expiryAbsolute}</h3>
+</div>
+<span class="material-symbols-outlined text-primary text-3xl">schedule</span>
+</div>
+<div class="relative h-24 w-full flex items-end">
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden relative">
+<div class="absolute top-0 right-0 h-full bg-primary neon-glow-primary rounded-full transition-all duration-1000" style="width: ${expiryPercent}%;"></div>
+</div>
+<div class="absolute bottom-4 left-0 right-0 flex justify-between text-[10px] text-on-surface-variant font-label-md">
+<span>\u0634\u0631\u0648\u0639 \u062F\u0648\u0631\u0647</span>
+<span>${expiryRelative}</span>
+</div>
+</div>
+</div>
+<!-- Gauge 2: Traffic -->
+<div class="glass-panel p-6 rounded-3xl flex flex-col justify-between overflow-hidden relative">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="text-on-surface-variant text-sm font-label-md">\u062D\u062C\u0645 \u0645\u0635\u0631\u0641\u06CC</p>
+<h3 class="text-on-surface font-headline-md text-xl farsi-nums mt-1">${usageText}</h3>
+</div>
+<span class="material-symbols-outlined text-tertiary text-3xl">data_usage</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs text-on-surface-variant farsi-nums">
+<span>\u0645\u0635\u0631\u0641 \u0634\u062F\u0647: ${formatBytes(used)}</span>
+<span>\u06A9\u0644: ${limit > 0 ? formatBytes(limit) : "\u0646\u0627\u0645\u062D\u062F\u0648\u062F"}</span>
+</div>
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden relative">
+<div class="absolute top-0 right-0 h-full bg-tertiary neon-glow-success rounded-full transition-all duration-1000" style="width: ${percent}%;"></div>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary pulse" style="background:#34d399"></div>
+<p class="text-tertiary text-xs">\u0627\u062A\u0635\u0627\u0644 \u067E\u0627\u06CC\u062F\u0627\u0631</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Configuration Section -->
+<h3 class="text-on-surface font-headline-md text-xl mb-6 pr-2 border-r-4 border-primary">\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0627\u062A\u0635\u0627\u0644</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+<!-- VLESS Card -->
+<div class="glass-panel rounded-3xl p-6 relative group border-t border-r border-white/5 hover:border-primary/30 transition-all">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+<span class="material-symbols-outlined">bolt</span>
+</div>
+<div>
+<h4 class="text-on-surface font-headline-md text-lg">VLESS + WS</h4>
+<p class="text-on-surface-variant text-xs">\u0645\u0646\u0627\u0633\u0628 \u0628\u0631\u0627\u06CC \u0627\u06CC\u0646\u062A\u0631\u0646\u062A\u200C\u0647\u0627\u06CC \u067E\u0631\u0633\u0631\u0639\u062A</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest/50 rounded-xl p-4 mb-6 font-code-sm text-xs break-all border border-white/5 text-on-surface-variant/80 select-all" style="direction:ltr; text-align:left;">
+    ${vlessWS}
+</div>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2 py-3 bg-primary text-on-primary rounded-xl font-label-md text-sm hover:opacity-90 active:scale-95 transition-all" onclick="navigator.clipboard.writeText('${vlessWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF VLESS \u06A9\u067E\u06CC \u0634\u062F'))">
+<span class="material-symbols-outlined text-lg">content_copy</span>
+                        \u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF
+                    </button>
+<button class="flex items-center justify-center gap-2 py-3 bg-white/5 text-on-surface border border-white/10 rounded-xl font-label-md text-sm hover:bg-white/10 active:scale-95 transition-all" onclick="showQrModal('${vlessWS}', '\u0627\u062A\u0635\u0627\u0644 VLESS WS')">
+<span class="material-symbols-outlined text-lg">qr_code_2</span>
+                        \u0646\u0645\u0627\u06CC\u0634 QR
+                    </button>
+</div>
+</div>
+<!-- Trojan Card -->
+<div class="glass-panel rounded-3xl p-6 relative group border-t border-r border-white/5 hover:border-secondary/30 transition-all">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary border border-secondary/20">
+<span class="material-symbols-outlined">security</span>
+</div>
+<div>
+<h4 class="text-on-surface font-headline-md text-lg">Trojan + WS</h4>
+<p class="text-on-surface-variant text-xs">\u0627\u0645\u0646\u06CC\u062A \u0628\u0627\u0644\u0627 \u0648 \u062F\u0648\u0631 \u0632\u062F\u0646 \u0645\u062D\u062F\u0648\u062F\u06CC\u062A\u200C\u0647\u0627</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest/50 rounded-xl p-4 mb-6 font-code-sm text-xs break-all border border-white/5 text-on-surface-variant/80 select-all" style="direction:ltr; text-align:left;">
+    ${trojanWS}
+</div>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2 py-3 bg-secondary text-on-secondary rounded-xl font-label-md text-sm hover:opacity-90 active:scale-95 transition-all" onclick="navigator.clipboard.writeText('${trojanWS}').then(() => alert('\u06A9\u0627\u0646\u0641\u06CC\u06AF Trojan \u06A9\u067E\u06CC \u0634\u062F'))">
+<span class="material-symbols-outlined text-lg">content_copy</span>
+                        \u06A9\u067E\u06CC \u06A9\u0627\u0646\u0641\u06CC\u06AF
+                    </button>
+<button class="flex items-center justify-center gap-2 py-3 bg-white/5 text-on-surface border border-white/10 rounded-xl font-label-md text-sm hover:bg-white/10 active:scale-95 transition-all" onclick="showQrModal('${trojanWS}', '\u0627\u062A\u0635\u0627\u0644 TROJAN WS')">
+<span class="material-symbols-outlined text-lg">qr_code_2</span>
+                        \u0646\u0645\u0627\u06CC\u0634 QR
+                    </button>
+</div>
+</div>
+</div>
+<!-- Subscription Section -->
+<div class="glass-panel rounded-[2rem] p-10 overflow-hidden relative">
+<div class="absolute -bottom-20 -left-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
+<div class="relative z-10 flex flex-col md:flex-row items-center gap-10">
+<!-- QR Code Display -->
+<div class="w-48 h-48 bg-white p-3 rounded-2xl neon-glow-primary shrink-0 flex items-center justify-center">
+<canvas id="sub-qr-canvas" style="display:block; width:100%; height:100%;"></canvas>
+</div>
+<div class="flex-1 text-center md:text-right">
+<h3 class="text-on-surface font-headline-md text-2xl mb-4">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u06CC\u067E\u0634\u0646 \u0647\u0648\u0634\u0645\u0646\u062F</h3>
+<p class="text-on-surface-variant font-body-md mb-8 max-w-xl text-justify">\u0628\u0627 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0644\u06CC\u0646\u06A9 \u0632\u06CC\u0631 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u062A\u0645\u0627\u0645 \u06A9\u0627\u0646\u0641\u06CC\u06AF\u200C\u0647\u0627\u06CC \u062E\u0648\u062F \u0631\u0627 \u062F\u0631 \u0646\u0631\u0645\u200C\u0627\u0641\u0632\u0627\u0631\u0647\u0627\u06CC V2Ray\u060C Shadowrocket \u06CC\u0627 V2rayNG \u0628\u0647 \u0635\u0648\u0631\u062A \u06CC\u06A9\u062C\u0627 \u062F\u0631\u06CC\u0627\u0641\u062A \u0648 \u0628\u0647 \u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u06A9\u0646\u06CC\u062F.</p>
+<div class="flex flex-col sm:flex-row items-center gap-4">
+<button class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-l from-primary to-primary-container text-on-primary rounded-2xl font-headline-md shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all" onclick="navigator.clipboard.writeText('${subLink}').then(() => alert('\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u06CC\u067E\u0634\u0646 \u06A9\u067E\u06CC \u0634\u062F'))">
+<span class="material-symbols-outlined">link</span>
+                            \u06A9\u067E\u06CC \u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628\u200C\u0627\u0633\u06A9\u0631\u06CC\u067E\u0634\u0646
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-20 py-10 border-t border-white/5 text-center">
+<p class="text-on-surface-variant/40 text-sm font-label-md">Penhan Deep Space Command \xA9 2026 - All Systems Operational</p>
+</footer>
+</main>
+
+<!-- QR Modal -->
+<div id="qr-modal" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:none; justify-content:center; align-items:center; z-index:10000; transition:0.3s;" onclick="closeQrModal()">
+  <div style="background:rgba(31,31,38,0.9); border:1px solid rgba(255,255,255,0.08); border-radius:28px; padding:28px 20px; max-width:320px; width:90%; box-shadow:0 30px 60px rgba(0,0,0,0.8); animation: zoomIn 0.25s; display:flex; flex-direction:column; align-items:center;" onclick="event.stopPropagation()">
+    <style>
+      @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+    <h3 id="qr-modal-title" style="font-size:16px; margin-bottom:20px; font-weight:800; color:#fff;"></h3>
+    <div style="background:#fff; padding:12px; border-radius:16px; margin-bottom:24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); direction:ltr;">
+      <canvas id="qr-canvas" style="display:block;"></canvas>
+    </div>
+    <button onclick="closeQrModal()" style="width:100%; padding:12px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:12px; color:#fff; font-weight:700; cursor:pointer; transition:0.2s; outline:none;">\u0628\u0633\u062A\u0646</button>
+  </div>
+</div>
+
+<script>
+        let qrInstance = null;
+        function showQrModal(value, title) {
+          document.getElementById('qr-modal-title').textContent = title;
+          document.getElementById('qr-modal').style.display = 'flex';
+          if (!qrInstance) {
+            qrInstance = new QRious({
+              element: document.getElementById('qr-canvas'),
+              size: 200,
+              level: 'L'
+            });
+          }
+          qrInstance.value = value;
+        }
+        function closeQrModal() {
+          document.getElementById('qr-modal').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Generate Sub QR Code
+            new QRious({
+              element: document.getElementById('sub-qr-canvas'),
+              size: 160,
+              value: '${subLink}',
+              level: 'L'
+            });
+
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.addEventListener('mousedown', () => {
+                    btn.style.transform = 'scale(0.95)';
+                });
+                btn.addEventListener('mouseup', () => {
+                    btn.style.transform = 'scale(1)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.transform = 'scale(1)';
+                });
+            });
+
+            // Smooth opacity entrance for cards
+            const panels = document.querySelectorAll('.glass-panel');
+            panels.forEach((panel, index) => {
+                panel.style.opacity = '0';
+                panel.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    panel.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    panel.style.opacity = '1';
+                    panel.style.transform = 'translateY(0)';
+                }, 100 * index);
+            });
         });
-      }
-      qrInstance.value = value;
-    }
-    function closeQrModal() {
-      document.getElementById('qr-modal').style.display = 'none';
-    }
-  <\/script>
-</body>
-</html>`;
+<\/script>
+</body></html>`;
 }
 function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken) {
   return `<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <title>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0647\u0627\u0646</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root { --bg: #09090b; --surface: #18181b; --surface-hover: #27272a; --border: #27272a; --primary: #a855f7; --primary-hover: #9333ea; --text: #fafafa; --muted: #a1a1aa; --danger: #ef4444; --success: #10b981; }
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
-    
-    /* Sidebar */
-    .sidebar { width: 260px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; }
-    .brand { padding: 0 24px 20px; font-size: 24px; font-weight: 800; border-bottom: 1px solid var(--border); margin-bottom: 20px; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-item { padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; font-weight: 500; }
-    .nav-item:hover, .nav-item.active { background: var(--surface-hover); color: var(--primary); border-right: 3px solid var(--primary); }
-    .github-link:hover { color: var(--primary) !important; background: var(--surface-hover); }
-    .github-link:hover svg { transform: scale(1.1); }
-    .nav-icon { font-size: 18px; }
-    
-    /* Main Content */
-    .main { flex: 1; overflow-y: auto; padding: 32px; background: radial-gradient(circle at top right, rgba(168, 85, 247, 0.05), transparent 50%); }
-    .page { display: none; animation: fadeIn 0.3s; }
-    .page.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
-    .title { font-size: 24px; font-weight: bold; }
-    
-    .btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
-    .btn:hover { background: var(--primary-hover); }
-    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover { background: var(--surface-hover); }
-    .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
-    .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
-    
-    /* Tables */
-    .table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 16px; text-align: right; border-bottom: 1px solid var(--border); }
-    th { background: rgba(255,255,255,0.02); color: var(--muted); font-size: 13px; font-weight: 600; }
-    tr:hover { background: rgba(255,255,255,0.02); }
-    tr:last-child td { border-bottom: none; }
-    
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-    .badge.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-    .badge.red { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-    
-    /* Forms & Modals */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 50; padding: 24px; overflow-y: auto; }
-    .modal-overlay.active { display: flex; }
-    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 480px; padding: 24px; max-height: calc(100vh - 48px); overflow-y: auto; margin: auto; }
-
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .modal-close { cursor: pointer; color: var(--muted); font-size: 20px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
-    .form-control { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; }
-    .form-control:focus { border-color: var(--primary); }
-    
-    /* Utils */
-    .code-span { font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #a5b4fc; direction: ltr; display: inline-block; }
-    .flex-gap { display: flex; gap: 8px; }
-    .docs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 32px; }
-    pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; font-size: 13px; color: #e2e8f0; margin-top: 10px; border: 1px solid var(--border); }
-
-    /* ===== Proxy IP Manager (redesigned) ===== */
-    .pip-stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap:16px; margin-bottom:22px; }
-    .pip-stat { position:relative; overflow:hidden; background:linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); border:1px solid var(--border); border-radius:16px; padding:18px 20px; transition:.25s; }
-    .pip-stat:hover { transform:translateY(-3px); border-color:var(--primary); box-shadow:0 10px 30px -12px rgba(139,92,246,0.5); }
-    .pip-stat .lbl { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
-    .pip-stat .val { font-size:26px; font-weight:800; margin-top:10px; letter-spacing:.5px; }
-    .pip-stat .ic { position:absolute; left:16px; top:16px; font-size:26px; opacity:.18; }
-    .pip-stat.accent-green .val { color:#34d399; }
-    .pip-stat.accent-purple .val { color:#a78bfa; }
-    .pip-stat.accent-blue .val { color:#38bdf8; }
-
-    .pip-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:16px; }
-    .pip-toolbar .sep { width:1px; height:26px; background:var(--border); margin:0 2px; }
-    .pip-toolbar .spacer { flex:1; }
-    .pip-chip { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg); color:var(--text); transition:.18s; white-space:nowrap; }
-    .pip-chip:hover { border-color:var(--primary); color:#fff; background:rgba(139,92,246,0.12); }
-    .pip-chip.solid { background:var(--primary); border-color:var(--primary); color:#fff; }
-    .pip-chip.solid:hover { filter:brightness(1.1); }
-    .pip-chip.danger { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4); color:#f87171; }
-    .pip-chip.danger:hover { background:#ef4444; color:#fff; }
-    .pip-chip:disabled { opacity:.5; cursor:not-allowed; }
-    .pip-select { padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; font-family:inherit; outline:none; cursor:pointer; transition:.18s; }
-    .pip-select:hover, .pip-select:focus { border-color:var(--primary); }
-
-    /* Selection bar: sits above the table, animated */
-    .pip-selbar { display:flex; align-items:center; gap:14px; padding:0 18px; margin-bottom:0; height:0; overflow:hidden; background:linear-gradient(90deg, rgba(139,92,246,0.16), rgba(139,92,246,0.04)); border:1px solid transparent; border-radius:14px 14px 0 0; opacity:0; transition:.25s ease; }
-    .pip-selbar.show { height:56px; opacity:1; margin-bottom:-1px; border-color:var(--primary); border-bottom:none; }
-    .pip-selbar .cnt { font-weight:700; color:#c4b5fd; display:flex; align-items:center; gap:8px; }
-    .pip-selbar .cnt .num { background:var(--primary); color:#fff; border-radius:20px; padding:2px 12px; font-size:13px; }
-
-    .pip-tablewrap { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-    .pip-selbar.show + .pip-tablewrap { border-top-left-radius:0; border-top-right-radius:0; }
-    .pip-table { width:100%; border-collapse:collapse; }
-    .pip-table thead th { background:rgba(255,255,255,0.02); font-size:12px; font-weight:700; color:var(--muted); text-align:right; padding:14px 16px; border-bottom:1px solid var(--border); white-space:nowrap; }
-    .pip-table tbody td { padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; vertical-align:middle; }
-    .pip-table tbody tr { transition:.15s; }
-    .pip-table tbody tr:hover { background:rgba(139,92,246,0.06); }
-    .pip-table tbody tr.sel { background:rgba(139,92,246,0.1); }
-    .pip-table tbody tr:last-child td { border-bottom:none; }
-    .pip-ip { font-family:'Courier New', monospace; font-size:13.5px; font-weight:600; direction:ltr; display:inline-block; }
-    .pip-port { font-family:monospace; color:var(--muted); background:rgba(255,255,255,0.05); padding:2px 9px; border-radius:6px; font-size:12px; }
-    .pip-loc { display:inline-flex; align-items:center; gap:7px; }
-    .pip-loc .flag { font-size:17px; line-height:1; }
-    .pip-isp { font-size:12px; color:var(--muted); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; }
-    .pip-ping { font-family:monospace; font-weight:700; }
-    .pip-ping.good { color:#34d399; } .pip-ping.mid { color:#fbbf24; } .pip-ping.bad { color:#f87171; }
-
-    .pip-badge { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:20px; font-size:12px; font-weight:700; white-space:nowrap; }
-    .pip-badge.on { background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25); }
-    .pip-badge.off { background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.22); }
-    .pip-badge.slow { background:rgba(251,191,36,0.12); color:#fbbf24; border:1px solid rgba(251,191,36,0.25); }
-    .pip-badge.unk { background:rgba(148,163,184,0.1); color:#94a3b8; border:1px solid rgba(148,163,184,0.22); }
-    .pip-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
-    .pip-badge.on .pip-dot { background:#34d399; box-shadow:0 0 6px #34d399; }
-    .pip-badge.off .pip-dot { background:#f87171; }
-    .pip-badge.slow .pip-dot { background:#fbbf24; }
-    .pip-badge.unk .pip-dot { background:#94a3b8; }
-
-    .pip-act { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:9px; border:1px solid var(--border); background:var(--bg); cursor:pointer; transition:.18s; font-size:14px; }
-    .pip-act:hover { border-color:var(--primary); background:rgba(139,92,246,0.12); }
-    .pip-act.del:hover { border-color:#ef4444; background:rgba(239,68,68,0.15); }
-    .pip-date { font-size:11.5px; color:var(--muted); direction:ltr; display:inline-block; }
-
-    /* Custom checkbox */
-    .pip-check { appearance:none; -webkit-appearance:none; width:18px; height:18px; border:2px solid var(--border); border-radius:5px; cursor:pointer; position:relative; transition:.15s; vertical-align:middle; background:var(--bg); }
-    .pip-check:hover { border-color:var(--primary); }
-    .pip-check:checked { background:var(--primary); border-color:var(--primary); }
-    .pip-check:checked::after { content:'\u2713'; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); color:#fff; font-size:12px; font-weight:900; }
-    .pip-check:indeterminate { background:var(--primary); border-color:var(--primary); }
-    .pip-check:indeterminate::after { content:'\u2013'; position:absolute; top:50%; left:50%; transform:translate(-50%,-58%); color:#fff; font-size:13px; font-weight:900; }
-    .pip-empty { text-align:center; padding:56px 20px; color:var(--muted); }
-    .pip-empty .big { font-size:40px; opacity:.4; margin-bottom:12px; }
-    .pip-act.spin { pointer-events:none; opacity:.7; }
-    .pip-act.spin::after { content:''; }
-    @keyframes pipspin { to { transform:rotate(360deg); } }
-    .pip-spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,0.2); border-top-color:var(--primary); border-radius:50%; animation:pipspin .6s linear infinite; }
-
+<html class="dark" dir="rtl" lang="fa"><head>
+<meta charset="UTF-8">
+<title>\u067E\u0646\u0644 \u0645\u062F\u06CC\u0631\u06CC\u062A \u067E\u0646\u0647\u0627\u0646</title>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!-- Tailwind CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"><\/script>
+<!-- Icons & Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<style>
+    body {
+        font-family: 'Vazirmatn', sans-serif;
+        background-color: #131319;
+        color: #e4e1ea;
+        margin: 0;
+        overflow: hidden;
+    }
+    .glass-panel {
+        background: rgba(25, 25, 32, 0.4);
+        backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.02), 0 20px 50px rgba(0,0,0,0.4);
+    }
+    .neon-glow-primary {
+        box-shadow: 0 0 20px rgba(221, 183, 255, 0.25);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(221, 183, 255, 0.2);
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(221, 183, 255, 0.4);
+    }
+    /* Modals overlays styling */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(12px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 24px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .modal-overlay.active {
+        display: flex;
+        opacity: 1;
+    }
+    .modal-card {
+        background: rgba(31, 31, 38, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        padding: 32px;
+        max-width: 480px;
+        width: 100%;
+        transform: scale(0.95);
+        transition: transform 0.3s ease;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+    .modal-overlay.active .modal-card {
+        transform: scale(1);
+    }
+    /* Table hover */
+    tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+    /* Toolbar Selection */
+    .pip-selbar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+        margin-bottom: 0;
+        height: 0;
+        overflow: hidden;
+        background: linear-gradient(90deg, rgba(139, 92, 246, 0.16), rgba(139, 92, 246, 0.04));
+        border: 1px solid transparent;
+        border-radius: 14px 14px 0 0;
+        opacity: 0;
+        transition: all 0.25s ease;
+    }
+    .pip-selbar.show {
+        height: 56px;
+        opacity: 1;
+        margin-bottom: -1px;
+        border-color: #ddb7ff;
+    }
+    /* Spinner spin */
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .pip-spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #ddb7ff;
+        border-radius: 50%;
+        animation: spin .6s linear infinite;
+    }
+    .pip-act.spin {
+        pointer-events: none;
+        opacity: 0.7;
+    }
     /* Toast notifications */
-    .pip-toasts { position:fixed; bottom:24px; left:24px; display:flex; flex-direction:column; gap:10px; z-index:9999; }
-    .pip-toast { display:flex; align-items:center; gap:10px; min-width:240px; max-width:360px; padding:13px 16px; border-radius:12px; background:var(--surface); border:1px solid var(--border); box-shadow:0 12px 30px -8px rgba(0,0,0,0.6); font-size:13px; font-weight:600; color:var(--text); animation:toastIn .25s cubic-bezier(.16,1,.3,1); }
-    .pip-toast.ok { border-color:rgba(16,185,129,0.4); }
-    .pip-toast.err { border-color:rgba(239,68,68,0.4); }
-    .pip-toast.info { border-color:rgba(139,92,246,0.4); }
-    .pip-toast .tico { font-size:16px; }
+    .pip-toasts {
+        position: fixed;
+        bottom: 24px;
+        left: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 9999;
+    }
+    .pip-toast {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 240px;
+        max-width: 360px;
+        padding: 13px 16px;
+        border-radius: 12px;
+        background: rgba(31, 31, 38, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 12px 30px -8px rgba(0,0,0,0.6);
+        font-size: 13px;
+        font-weight: 600;
+        color: #e4e1ea;
+        animation: toastIn .25s cubic-bezier(.16,1,.3,1);
+    }
+    .pip-toast.ok { border-color: rgba(78, 222, 163, 0.4); }
+    .pip-toast.err { border-color: rgba(255, 180, 171, 0.4); }
+    .pip-toast.info { border-color: rgba(221, 183, 255, 0.4); }
+    .pip-toast .tico { font-size: 16px; }
     @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .pip-toast.out { animation:toastOut .25s forwards; }
     @keyframes toastOut { to { opacity:0; transform:translateX(-20px); } }
-  </style>
 
-
+    .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+</style>
 </head>
-<body>
+<body class="custom-scrollbar h-screen overflow-hidden">
+<!-- Global Background WebGL Shader -->
+<div class="fixed inset-0 w-full h-full -z-10 opacity-30" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_2');
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = \`attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}\`;
+  const fs = \`precision highp float;
+varying vec2 v_texCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
+void main() {
+    vec2 uv = v_texCoord;
+    vec2 p1 = vec2(0.5 + 0.3 * sin(u_time * 0.4), 0.5 + 0.2 * cos(u_time * 0.5));
+    vec2 p2 = vec2(0.3 + 0.2 * cos(u_time * 0.3), 0.7 + 0.1 * sin(u_time * 0.6));
+    vec2 p3 = vec2(0.7 + 0.2 * sin(u_time * 0.5), 0.3 + 0.2 * cos(u_time * 0.4));
+    vec3 col1 = vec3(0.658, 0.333, 0.968); // #a855f7 (Purple)
+    vec3 col2 = vec3(0.925, 0.282, 0.6);   // #ec4899 (Pink)
+    vec3 col3 = vec3(0.062, 0.725, 0.505); // #10b981 (Cyan/Emerald)
+    float d1 = length(uv - p1);
+    float d2 = length(uv - p2);
+    float d3 = length(uv - p3);
+    float f1 = 0.5 / (1.0 + d1 * 5.0);
+    float f2 = 0.5 / (1.0 + d2 * 4.0);
+    float f3 = 0.5 / (1.0 + d3 * 6.0);
+    vec3 aurora = (col1 * f1 + col2 * f2 + col3 * f3) * 0.4;
+    vec3 bg = vec3(0.02, 0.02, 0.04);
+    gl_FragColor = vec4(bg + aurora, 1.0);
+}\`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+<\/script>
+</div>
 
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="brand">\u0646\u0647\u0627\u0646</div>
-    <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">\u{1F465}</span> \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
-    <div class="nav-item" onclick="nav('proxyip')"><span class="nav-icon">\u{1F310}</span> \u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</div>
-    <div class="nav-item" onclick="nav('api')"><span class="nav-icon">\u{1F511}</span> \u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</div>
-    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">\u2699\uFE0F</span> \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</div>
-    <div style="flex:1"></div>
-    <a href="https://github.com/emad1381/penhan" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--muted); text-decoration: none; transition: 0.2s; font-weight: 500;" class="github-link">
-      <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="transition: transform 0.2s; vertical-align: middle;">
-        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-      </svg>
-      <span>\u06AF\u06CC\u062A\u200C\u0647\u0627\u0628 \u067E\u0631\u0648\u0698\u0647</span>
-    </a>
-    <div class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">\u{1F6AA}</span> \u062E\u0631\u0648\u062C</div>
+<!-- Sidebar Fixed Right -->
+<aside class="fixed top-0 right-0 h-full w-[280px] bg-surface-container/30 backdrop-blur-xl border-l border-white/5 shadow-2xl z-50 flex flex-col py-8 px-4">
+<div class="mb-12 px-2">
+<div class="font-headline-md text-headline-md font-bold text-primary flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center shadow-lg neon-glow-primary">
+<span class="material-symbols-outlined text-on-primary-container">rocket_launch</span>
+</div>
+<div>
+<h1 class="font-bold text-primary tracking-tight">\u067E\u0646\u0644 \u067E\u0646\u0647\u0627\u200C\u0646</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Deep Space Command</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
+<button id="nav-users" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-primary font-bold border-r-2 border-primary bg-primary/5 transition-all duration-300" onclick="nav('users')">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-sm">\u06A9\u0627\u0631\u0628\u0631\u0627\u0646</span>
+</button>
+<button id="nav-proxyip" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-white/5 hover:text-primary transition-all duration-300" onclick="nav('proxyip')">
+<span class="material-symbols-outlined">settings_ethernet</span>
+<span class="font-body-md text-sm">\u067E\u0631\u0648\u06A9\u0633\u06CC IP</span>
+</button>
+<button id="nav-nodes" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-white/5 hover:text-primary transition-all duration-300" onclick="nav('nodes')">
+<span class="material-symbols-outlined">lan</span>
+<span class="font-body-md text-sm">\u0646\u0648\u062F\u0647\u0627</span>
+</button>
+<button id="nav-api" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-white/5 hover:text-primary transition-all duration-300" onclick="nav('api')">
+<span class="material-symbols-outlined">key</span>
+<span class="font-body-md text-sm">\u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</span>
+</button>
+<button id="nav-settings" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-white/5 hover:text-primary transition-all duration-300" onclick="nav('settings')">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-sm">\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</span>
+</button>
+</nav>
+<div class="mt-auto border-t border-white/5 pt-6 space-y-2">
+<button class="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-white/5 hover:text-error transition-all duration-300 text-right" onclick="window.location.href='/'">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-body-md text-sm">\u062E\u0631\u0648\u062C \u0627\u0632 \u067E\u0646\u0644</span>
+</button>
+</div>
+</aside>
+
+<!-- TopAppBar Fixed -->
+<header class="fixed top-0 left-0 right-[280px] h-16 flex justify-between items-center px-8 z-40 bg-transparent">
+<div class="flex items-center gap-4 bg-surface-container/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/5 w-80">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-full placeholder-on-surface-variant/40 text-white" placeholder="\u062C\u0633\u062A\u062C\u0648..." type="text" oninput="searchFilter(this.value)"/>
+</div>
+<div class="flex items-center gap-3">
+<div class="h-10 px-4 rounded-full flex items-center gap-3 bg-surface-container/60 border border-white/5">
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-secondary overflow-hidden flex items-center justify-center">
+<span class="material-symbols-outlined text-sm text-white">person</span>
+</div>
+<span class="text-xs text-white">\u0627\u062F\u0645\u06CC\u0646 \u0627\u0631\u0634\u062F</span>
+</div>
+</div>
+</header>
+
+<!-- Main Container -->
+<main class="mr-[280px] pt-24 px-8 pb-32 h-screen overflow-y-auto custom-scrollbar">
+<div class="max-w-7xl mx-auto">
+
+  <!-- ================= USERS PAGE ================= -->
+  <div id="page-users" class="page active space-y-6">
+    <div class="flex justify-between items-end">
+      <div>
+        <h2 class="font-headline-lg text-headline-lg text-white">\u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</h2>
+        <p class="text-on-surface-variant mt-1 text-sm">\u062A\u0639\u0631\u06CC\u0641 \u0648 \u0645\u0627\u0646\u06CC\u062A\u0648\u0631\u06CC\u0646\u06AF \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0641\u0639\u0627\u0644 \u0633\u06CC\u0633\u062A\u0645 \u062F\u0631 \u0632\u0645\u0627\u0646 \u0648\u0627\u0642\u0639\u06CC</p>
+      </div>
+      <button class="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all" onclick="openAddUserModal()">
+        <span class="material-symbols-outlined text-sm">person_add</span>
+        <span class="text-xs">\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F</span>
+      </button>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="glass-panel rounded-2xl p-6 flex items-center justify-between overflow-hidden relative group">
+        <div class="relative z-10">
+          <p class="text-on-surface-variant text-xs mb-2">\u06A9\u0644 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</p>
+          <h3 id="stat-total-users" class="text-3xl font-bold text-white">0</h3>
+        </div>
+        <div class="absolute -left-4 -bottom-4 opacity-10 text-white">
+          <span class="material-symbols-outlined text-[100px]">groups</span>
+        </div>
+      </div>
+      <div class="glass-panel rounded-2xl p-6 flex items-center justify-between overflow-hidden relative group">
+        <div class="relative z-10">
+          <p class="text-on-surface-variant text-xs mb-2">\u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0641\u0639\u0627\u0644</p>
+          <h3 id="stat-active-users" class="text-3xl font-bold text-tertiary">0</h3>
+        </div>
+        <div class="absolute -left-4 -bottom-4 opacity-10 text-tertiary">
+          <span class="material-symbols-outlined text-[100px]">bolt</span>
+        </div>
+      </div>
+      <div class="glass-panel rounded-2xl p-6 flex items-center gap-6 overflow-hidden relative">
+        <div id="cf-circle-container" class="relative w-16 h-16 flex items-center justify-center shrink-0">
+          <svg class="w-full h-full transform -rotate-90">
+            <circle class="text-white/5" cx="32" cy="32" fill="transparent" r="28" stroke="currentColor" stroke-width="5"></circle>
+            <circle id="cf-circle-progress" class="text-primary drop-shadow-[0_0_8px_rgba(221,183,255,0.6)]" cx="32" cy="32" fill="transparent" r="28" stroke="currentColor" stroke-dasharray="175.8" stroke-dashoffset="0" stroke-width="5"></circle>
+          </svg>
+          <div id="cf-circle-text" class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">0%</div>
+        </div>
+        <div>
+          <p class="text-on-surface-variant text-xs mb-1">\u0627\u0645\u0631\u0648\u0632 \u0648\u0631\u06A9\u0631 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631</p>
+          <h3 id="stat-cf-reqs" class="text-lg font-bold text-white">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</h3>
+        </div>
+        <button class="absolute left-4 top-4 text-on-surface-variant hover:text-white" onclick="loadCfMetrics()">
+          <span class="material-symbols-outlined text-sm">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Table content -->
+    <div class="glass-panel rounded-2xl overflow-hidden border border-white/5">
+      <table class="w-full text-right border-collapse">
+        <thead>
+          <tr class="bg-white/5 text-on-surface-variant text-xs">
+            <th class="py-4 px-6 font-medium">\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631</th>
+            <th class="py-4 px-6 font-medium">UUID</th>
+            <th class="py-4 px-6 font-medium">\u0648\u0636\u0639\u06CC\u062A \u0627\u062A\u0635\u0627\u0644</th>
+            <th class="py-4 px-6 font-medium">\u062A\u0631\u0627\u0641\u06CC\u06A9 \u0645\u0635\u0631\u0641\u06CC</th>
+            <th class="py-4 px-6 font-medium">\u062A\u0627\u0631\u06CC\u062E \u0627\u0646\u0642\u0636\u0627</th>
+            <th class="py-4 px-6 font-medium text-left">\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody" class="divide-y divide-white/5 text-sm">
+          <tr><td colspan="6" class="py-10 text-center text-on-surface-variant/50">\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0644\u06CC\u0633\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- Main -->
-  <div class="main">
-  
-    <!-- Users Page -->
-    <div id="page-users" class="page active">
-      <div class="header">
-        <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</h2>
-        <button class="btn" onclick="openAddUserModal()">+ \u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F</button>
+  <!-- ================= PROXY IP PAGE ================= -->
+  <div id="page-proxyip" class="page hidden space-y-6">
+    <div class="flex justify-between items-end">
+      <div>
+        <h2 class="font-headline-lg text-headline-lg text-white">\u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</h2>
+        <p class="text-on-surface-variant mt-1 text-sm">\u067E\u0627\u06CC\u0634\u060C \u0645\u0631\u062A\u0628\u200C\u0633\u0627\u0632\u06CC \u0648 \u0627\u06CC\u0645\u067E\u0648\u0631\u062A \u062F\u0633\u062A\u0647\u200C\u0627\u06CC \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u062A\u0645\u06CC\u0632 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631</p>
       </div>
-      
-      <div class="dashboard-stats" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:24px;">
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
-          <div style="font-size:12px; color:var(--muted)">\u062A\u0639\u062F\u0627\u062F \u06A9\u0644 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
-          <div id="stat-total-users" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+      <div class="flex gap-2">
+        <button class="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-white/10 rounded-xl hover:bg-white/5 transition-all text-xs" onclick="openProxyIPImportModal()">
+          <span class="material-symbols-outlined text-sm text-primary">download</span>
+          <span>\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A</span>
+        </button>
+        <button class="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-white/10 rounded-xl hover:bg-white/5 transition-all text-xs" onclick="openProxyIPAddModal()">
+          <span class="material-symbols-outlined text-sm text-primary">add</span>
+          <span>\u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="glass-panel rounded-2xl p-6 flex items-center justify-between relative overflow-hidden group">
+        <div>
+          <p class="text-on-surface-variant text-xs mb-2">\u06A9\u0644 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627</p>
+          <h3 id="stat-total-proxyip" class="text-3xl font-bold text-white">0</h3>
         </div>
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
-          <div style="font-size:12px; color:var(--muted)">\u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0641\u0639\u0627\u0644</div>
-          <div id="stat-active-users" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        <span class="material-symbols-outlined text-[100px] opacity-10 absolute -left-4 -bottom-4 text-white">language</span>
+      </div>
+      <div class="glass-panel rounded-2xl p-6 flex items-center justify-between relative overflow-hidden group">
+        <div>
+          <p class="text-on-surface-variant text-xs mb-2">\u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0641\u0639\u0627\u0644</p>
+          <h3 id="stat-active-proxyip" class="text-3xl font-bold text-tertiary">0</h3>
         </div>
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px; display:flex; align-items:center; justify-content:space-between;">
+        <span class="material-symbols-outlined text-[100px] opacity-10 absolute -left-4 -bottom-4 text-tertiary">check_circle</span>
+      </div>
+      <div class="glass-panel rounded-2xl p-6 flex items-center justify-between relative overflow-hidden group">
+        <div>
+          <p class="text-on-surface-variant text-xs mb-2">\u0645\u06CC\u0627\u0646\u06AF\u06CC\u0646 \u067E\u06CC\u0646\u06AF (\u0627\u0632 \u0645\u0631\u0648\u0631\u06AF\u0631)</p>
+          <h3 id="stat-avg-ping" class="text-3xl font-bold text-secondary">--</h3>
+        </div>
+        <button class="absolute left-4 top-4 text-on-surface-variant hover:text-white" onclick="refreshAllProxyIP(event)">
+          <span class="material-symbols-outlined text-sm">bolt</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Toolbar Filters -->
+    <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+      <div class="flex flex-wrap items-center gap-3">
+        <select id="proxyip-filter-country" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
+          <option value="" class="bg-surface">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
+          <option value="IR" class="bg-surface">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
+          <option value="DE" class="bg-surface">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
+          <option value="US" class="bg-surface">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
+          <option value="NL" class="bg-surface">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
+          <option value="FR" class="bg-surface">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
+          <option value="SG" class="bg-surface">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
+          <option value="JP" class="bg-surface">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
+          <option value="TR" class="bg-surface">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
+        </select>
+        <select id="proxyip-filter-status" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
+          <option value="" class="bg-surface">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
+          <option value="active" class="bg-surface">\u2705 \u0641\u0639\u0627\u0644</option>
+          <option value="slow" class="bg-surface">\u{1F422} \u06A9\u0646\u062F</option>
+          <option value="dead" class="bg-surface">\u274C \u0642\u0637\u0639</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs hover:bg-white/10 text-white" onclick="fetchProxyIPFromSources(event)">
+          <span class="material-symbols-outlined text-sm">cloud_download</span>
+          <span>\u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u062A\u0648\u0645\u0627\u062A\u06CC\u06A9</span>
+        </button>
+        <button class="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs hover:bg-white/10 text-white" onclick="detectCountriesForIPs(event)">
+          <span class="material-symbols-outlined text-sm">map</span>
+          <span>\u062A\u0634\u062E\u06CC\u0635 \u0644\u0648\u06A9\u06CC\u0634\u0646</span>
+        </button>
+        <button class="flex items-center gap-1.5 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs hover:bg-white/10 text-white" onclick="refreshAllProxyIP(event)">
+          <span class="material-symbols-outlined text-sm">speed</span>
+          <span>\u062A\u0633\u062A \u0647\u0645\u06AF\u0627\u0646\u06CC</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Selection Bar -->
+    <div id="proxyip-selection-toolbar" class="pip-selbar border-white/10">
+      <div class="cnt text-sm">
+        <span class="num text-xs px-2 py-0.5 rounded-full" id="proxyip-toolbar-count">0</span>
+        <span id="proxyip-selected-count">\u0645\u0648\u0631\u062F \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647</span>
+      </div>
+      <button class="flex items-center gap-1 bg-error/20 hover:bg-error/30 border border-error/40 text-error rounded-lg px-4 py-1.5 text-xs font-bold transition-all" onclick="deleteSelectedProxyIP()">
+        <span class="material-symbols-outlined text-sm">delete</span>
+        <span>\u062D\u0630\u0641 \u062F\u0633\u062A\u0647\u200C\u0627\u06CC</span>
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="glass-panel rounded-2xl overflow-hidden border border-white/5">
+      <table class="w-full text-right border-collapse">
+        <thead>
+          <tr class="bg-white/5 text-on-surface-variant text-xs">
+            <th class="py-4 px-6 text-center w-12">
+              <input type="checkbox" id="proxyip-select-all" class="pip-check rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" onchange="toggleSelectAllProxyIP(this)">
+            </th>
+            <th class="py-4 px-6 text-center w-12">#</th>
+            <th class="py-4 px-6 font-medium">\u0622\u062F\u0631\u0633 IP</th>
+            <th class="py-4 px-6 font-medium">\u067E\u0648\u0631\u062A</th>
+            <th class="py-4 px-6 font-medium">\u0644\u0648\u06A9\u06CC\u0634\u0646 / \u06A9\u0634\u0648\u0631</th>
+            <th class="py-4 px-6 font-medium">ISP \u067E\u0631\u0648\u0648\u0627\u06CC\u062F\u0631</th>
+            <th class="py-4 px-6 font-medium">\u067E\u06CC\u0646\u06AF</th>
+            <th class="py-4 px-6 font-medium">\u0648\u0636\u0639\u06CC\u062A</th>
+            <th class="py-4 px-6 font-medium">\u0622\u062E\u0631\u06CC\u0646 \u0628\u0631\u0631\u0633\u06CC</th>
+            <th class="py-4 px-6 text-left">\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+          </tr>
+        </thead>
+        <tbody id="proxyip-tbody" class="divide-y divide-white/5 text-sm">
+          <tr><td colspan="10" class="py-10 text-center text-on-surface-variant/50">\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0644\u06CC\u0633\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ================= NODES PAGE (MOCKUP) ================= -->
+  <div id="page-nodes" class="page hidden space-y-6">
+    <div>
+      <h2 class="font-headline-lg text-headline-lg text-white">\u0645\u062F\u06CC\u0631\u06CC\u062A \u0646\u0648\u062F\u0647\u0627</h2>
+      <p class="text-on-surface-variant mt-1 text-sm">\u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC \u0633\u0631\u0648\u0631\u0647\u0627\u06CC \u0645\u0631\u0632\u06CC (Edge Nodes) \u062C\u0647\u062A \u062A\u0648\u0632\u06CC\u0639 \u062A\u0631\u0627\u0641\u06CC\u06A9 \u062F\u0631 \u0622\u06CC\u0646\u062F\u0647</p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 border-primary">
+        <div class="flex justify-between items-start mb-6">
           <div>
-            <div style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">
-              \u062F\u0631\u062E\u0648\u0627\u0633\u062A\u200C\u0647\u0627\u06CC \u0627\u0645\u0631\u0648\u0632 \u0648\u0631\u06A9\u0631
-              <span style="cursor:pointer; font-size:11px;" onclick="loadCfMetrics(); this.style.transform='rotate(360deg)'; setTimeout(()=>this.style.transform='', 300); transition='0.3s';" title="\u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC">\u{1F504}</span>
-            </div>
-            <div id="stat-cf-reqs" style="font-size:18px; font-weight:bold; margin-top:8px;">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</div>
+            <h4 class="text-white font-bold text-lg mb-1">Edge Node #1 (\u062A\u0647\u0631\u0627\u0646)</h4>
+            <p class="text-xs text-on-surface-variant/80">\u0633\u0631\u0648\u0631 \u067E\u0631\u0648\u06A9\u0633\u06CC \u0644\u0628\u0647 \u0627\u06CC\u0631\u0627\u0646</p>
           </div>
-          <!-- Circular progress chart -->
-          <div id="cf-circle-container" style="width:42px; height:42px; position:relative; display:none;">
-            <svg viewBox="0 0 36 36" style="width:100%; height:100%; transform: rotate(-90deg);">
-              <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#27272a" stroke-width="4" />
-              <path id="cf-circle-progress" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--primary)" stroke-width="4" stroke-dasharray="0, 100" />
-            </svg>
-            <div id="cf-circle-text" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; font-family:'Outfit', sans-serif;">0%</div>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-tertiary/10 text-tertiary">
+            <span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+            \u0641\u0639\u0627\u0644
+          </span>
+        </div>
+        <div class="space-y-3 text-sm border-t border-white/5 pt-4">
+          <div class="flex justify-between"><span class="text-on-surface-variant">\u0622\u062F\u0631\u0633 \u0633\u0631\u0648\u0631:</span><span class="font-mono text-white">node1.penhan.space</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">\u067E\u0631\u0648\u062A\u06A9\u0644\u200C\u0647\u0627:</span><span class="text-white">VLESS WS, Trojan WS</span></div>
+        </div>
+      </div>
+      <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 border-secondary">
+        <div class="flex justify-between items-start mb-6">
+          <div>
+            <h4 class="text-white font-bold text-lg mb-1">Edge Node #2 (\u062E\u0627\u0631\u062C)</h4>
+            <p class="text-xs text-on-surface-variant/80">\u0633\u0631\u0648\u0631 \u06A9\u0645\u06A9\u06CC \u062E\u0627\u0631\u062C \u06A9\u0634\u0648\u0631</p>
           </div>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-secondary/10 text-secondary">
+            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            \u067E\u0634\u062A\u06CC\u0628\u0627\u0646
+          </span>
+        </div>
+        <div class="space-y-3 text-sm border-t border-white/5 pt-4">
+          <div class="flex justify-between"><span class="text-on-surface-variant">\u0622\u062F\u0631\u0633 \u0633\u0631\u0648\u0631:</span><span class="font-mono text-white">node2.penhan.space</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">\u067E\u0631\u0648\u062A\u06A9\u0644\u200C\u0647\u0627:</span><span class="text-white">VLESS WS, Trojan WS</span></div>
         </div>
       </div>
-      
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>\u0646\u0627\u0645</th>
-              <th>UUID</th>
-              <th>\u0648\u0636\u0639\u06CC\u062A</th>
-              <th>\u0645\u0635\u0631\u0641</th>
-              <th>\u0645\u0647\u0644\u062A</th>
-              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
-            </tr>
-          </thead>
-          <tbody id="users-tbody">
-            <tr><td colspan="6" style="text-align:center; padding: 40px; color:var(--muted)">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    
-    <!-- API Page -->
-    <div id="page-api" class="page">
-      <div class="header">
-        <h2 class="title">\u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</h2>
-        <button class="btn" onclick="openModal('token-modal')">+ \u0633\u0627\u062E\u062A \u062A\u0648\u06A9\u0646 \u062C\u062F\u06CC\u062F</button>
-      </div>
-      
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>\u0646\u0627\u0645 \u0631\u0628\u0627\u062A/\u062A\u0648\u06A9\u0646</th>
-              <th>\u06A9\u0644\u06CC\u062F (Key)</th>
-              <th>\u0639\u0645\u0644\u06CC\u0627\u062A</th>
-            </tr>
-          </thead>
-          <tbody id="tokens-tbody">
-          </tbody>
-        </table>
-      </div>
-      
-      <div class="docs-box">
-        <h3>\u062F\u0627\u06A9\u06CC\u0648\u0645\u0646\u062A \u0627\u062A\u0635\u0627\u0644 API</h3>
-        <p style="color:var(--muted); margin-top:8px; font-size:14px;">\u0628\u0627 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u06A9\u0644\u06CC\u062F\u0647\u0627\u06CC \u0628\u0627\u0644\u0627 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u0627\u0632 \u0637\u0631\u06CC\u0642 \u0631\u0628\u0627\u062A \u062A\u0644\u06AF\u0631\u0627\u0645 \u06CC\u0627 \u0647\u0631 \u0646\u0631\u0645\u200C\u0627\u0641\u0632\u0627\u0631 \u062F\u06CC\u06AF\u0631\u06CC\u060C \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0631\u0627 \u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0646\u06CC\u062F.</p>
-        <pre>
-# \u0633\u0627\u062E\u062A \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F
-curl -X POST https://${hostname}/api/users   -H "Authorization: Bearer YOUR_TOKEN"   -H "Content-Type: application/json"   -d '{"id":"UUID", "name":"User1", "limit_bytes": 10737418240, "expiry_date": 1712...}'
-
-# \u06AF\u0631\u0641\u062A\u0646 \u0644\u06CC\u0633\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646
-curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
-        </pre>
-      </div>
-    </div>
-    
-    <!-- Settings Page -->
-    <div id="page-settings" class="page">
-      <div class="header">
-        <h2 class="title">\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u06A9\u0644\u06CC</h2>
-        <button class="btn" onclick="saveSettings()">\u0630\u062E\u06CC\u0631\u0647 \u062A\u063A\u06CC\u06CC\u0631\u0627\u062A</button>
-      </div>
-      
-      <div style="background:var(--surface); border:1px solid var(--border); padding:24px; border-radius:12px; max-width: 600px;">
-        <div class="form-group">
-          <label>UUID \u0627\u062F\u0645\u06CC\u0646 (\u0628\u0631\u0627\u06CC \u0648\u0631\u0648\u062F \u0628\u0647 \u067E\u0646\u0644)</label>
-          <input type="text" class="form-control" id="st-uuid" value="${adminUUID}">
-        </div>
-        <div class="form-group">
-          <label>\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u067E\u0646\u0644</label>
-          <input type="password" class="form-control" id="st-pass" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
-        </div>
-        <div class="form-group">
-          <label>\u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 (Proxy IP)</label>
-          <input type="text" class="form-control" id="st-proxy" value="${defaultProxyIP || ""}" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
-        </div>
-        <div class="form-group">
-          <label>Cloudflare Account ID</label>
-          <input type="text" class="form-control" id="st-cf-account" value="${cfAccountId || ""}" placeholder="\u0645\u062B\u0627\u0644: 8e5f2...">
-        </div>
-        <div class="form-group">
-          <label>Cloudflare API Token (\u0628\u0627 \u062F\u0633\u062A\u0631\u0633\u06CC Account Analytics: Read)</label>
-          <input type="password" class="form-control" id="st-cf-token" value="${cfApiToken || ""}" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
-        </div>
-      </div>
-    </div>
-
-    <!-- Proxy IP Manager Page -->
-    <div id="page-proxyip" class="page">
-
-      <div class="header">
-        <h2 class="title">\u0645\u062F\u06CC\u0631\u06CC\u062A Proxy IP</h2>
-        <button class="btn" onclick="openProxyIPAddModal()">+ \u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP</button>
-      </div>
-
-      <!-- Stats Cards -->
-      <div class="pip-stats">
-        <div class="pip-stat accent-purple">
-          <span class="ic">\u{1F310}</span>
-          <div class="lbl">\u06A9\u0644 Proxy IP\u0647\u0627</div>
-          <div id="stat-total-proxyip" class="val">0</div>
-        </div>
-        <div class="pip-stat accent-green">
-          <span class="ic">\u2705</span>
-          <div class="lbl">\u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u0641\u0639\u0627\u0644</div>
-          <div id="stat-active-proxyip" class="val">0</div>
-        </div>
-        <div class="pip-stat accent-blue">
-          <span class="ic">\u26A1</span>
-          <div class="lbl">
-            \u0645\u06CC\u0627\u0646\u06AF\u06CC\u0646 \u067E\u06CC\u0646\u06AF
-            <span style="cursor:pointer;" onclick="refreshAllProxyIP()" title="\u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC">\u{1F504}</span>
-          </div>
-          <div id="stat-avg-ping" class="val">--</div>
-        </div>
-      </div>
-
-      <!-- Toolbar: filters + actions -->
-      <div class="pip-toolbar">
-        <select id="proxyip-filter-country" class="pip-select" onchange="filterProxyIP()">
-          <option value="">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
-          <option value="IR">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
-          <option value="DE">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
-          <option value="US">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
-          <option value="NL">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
-          <option value="FR">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
-          <option value="SG">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
-          <option value="JP">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
-          <option value="TR">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
-        </select>
-        <select id="proxyip-filter-status" class="pip-select" onchange="filterProxyIP()">
-          <option value="">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
-          <option value="active">\u2705 \u0641\u0639\u0627\u0644</option>
-          <option value="slow">\u{1F422} \u06A9\u0646\u062F</option>
-          <option value="dead">\u274C \u0645\u0631\u062F\u0647</option>
-        </select>
-        <span class="sep"></span>
-        <button class="pip-chip" onclick="refreshAllProxyIP()">\u{1F504} \u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0645\u0647</button>
-        <button class="pip-chip" onclick="fetchProxyIPFromSources()">\u2601\uFE0F \u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0632 \u0645\u0646\u0627\u0628\u0639</button>
-        <button class="pip-chip" onclick="detectCountriesForIPs()">\u{1F30D} \u062A\u0634\u062E\u06CC\u0635 \u06A9\u0634\u0648\u0631\u0647\u0627</button>
-
-
-        <span class="spacer"></span>
-        <button class="pip-chip solid" onclick="openProxyIPImportModal()">\u{1F4E5} \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A</button>
-      </div>
-
-      <!-- Selection bar (slides in when rows are selected) -->
-      <div id="proxyip-selection-toolbar" class="pip-selbar">
-        <span class="cnt"><span class="num" id="proxyip-toolbar-count">0</span> <span id="proxyip-selected-count">\u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647</span></span>
-        <span class="spacer"></span>
-        <button class="pip-chip" onclick="selectAllProxyIP(true)">\u2705 \u0627\u0646\u062A\u062E\u0627\u0628 \u0647\u0645\u0647</button>
-        <button class="pip-chip" onclick="selectAllProxyIP(false)">\u274C \u0644\u063A\u0648 \u0627\u0646\u062A\u062E\u0627\u0628</button>
-        <button class="pip-chip danger" onclick="deleteSelectedProxyIP()">\u{1F5D1}\uFE0F \u062D\u0630\u0641 \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647\u200C\u0647\u0627</button>
-      </div>
-
-      <!-- Proxy IP Table -->
-      <div class="pip-tablewrap">
-        <table class="pip-table">
-          <thead>
-            <tr>
-              <th style="width:46px; text-align:center;">
-                <input type="checkbox" class="pip-check" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="\u0627\u0646\u062A\u062E\u0627\u0628/\u0644\u063A\u0648 \u0647\u0645\u0647">
-              </th>
-              <th style="width:50px; text-align:center;">#</th>
-              <th>\u0622\u06CC\u200C\u067E\u06CC / \u0647\u0627\u0633\u062A</th>
-              <th>\u067E\u0648\u0631\u062A</th>
-              <th>\u0645\u0648\u0642\u0639\u06CC\u062A</th>
-              <th>ISP</th>
-              <th>\u067E\u06CC\u0646\u06AF</th>
-              <th>\u0648\u0636\u0639\u06CC\u062A</th>
-              <th>\u0622\u062E\u0631\u06CC\u0646 \u0628\u0631\u0631\u0633\u06CC</th>
-              <th style="text-align:center;">\u0639\u0645\u0644\u06CC\u0627\u062A</th>
-            </tr>
-          </thead>
-          <tbody id="proxyip-tbody">
-            <tr><td colspan="10" class="pip-empty">\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-
-<!-- Modals -->
-  <div class="modal-overlay" id="user-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="user-modal-title">\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631</h3>
-        <div class="modal-close" onclick="closeModal('user-modal')">&times;</div>
-      </div>
-      <div class="form-group">
-        <label>\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631</label>
-        <input type="text" id="u-name" class="form-control" placeholder="\u0645\u062B\u0627\u0644: Ali iPhone">
-      </div>
-      <div class="form-group" style="display:flex; gap:8px;">
-        <div style="flex:1">
-          <label>UUID (\u0634\u0646\u0627\u0633\u0647 \u06CC\u06A9\u062A\u0627)</label>
-          <input type="text" id="u-uuid" class="form-control" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-        </div>
-        <div style="align-self: flex-end;">
-          <button class="btn btn-outline" onclick="generateUUID()">\u062A\u0648\u0644\u06CC\u062F</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u062D\u062C\u0645 (GB) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
-        <input type="number" id="u-limit" class="form-control" value="0">
-      </div>
-      <div class="form-group">
-        <label>\u0645\u062D\u062F\u0648\u062F\u06CC\u062A \u0627\u062A\u0635\u0627\u0644\u0627\u062A \u0647\u0645\u0632\u0645\u0627\u0646 (Connection Limit) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
-        <input type="number" id="u-connlimit" class="form-control" value="0">
-      </div>
-      <div class="form-group">
-        <label>\u062A\u0627\u0631\u06CC\u062E \u0627\u0646\u0642\u0636\u0627 (\u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F\u060C \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F)</label>
-        <input type="datetime-local" id="u-expiry" class="form-control">
-      </div>
-      <div class="form-group">
-        <label>Clean IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
-        <input type="text" id="u-cleanip" class="form-control" placeholder="\u0622\u06CC\u200C\u067E\u06CC \u062A\u0645\u06CC\u0632 \u06A9\u0644\u0627\u062F\u0641\u0644\u0631">
-      </div>
-      <div class="form-group">
-        <label>Proxy IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC - \u0686\u0646\u062F\u06AF\u0627\u0646\u0647 \u0628\u0627 \u062E\u0637 \u062C\u062F\u06CC\u062F/\u06A9\u0627\u0645\u0627 \u062C\u062F\u0627 \u06A9\u0646\u06CC\u062F)</label>
-        <textarea id="u-proxyip" class="form-control" rows="2" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4&#10;5.6.7.8"></textarea>
-      </div>
-      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveUser()">\u0630\u062E\u06CC\u0631\u0647 \u06A9\u0627\u0631\u0628\u0631</button>
     </div>
   </div>
 
-  <div class="modal-overlay" id="token-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>\u0627\u0641\u0632\u0648\u062F\u0646 \u062A\u0648\u06A9\u0646 API</h3>
-        <div class="modal-close" onclick="closeModal('token-modal')">&times;</div>
+  <!-- ================= API TOKENS PAGE ================= -->
+  <div id="page-api" class="page hidden space-y-6">
+    <div class="flex justify-between items-end">
+      <div>
+        <h2 class="font-headline-lg text-headline-lg text-white">\u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</h2>
+        <p class="text-on-surface-variant mt-1 text-sm">\u0633\u0627\u062E\u062A \u06A9\u0644\u06CC\u062F\u0647\u0627\u06CC \u062F\u0633\u062A\u0631\u0633\u06CC API \u062C\u0647\u062A \u0627\u062A\u0635\u0627\u0644 \u0631\u0628\u0627\u062A\u200C\u0647\u0627\u06CC \u062A\u0644\u06AF\u0631\u0627\u0645\u06CC \u0648 \u0627\u067E\u0644\u06CC\u06A9\u06CC\u0634\u0646\u200C\u0647\u0627</p>
       </div>
-      <div class="form-group">
-        <label>\u0646\u0627\u0645 \u0631\u0628\u0627\u062A \u06CC\u0627 \u062A\u0648\u06A9\u0646</label>
-        <input type="text" id="t-name" class="form-control" placeholder="\u0645\u062B\u0627\u0644: Telegram Bot">
-      </div>
-      <div class="form-group" style="display:flex; gap:8px;">
-        <div style="flex:1">
-          <label>\u062A\u0648\u06A9\u0646</label>
-          <input type="text" id="t-key" class="form-control">
-        </div>
-        <div style="align-self: flex-end;">
-          <button class="btn btn-outline" onclick="document.getElementById('t-key').value = crypto.randomUUID().replace(/-/g, '')">\u062A\u0648\u0644\u06CC\u062F</button>
-        </div>
-      </div>
-      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveToken()">\u0627\u06CC\u062C\u0627\u062F \u062A\u0648\u06A9\u0646</button>
+      <button class="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all text-xs" onclick="openModal('token-modal')">
+        <span class="material-symbols-outlined text-sm">key</span>
+        <span>\u0627\u06CC\u062C\u0627\u062F \u062A\u0648\u06A9\u0646 \u062C\u062F\u06CC\u062F</span>
+      </button>
+    </div>
+
+    <div class="glass-panel rounded-2xl overflow-hidden border border-white/5">
+      <table class="w-full text-right border-collapse">
+        <thead>
+          <tr class="bg-white/5 text-on-surface-variant text-xs">
+            <th class="py-4 px-6 font-medium">\u0646\u0627\u0645 \u062A\u0648\u06A9\u0646 / \u0631\u0628\u0627\u062A</th>
+            <th class="py-4 px-6 font-medium">\u06A9\u0644\u06CC\u062F \u062A\u0648\u06A9\u0646 (API Key)</th>
+            <th class="py-4 px-6 font-medium text-left">\u0639\u0645\u0644\u06CC\u0627\u062A</th>
+          </tr>
+        </thead>
+        <tbody id="tokens-tbody" class="divide-y divide-white/5 text-sm">
+          <tr><td colspan="3" class="py-10 text-center text-on-surface-variant/50">\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u062A\u0648\u06A9\u0646\u200C\u0647\u0627...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- API Docs -->
+    <div class="glass-panel p-8 rounded-3xl space-y-4">
+      <h3 class="text-white font-bold text-lg">\u0645\u0633\u062A\u0646\u062F\u0627\u062A \u0627\u062A\u0635\u0627\u0644 \u0628\u0647 API</h3>
+      <p class="text-sm text-on-surface-variant/80">\u0628\u0631\u0627\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631\u0633\u0627\u0632\u06CC \u0645\u062F\u06CC\u0631\u06CC\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u067E\u0646\u0647\u0627\u0646\u060C \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u062F\u0631\u062E\u0648\u0627\u0633\u062A\u200C\u0647\u0627\u06CC \u062E\u0648\u062F \u0631\u0627 \u0628\u0647 \u0627\u0646\u062F\u067E\u0648\u06CC\u0646\u062A\u200C\u0647\u0627\u06CC \u0632\u06CC\u0631 \u0627\u0631\u0633\u0627\u0644 \u06A9\u0646\u06CC\u062F:</p>
+      <pre class="bg-black/40 border border-white/5 p-4 rounded-xl text-xs font-mono text-primary-fixed overflow-x-auto text-left leading-relaxed" style="direction:ltr;">
+# \u0627\u06CC\u062C\u0627\u062F \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F
+curl -X POST https://${hostname}/api/users \\
+  -H "Authorization: Bearer YOUR_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"id":"UUID", "name":"User1", "limit_bytes": 10737418240, "expiry_date": 1712000000000}'
+
+# \u062F\u0631\u06CC\u0627\u0641\u062A \u0644\u06CC\u0633\u062A \u06A9\u0627\u0631\u0628\u0631\u0627\u0646
+curl -X GET https://${hostname}/api/users \\
+  -H "Authorization: Bearer YOUR_TOKEN"
+      </pre>
     </div>
   </div>
 
-  <!-- Add Proxy IP Modal -->
-  <div class="modal-overlay" id="proxyip-add-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="proxyip-add-modal-title">\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F</h3>
-        <div class="modal-close" onclick="closeModal('proxyip-add-modal')">&times;</div>
+  <!-- ================= SETTINGS PAGE ================= -->
+  <div id="page-settings" class="page hidden space-y-6">
+    <div class="flex justify-between items-end">
+      <div>
+        <h2 class="font-headline-lg text-headline-lg text-white">\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0639\u0645\u0648\u0645\u06CC</h2>
+        <p class="text-on-surface-variant mt-1 text-sm">\u067E\u06CC\u06A9\u0631\u0628\u0646\u062F\u06CC \u0647\u0648\u06CC\u062A \u0627\u062F\u0645\u06CC\u0646\u060C \u06A9\u0644\u06CC\u062F\u0647\u0627 \u0648 \u0627\u062A\u0635\u0627\u0644\u0627\u062A \u06A9\u0644\u0627\u062F\u0641\u0644\u0631</p>
       </div>
-      <div class="form-group" style="display:flex; gap:8px;">
-        <div style="flex:2">
-          <label>\u0622\u06CC\u200C\u067E\u06CC \u06CC\u0627 \u0647\u0627\u0633\u062A</label>
-          <input type="text" id="pi-ip" class="form-control" placeholder="\u0645\u062B\u0627\u0644: 1.2.3.4">
-        </div>
-        <div style="flex:1">
-          <label>\u067E\u0648\u0631\u062A</label>
-          <input type="number" id="pi-port" class="form-control" value="443">
-        </div>
+      <button class="bg-primary text-on-primary font-bold py-2.5 px-6 rounded-xl hover:opacity-90 transition-all active:scale-95" onclick="saveSettings()">
+        <span>\u0630\u062E\u06CC\u0631\u0647 \u062A\u063A\u06CC\u06CC\u0631\u0627\u062A</span>
+      </button>
+    </div>
+
+    <div class="glass-panel p-8 rounded-3xl max-w-2xl space-y-6">
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-on-surface-variant/80">UUID \u0627\u062F\u0645\u06CC\u0646 (\u062C\u0647\u062A \u0627\u062D\u0631\u0627\u0632 \u0647\u0648\u06CC\u062A)</label>
+        <input type="text" id="st-uuid" class="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30" value="${adminUUID}">
       </div>
-      <div class="form-group">
-        <label>\u06A9\u0634\u0648\u0631 (\u06A9\u062F \u062F\u0648 \u062D\u0631\u0641\u06CC\u060C \u0627\u062E\u062A\u06CC\u0627\u0631\u06CC \u2014 \u062E\u0627\u0644\u06CC \u0628\u0630\u0627\u0631\u06CC\u062F \u062A\u0627 \u062E\u0648\u062F\u06A9\u0627\u0631 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u0648\u062F)</label>
-        <input type="text" id="pi-country" class="form-control" placeholder="\u0645\u062B\u0627\u0644: DE" maxlength="2" style="text-transform:uppercase">
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062C\u062F\u06CC\u062F \u067E\u0646\u0644 \u0627\u062F\u0645\u06CC\u0646</label>
+        <input type="password" id="st-pass" class="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
       </div>
-      <div class="form-group" style="display:flex; gap:8px;">
-        <div style="flex:1">
-          <label>\u0634\u0647\u0631 (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
-          <input type="text" id="pi-city" class="form-control" placeholder="Frankfurt">
-        </div>
-        <div style="flex:1">
-          <label>ISP (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
-          <input type="text" id="pi-isp" class="form-control" placeholder="Hetzner">
-        </div>
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-on-surface-variant/80">Proxy IP \u067E\u06CC\u0634\u200C\u0641\u0631\u0636</label>
+        <input type="text" id="st-proxy" class="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30" value="${defaultProxyIP || ""}" placeholder="1.2.3.4">
       </div>
-      <button class="btn" style="width:100%; margin-top:16px;" onclick="saveProxyIP()">\u0630\u062E\u06CC\u0631\u0647</button>
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-on-surface-variant/80">Cloudflare Account ID</label>
+        <input type="text" id="st-cf-account" class="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30" value="${cfAccountId || ""}" placeholder="\u0645\u062B\u0627\u0644: 8e5f2...">
+      </div>
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-on-surface-variant/80">Cloudflare API Token</label>
+        <input type="password" id="st-cf-token" class="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30" placeholder="\u0628\u0631\u0627\u06CC \u0639\u062F\u0645 \u062A\u063A\u06CC\u06CC\u0631 \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F">
+        <span class="text-[10px] text-on-surface-variant/50 block">\u0628\u0627 \u0633\u0637\u062D \u062F\u0633\u062A\u0631\u0633\u06CC Account Analytics: Read \u062C\u0647\u062A \u0627\u0633\u062A\u0639\u0644\u0627\u0645 \u0645\u06CC\u0632\u0627\u0646 \u0644\u06CC\u0645\u06CC\u062A \u0631\u06CC\u06A9\u0648\u0626\u0633\u062A\u200C\u0647\u0627\u06CC \u0648\u0631\u06A9\u0631 \u0634\u0645\u0627</span>
+      </div>
     </div>
   </div>
 
-  <!-- Import Proxy IP Modal -->
-  <div class="modal-overlay" id="proxyip-import-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A Proxy IP</h3>
-        <div class="modal-close" onclick="closeModal('proxyip-import-modal')">&times;</div>
+</div>
+</main>
+
+<!-- ================= SYSTEM MODALS ================= -->
+
+<!-- User Modal (Redesigned) -->
+<div class="modal-overlay" id="user-modal" onclick="closeModal('user-modal')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 id="user-modal-title" class="text-white font-bold text-lg">\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F</h3>
+      <button class="text-on-surface-variant hover:text-white" onclick="closeModal('user-modal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0634\u0646\u0627\u0633\u0647 UUID</label>
+        <div class="flex gap-2">
+          <input type="text" id="u-uuid" class="flex-1 bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50">
+          <button class="bg-white/5 border border-white/10 rounded-xl px-3 hover:bg-white/10 text-white" onclick="generateUUID()">\u0633\u062E\u062A</button>
+        </div>
       </div>
-      <div class="form-group">
-        <label>\u0641\u0631\u0645\u062A</label>
-        <select id="pi-import-format" class="form-control">
-          <option value="ip:port">ip:port (\u0647\u0631 \u062E\u0637 \u06CC\u06A9 \u0622\u06CC\u200C\u067E\u06CC)</option>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0646\u0627\u0645 \u06A9\u0627\u0631\u0628\u0631</label>
+        <input type="text" id="u-name" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="\u0645\u062B\u0627\u0644: \u06AF\u0648\u0634\u06CC \u0639\u0644\u06CC">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">\u0633\u0642\u0641 \u062D\u062C\u0645 (\u06AF\u06CC\u06AF\u0627\u0628\u0627\u06CC\u062A\u060C 0=\u0646\u0627\u0645\u062D\u062F\u0648\u062F)</label>
+          <input type="number" id="u-limit" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" value="0">
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">\u062A\u0639\u062F\u0627\u062F \u06A9\u0627\u0631\u0628\u0631 \u0645\u062C\u0627\u0632 (\u0627\u062A\u0635\u0627\u0644 \u0647\u0645\u0632\u0645\u0627\u0646)</label>
+          <input type="number" id="u-connlimit" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" value="0">
+        </div>
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0645\u0647\u0644\u062A \u0632\u0645\u0627\u0646\u06CC (\u062A\u0627\u0631\u06CC\u062E \u0627\u0646\u0642\u0636\u0627)</label>
+        <input type="datetime-local" id="u-expiry" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-right">
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u062A\u0645\u06CC\u0632 \u0622\u06CC\u200C\u067E\u06CC \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (Clean IP)</label>
+        <input type="text" id="u-cleanip" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" placeholder="\u062E\u0627\u0644\u06CC \u0628\u0631\u0627\u06CC \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0622\u06CC\u200C\u067E\u06CC \u0633\u0631\u0648\u0631">
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u067E\u0631\u0648\u06A9\u0633\u06CC \u0622\u06CC\u200C\u067E\u06CC \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (Proxy IP)</label>
+        <textarea id="u-proxyip" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" rows="2" placeholder="\u06CC\u06A9 \u06CC\u0627 \u0686\u0646\u062F \u0622\u06CC\u200C\u067E\u06CC"></textarea>
+      </div>
+      <button class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl hover:brightness-110 active:scale-95 transition-all mt-4" onclick="saveUser()">\u0630\u062E\u06CC\u0631\u0647 \u06A9\u0627\u0631\u0628\u0631</button>
+    </div>
+  </div>
+</div>
+
+<!-- Token Modal (Redesigned) -->
+<div class="modal-overlay" id="token-modal" onclick="closeModal('token-modal')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-white font-bold text-lg">\u0627\u06CC\u062C\u0627\u062F \u062A\u0648\u06A9\u0646 \u062C\u062F\u06CC\u062F</h3>
+      <button class="text-on-surface-variant hover:text-white" onclick="closeModal('token-modal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0634\u0646\u0627\u0633\u0647 \u06A9\u0644\u06CC\u062F \u062F\u0633\u062A\u0631\u0633\u06CC (Key)</label>
+        <div class="flex gap-2">
+          <input type="text" id="t-key" class="flex-1 bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50">
+          <button class="bg-white/5 border border-white/10 rounded-xl px-3 hover:bg-white/10 text-white" onclick="document.getElementById('t-key').value = crypto.randomUUID().replace(/-/g,'')">\u062A\u0648\u0644\u06CC\u062F</button>
+        </div>
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0646\u0627\u0645 \u0631\u0628\u0627\u062A / \u06A9\u0627\u0631\u0628\u0631 \u062A\u0648\u06A9\u0646</label>
+        <input type="text" id="t-name" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="\u0645\u062B\u0627\u0644: \u0631\u0628\u0627\u062A \u062A\u0644\u06AF\u0631\u0627\u0645\u06CC \u067E\u0646\u0647\u0627\u0646">
+      </div>
+      <button class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl hover:brightness-110 active:scale-95 transition-all mt-4" onclick="saveToken()">\u0630\u062E\u06CC\u0631\u0647 \u062A\u0648\u06A9\u0646</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Proxy IP Modal (Redesigned) -->
+<div class="modal-overlay" id="proxyip-add-modal" onclick="closeModal('proxyip-add-modal')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 id="proxyip-add-modal-title" class="text-white font-bold text-lg">\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F</h3>
+      <button class="text-on-surface-variant hover:text-white" onclick="closeModal('proxyip-add-modal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div class="grid grid-cols-3 gap-4">
+        <div class="col-span-2 space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">\u0622\u06CC\u200C\u067E\u06CC (IPv4)</label>
+          <input type="text" id="pi-ip" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" placeholder="1.2.3.4">
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">\u067E\u0648\u0631\u062A</label>
+          <input type="number" id="pi-port" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" value="443">
+        </div>
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u06A9\u0634\u0648\u0631 (\u06A9\u062F \u062F\u0648 \u062D\u0631\u0641\u06CC - \u062E\u0627\u0644\u06CC \u062C\u0647\u062A \u062A\u0634\u062E\u06CC\u0635 \u062E\u0648\u062F\u06A9\u0627\u0631)</label>
+        <input type="text" id="pi-country" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" placeholder="\u0645\u062B\u0627\u0644: DE" maxlength="2" style="text-transform:uppercase">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">\u0634\u0647\u0631 (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
+          <input type="text" id="pi-city" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="Frankfurt">
+        </div>
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-on-surface-variant/80">ISP (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
+          <input type="text" id="pi-isp" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="Hetzner">
+        </div>
+      </div>
+      <button class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl hover:brightness-110 active:scale-95 transition-all mt-4" onclick="saveProxyIP()">\u0630\u062E\u06CC\u0631\u0647 \u067E\u0631\u0648\u06A9\u0633\u06CC</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Proxy IP Modal (Redesigned) -->
+<div class="modal-overlay" id="proxyip-import-modal" onclick="closeModal('proxyip-import-modal')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-white font-bold text-lg">\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0644\u06CC\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627</h3>
+      <button class="text-on-surface-variant hover:text-white" onclick="closeModal('proxyip-import-modal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0641\u0631\u0645\u062A \u0644\u06CC\u0633\u062A</label>
+        <select id="pi-import-format" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50">
+          <option value="ip:port" class="bg-surface">ip:port (\u0647\u0631 \u062E\u0637 \u06CC\u06A9 \u0622\u06CC\u200C\u067E\u06CC)</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>\u0644\u06CC\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 (\u0647\u0631 \u062E\u0637 \u06CC\u06A9\u06CC\u060C \u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u06CC \u0627\u0632 <code>#\u062A\u0648\u0636\u06CC\u062D</code>)</label>
-        <textarea id="pi-import-text" class="form-control" rows="8" placeholder="1.2.3.4:443&#10;5.6.7.8:8443 # \u0622\u0644\u0645\u0627\u0646"></textarea>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-on-surface-variant/80">\u0644\u06CC\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627</label>
+        <textarea id="pi-import-text" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50" rows="8" placeholder="1.2.3.4:443&#10;5.6.7.8:8443 # \u062A\u0648\u0636\u06CC\u062D"></textarea>
       </div>
-      <div class="desc" style="font-size:12px; color:var(--muted); margin-bottom:12px;">\u067E\u0633 \u0627\u0632 \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646\u060C \u06A9\u0634\u0648\u0631\u0650 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u062E\u0648\u062F\u06A9\u0627\u0631 \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F.</div>
-      <button class="btn" style="width:100%;" onclick="importProxyIP()">\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646</button>
+      <span class="text-[10px] text-on-surface-variant/50 block">\u067E\u0633 \u0627\u0632 \u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u060C \u06A9\u0634\u0648\u0631 \u0647\u0631\u06A9\u062F\u0627\u0645 \u0628\u0647 \u0635\u0648\u0631\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u06A9\u0648\u0626\u0631\u06CC \u0632\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F.</span>
+      <button class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl hover:brightness-110 active:scale-95 transition-all mt-4" onclick="importProxyIP()">\u0627\u06CC\u0645\u067E\u0648\u0631\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627</button>
     </div>
   </div>
+</div>
 
-  <!-- Toast container -->
+<div class="pip-toasts" id="pip-toasts"></div>
 
-  <div class="pip-toasts" id="pip-toasts"></div>
-
-
-  <script>
+<script>
     const basePath = '/api';
 
-    // Non-blocking toast notification
     function showToast(msg, type) {
       type = type || 'info';
       const wrap = document.getElementById('pip-toasts');
@@ -2135,12 +3077,28 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }, 3200);
     }
 
-
     function nav(page) {
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
-      document.getElementById('page-' + page).classList.add('active');
-      event.currentTarget.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => {
+        p.classList.add('hidden');
+        p.classList.remove('active');
+      });
+      document.querySelectorAll('aside nav button').forEach(b => {
+        b.classList.remove('text-primary', 'font-bold', 'border-r-2', 'border-primary', 'bg-primary/5');
+        b.classList.add('text-on-surface-variant', 'hover:bg-white/5', 'hover:text-primary');
+      });
+      
+      const targetPage = document.getElementById('page-' + page);
+      if (targetPage) {
+        targetPage.classList.remove('hidden');
+        targetPage.classList.add('active');
+      }
+      
+      const targetNav = document.getElementById('nav-' + page);
+      if (targetNav) {
+        targetNav.classList.add('text-primary', 'font-bold', 'border-r-2', 'border-primary', 'bg-primary/5');
+        targetNav.classList.remove('text-on-surface-variant', 'hover:bg-white/5', 'hover:text-primary');
+      }
+      
       if (page === 'proxyip') loadProxyIP();
     }
 
@@ -2159,6 +3117,29 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       return (b / (1024 * 1024 * 1024)).toFixed(2) + " GB";
     }
 
+    // Client-side search filters
+    let searchVal = '';
+    function searchFilter(val) {
+      searchVal = val.toLowerCase();
+      // Apply filters for active page
+      const activePage = document.querySelector('.page.active');
+      if (activePage.id === 'page-users') {
+        const rows = document.querySelectorAll('#users-tbody tr');
+        rows.forEach(row => {
+          const txt = row.textContent.toLowerCase();
+          if (txt.includes(searchVal)) row.style.display = '';
+          else row.style.display = 'none';
+        });
+      } else if (activePage.id === 'page-proxyip') {
+        const rows = document.querySelectorAll('#proxyip-tbody tr');
+        rows.forEach(row => {
+          const txt = row.textContent.toLowerCase();
+          if (txt.includes(searchVal)) row.style.display = '';
+          else row.style.display = 'none';
+        });
+      }
+    }
+
     async function loadUsers() {
       try {
         const res = await fetch(basePath + '/users');
@@ -2172,12 +3153,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         const tbody = document.getElementById('users-tbody');
         tbody.innerHTML = '';
         if (data.users.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#a1a1aa">\u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-on-surface-variant/50">\u06A9\u0627\u0631\u0628\u0631\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
           return;
         }
         data.users.forEach(u => {
-          let usage = u.limit_bytes ? \`\${formatBytes(u.used_bytes)} / \${formatBytes(u.limit_bytes)}\` : \`\${formatBytes(u.used_bytes)} (\u221E)\`;
-          let expiryHTML = '<span style="color:#a1a1aa">\u0646\u0627\u0645\u062D\u062F\u0648\u062F (\u221E)</span>';
+          let expiryHTML = '<span class="text-on-surface-variant/70 text-xs">\u0646\u0627\u0645\u062D\u062F\u0648\u062F</span>';
           if (u.expiry_date) {
             const d = new Date(u.expiry_date);
             const pad = (n) => n.toString().padStart(2, '0');
@@ -2197,30 +3177,66 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             
             expiryHTML = \`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
               <span style="font-size:12px; font-weight:600; direction:ltr;">\${abs}</span>
-              <span class="badge \${badgeClass}" style="font-size:10px; padding:2px 6px;">\${rel}</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold \${badgeClass === 'green' ? 'bg-tertiary/10 text-tertiary' : 'bg-error/10 text-error'}">\${rel}</span>
             </div>\`;
           }
-          let statusBadge = u.enabled ? '<span class="badge green">\u0641\u0639\u0627\u0644</span>' : '<span class="badge red">\u0645\u0633\u062F\u0648\u062F</span>';
+          let statusBadge = u.enabled ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-tertiary/10 text-tertiary">\u0641\u0639\u0627\u0644</span>' : '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-error/10 text-error">\u0645\u0633\u062F\u0648\u062F</span>';
           
-          // Conn Limit label
           let connLimitLabel = u.conn_limit > 0 ? u.conn_limit : '\u221E';
           let activeConnsLabel = u.active_connections !== undefined ? u.active_connections : 0;
           let activeConnsColor = activeConnsLabel > 0 ? 'var(--success)' : 'var(--muted)';
           
-          tbody.innerHTML += \`<tr>
-            <td style="font-weight:600">
-              \${u.name} 
-              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/\\r?\\n/g, '\\\\n')}')">\u270F\uFE0F</span>
+          tbody.innerHTML += \`<tr class="group hover:bg-white/5 transition-colors">
+            <td class="py-5 px-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center overflow-hidden">
+                  <span class="material-symbols-outlined text-on-surface-variant">person</span>
+                </div>
+                <div>
+                  <div class="text-white font-medium flex items-center gap-2">
+                    \${u.name}
+                    <button class="material-symbols-outlined text-xs hover:text-primary" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/\\r?\\n/g, '\\\\n')}')">edit</button>
+                  </div>
+                </div>
+              </div>
             </td>
-            <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
-            <td>\${statusBadge} <span class="badge" style="color:\${activeConnsColor}; background:rgba(255,255,255,0.02)">\u{1F465} \${activeConnsLabel}/\${connLimitLabel}</span></td>
-            <td style="direction:ltr; text-align:right">\${usage}</td>
-            <td>\${expiryHTML}</td>
-            <td>
-              <div class="flex-gap">
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? '\u0645\u0633\u062F\u0648\u062F' : '\u0622\u0632\u0627\u062F\u0633\u0627\u0632\u06CC'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${window.location.hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
-                <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">\u{1F5D1}\uFE0F</button>
+            <td class="py-5 px-6">
+              <div class="flex items-center gap-2 group/uuid">
+                <code class="text-code-sm text-on-surface-variant/80 bg-white/5 px-2 py-1 rounded">\${u.id.substring(0,8)}...</code>
+                <button class="material-symbols-outlined text-sm opacity-0 group-hover/uuid:opacity-100 hover:text-primary transition-all" onclick="navigator.clipboard.writeText('\${u.id}').then(() => showToast('UUID \u06A9\u067E\u06CC \u0634\u062F', 'ok'))">content_copy</button>
+              </div>
+            </td>
+            <td class="py-5 px-6">
+              <div class="inline-flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full text-xs font-bold text-white">
+                \${statusBadge}
+                <span class="text-on-surface-variant/70">\u{1F465} \${activeConnsLabel}/\${connLimitLabel}</span>
+              </div>
+            </td>
+            <td class="py-5 px-6 text-on-surface-variant" style="direction:ltr; text-align:right;">
+              <div class="w-32 inline-block">
+                <div class="flex justify-between text-[10px] mb-1">
+                  <span>\${formatBytes(u.used_bytes)}</span>
+                  <span class="text-on-surface-variant/60">\${u.limit_bytes ? formatBytes(u.limit_bytes) : '\u221E'}</span>
+                </div>
+                <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <div class="h-full bg-primary" style="width: \${u.limit_bytes ? Math.min(100, Math.round((u.used_bytes / u.limit_bytes) * 100)) : 0}%"></div>
+                </div>
+              </div>
+            </td>
+            <td class="py-5 px-6 text-on-surface-variant">
+              \${expiryHTML}
+            </td>
+            <td class="py-5 px-6">
+              <div class="flex items-center justify-end gap-2">
+                <button class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-white/10 hover:bg-white/5 transition-all text-on-surface-variant" onclick="toggleUser('\${u.id}')">
+                  \${u.enabled ? '\u0645\u0633\u062F\u0648\u062F\u0633\u0627\u0632\u06CC' : '\u0641\u0639\u0627\u0644\u200C\u0633\u0627\u0632\u06CC'}
+                </button>
+                <button class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-white/10 hover:bg-white/5 transition-all text-on-surface-variant" onclick="window.open('https://\${window.location.hostname}/\${u.id}/sub', '_blank')">
+                  \u0633\u0627\u0628
+                </button>
+                <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteUser('\${u.id}')">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
               </div>
             </td>
           </tr>\`;
@@ -2237,7 +3253,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const clean = document.getElementById('u-cleanip').value;
        const proxyip = document.getElementById('u-proxyip').value;
        
-       if (!id || !name) { alert("\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0646\u0627\u0645 \u0648 UUID \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A!"); return; }
+       if (!id || !name) { showToast("\u0646\u0627\u0645 \u0648 UUID \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A!", 'err'); return; }
        
        const limit_bytes = gb * 1024 * 1024 * 1024;
        const expiry_date = expiryVal ? new Date(expiryVal).getTime() : 0;
@@ -2274,10 +3290,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         const tbody = document.getElementById('tokens-tbody');
         tbody.innerHTML = '';
         data.tokens.forEach(t => {
-          tbody.innerHTML += \`<tr>
-            <td>\${t.name}</td>
-            <td><span class="code-span">\${t.key}</span></td>
-            <td><button class="btn btn-danger" style="padding:4px 8px" onclick="deleteToken('\${t.key}')">\u062D\u0630\u0641</button></td>
+          tbody.innerHTML += \`<tr class="group hover:bg-white/5 transition-colors">
+            <td class="py-4 px-6 text-white font-medium">\${t.name}</td>
+            <td class="py-4 px-6"><span class="font-mono text-sm bg-white/5 px-2 py-1 rounded text-primary-fixed">\${t.key}</span></td>
+            <td class="py-4 px-6 text-left"><button class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-error/10 border border-error/20 text-error hover:bg-error/20 transition-all" onclick="deleteToken('\${t.key}')">\u062D\u0630\u0641 \u06A9\u0644\u06CC\u062F</button></td>
           </tr>\`;
         });
       } catch(e) { console.error(e); }
@@ -2297,8 +3313,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     }
     
     async function deleteToken(key) {
-       await fetch(basePath + '/tokens/' + key, {method: 'DELETE'});
-       loadTokens();
+       if (confirm('\u0622\u06CC\u0627 \u0645\u0627\u06CC\u0644 \u0628\u0647 \u062D\u0630\u0641 \u0627\u06CC\u0646 \u062A\u0648\u06A9\u0646 \u0647\u0633\u062A\u06CC\u062F\u061F')) {
+         await fetch(basePath + '/tokens/' + key, {method: 'DELETE'});
+         loadTokens();
+       }
     }
 
     async function saveSettings() {
@@ -2315,7 +3333,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
          headers: {'Content-Type': 'application/json'},
          body: JSON.stringify(payload)
        });
-       alert('\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F.');
+       showToast('\u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0630\u062E\u06CC\u0631\u0647 \u0634\u062F.', 'ok');
        loadCfMetrics();
     }
 
@@ -2361,22 +3379,22 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           const reqs = data.requestsUsed;
           const limit = data.limit;
           const percent = Math.min(100, Math.round((reqs / limit) * 100));
-          document.getElementById('stat-cf-reqs').innerHTML = reqs.toLocaleString() + ' <span style="font-size:10px; color:var(--muted)">/ ' + limit.toLocaleString() + '</span>';
+          document.getElementById('stat-cf-reqs').innerHTML = reqs.toLocaleString() + ' <span style="font-size:10px; color:#a1a1aa">/ ' + limit.toLocaleString() + '</span>';
           document.getElementById('cf-circle-container').style.display = 'block';
-          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', percent + ', 100');
+          document.getElementById('cf-circle-progress').setAttribute('stroke-dasharray', (percent * 1.758) + ', 175.8');
           document.getElementById('cf-circle-text').textContent = percent + '%';
           if (percent > 85) {
-            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--danger)');
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--color-error)');
           } else if (percent > 60) {
-            document.getElementById('cf-circle-progress').setAttribute('stroke', 'orange');
+            document.getElementById('cf-circle-progress').setAttribute('stroke', '#fbbf24');
           } else {
-            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--primary)');
+            document.getElementById('cf-circle-progress').setAttribute('stroke', 'var(--color-primary)');
           }
         } else {
           if (data.error && data.error !== 'Not Configured') {
             document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--danger)">\u062E\u0637\u0627: ' + data.error + '</span>';
           } else {
-            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:var(--muted)">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647 (\u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A)</span>';
+            document.getElementById('stat-cf-reqs').innerHTML = '<span style="font-size:10px; color:#a1a1aa">\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647</span>';
           }
           document.getElementById('cf-circle-container').style.display = 'none';
         }
@@ -2385,13 +3403,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }
     }
 
-    
-
     // ============ Proxy IP Manager ============
     let proxyIPData = [];
     let proxyIPSelectedRows = new Set();
 
-    // Universal country-code \u2192 flag emoji (regional indicator symbols)
     function countryToFlag(cc) {
       if (!cc || cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '\u{1F30D}';
       const A = 0x1F1E6;
@@ -2399,7 +3414,6 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       return String.fromCodePoint(A + up.charCodeAt(0) - 65, A + up.charCodeAt(1) - 65);
     }
 
-    // Persian names for the most common proxy-IP countries (fallback = code)
     const COUNTRY_NAMES_FA = {
       IR: '\u0627\u06CC\u0631\u0627\u0646', US: '\u0622\u0645\u0631\u06CC\u06A9\u0627', DE: '\u0622\u0644\u0645\u0627\u0646', NL: '\u0647\u0644\u0646\u062F', FR: '\u0641\u0631\u0627\u0646\u0633\u0647',
       GB: '\u0627\u0646\u06AF\u0644\u0633\u062A\u0627\u0646', SG: '\u0633\u0646\u06AF\u0627\u067E\u0648\u0631', JP: '\u0698\u0627\u067E\u0646', TR: '\u062A\u0631\u06A9\u06CC\u0647', CA: '\u06A9\u0627\u0646\u0627\u062F\u0627',
@@ -2427,7 +3441,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         updateProxyIPStats();
       } catch (e) {
         console.error(e);
-        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:var(--muted);">\u062E\u0637\u0627 \u062F\u0631 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC: ' + e.message + '</td></tr>';
+        document.getElementById('proxyip-tbody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 40px; color:#a1a1aa;">\u062E\u0637\u0627 \u062F\u0631 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC: ' + e.message + '</td></tr>';
       }
     }
 
@@ -2451,7 +3465,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="pip-empty"><div class="big">\u{1F310}</div>\u0647\u06CC\u0686 Proxy IP\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">\u{1F30D}</div>\u0647\u06CC\u0686 \u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
         updateSelectionToolbar();
         return;
       }
@@ -2468,27 +3482,38 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
         const pingTxt = p.ping != null ? p.ping + ' ms' : '\u2014';
 
-        return '<tr class="' + (isSel ? 'sel' : '') + '">' +
-          '<td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)"></td>' +
-          '<td style="text-align:center; color:var(--muted); font-size:12px; font-weight:bold;">' + (idx + 1) + '</td>' +
-          '<td><span class="pip-ip">' + p.ip + '</span></td>' +
-          '<td><span class="pip-port">' + p.port + '</span></td>' +
-          '<td><span class="pip-loc"><span class="flag">' + flag + '</span> ' + loc + '</span></td>' +
-          '<td><span class="pip-isp" title="' + (p.isp || '') + '">' + (p.isp || '\u2014') + '</span></td>' +
-          '<td><span class="pip-ping ' + pingCls + '">' + pingTxt + '</span></td>' +
-          '<td><span class="pip-badge ' + st + '"><span class="pip-dot"></span>' + stText + '</span></td>' +
-          '<td><span class="pip-date">' + lastCheck + '</span></td>' +
-          '<td>' +
-            '<div style="display:flex; gap:8px; justify-content:center;">' +
-              '<button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP(\\'' + p.ip + '\\', ' + p.port + ', event)">\u26A1</button>' +
-              '<button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP(\\'' + p.ip + '\\', ' + p.port + ')"' + '>\u{1F5D1}\uFE0F</button>' +
-            '</div>' +
-          '</td>' +
-        '</tr>';
+        return \`
+        <tr class="group hover:bg-white/5 transition-all \${isSel ? 'bg-primary/5' : ''}">
+          <td class="py-4 px-6 text-center">
+            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)">
+          </td>
+          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">\${idx + 1}</td>
+          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">\${p.ip}</td>
+          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">\${p.port}</span></td>
+          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">\${flag}</span> \${loc}</td>
+          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="\${p.isp || ''}">\${p.isp || '\u2014'}</td>
+          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="\${pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')}">\${pingTxt}</span></td>
+          <td class="py-4 px-6">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold \${st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))}">
+              <span class="w-1.5 h-1.5 rounded-full \${st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))}"></span>
+              \${stText}
+            </span>
+          </td>
+          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/50">\${lastCheck}</td>
+          <td class="py-4 px-6">
+            <div class="flex items-center justify-end gap-2">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\\'\${p.ip}\\'', \${p.port}, event)" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644">
+                <span class="material-symbols-outlined text-sm">bolt</span>
+              </button>
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\\'\${p.ip}\\'', \${p.port})" title="\u062D\u0630\u0641">
+                <span class="material-symbols-outlined text-sm">delete</span>
+              </button>
+            </div>
+          </td>
+        </tr>\`;
       }).join('');
       updateSelectionToolbar();
     }
-
 
     function filterProxyIP() {
       renderProxyIPTable();
@@ -2512,11 +3537,14 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }
     }
 
-    async function refreshAllProxyIP() {
-      const btn = event.target.closest('button');
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A...';
-      btn.disabled = true;
+    async function refreshAllProxyIP(e) {
+      const btn = e && e.target ? e.target.closest('button') : null;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A...';
+        btn.disabled = true;
+      }
 
       try {
         const results = [];
@@ -2524,12 +3552,12 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         
         for (let i = 0; i < proxyIPData.length; i += batchSize) {
           const batch = proxyIPData.slice(i, i + batchSize);
-          btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A (' + i + '/' + proxyIPData.length + ')...';
+          if (btn) btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A (' + i + '/' + proxyIPData.length + ')...';
           const batchResults = await Promise.all(batch.map(p => pingIPClient(p.ip, p.port)));
           results.push(...batchResults);
         }
 
-        btn.innerHTML = '\u{1F4BE} \u062F\u0631 \u062D\u0627\u0644 \u0630\u062E\u06CC\u0631\u0647...';
+        if (btn) btn.innerHTML = '\u{1F4BE} \u062F\u0631 \u062D\u0627\u0644 \u0630\u062E\u06CC\u0631\u0647...';
 
         const res = await fetch(basePath + '/proxyip/bulk-update', {
           method: 'POST',
@@ -2546,8 +3574,10 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       } catch (e) {
         alert('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627: ' + e.message);
       } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
       }
     }
 
@@ -2584,120 +3614,108 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       }
     }
 
-
-    async function fetchProxyIPFromSources() {
-          const btn = event.target.closest('button');
-          const originalText = btn.innerHTML;
-          btn.innerHTML = '\u2601\uFE0F \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
-          btn.disabled = true;
-      
-          try {
-            const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
-            const data = await res.json();
-            if (data.ok) {
-              alert('\u2705 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F');
-              loadProxyIP();
-            } else {
-              alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
-            }
-          } catch (e) {
-            alert('\u062E\u0637\u0627: ' + e.message);
-          }
+    async function fetchProxyIPFromSources(e) {
+      const btn = e && e.target ? e.target.closest('button') : null;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '\u2601\uFE0F \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...';
+        btn.disabled = true;
+      }
+  
+      try {
+        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('\u2705 ' + (data.count || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062C\u062F\u06CC\u062F \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F', 'ok');
+          loadProxyIP();
+        } else {
+          showToast('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
+        }
+      } catch (e) {
+        showToast('\u062E\u0637\u0627: ' + e.message, 'err');
+      } finally {
+        if (btn) {
           btn.innerHTML = originalText;
           btn.disabled = false;
         }
+      }
+    }
 
-        async function detectCountriesForIPs() {
-          const btn = event.target.closest('button');
-          const originalText = btn.innerHTML;
-          btn.innerHTML = '\u{1F30D} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0634\u062E\u06CC\u0635...';
-          btn.disabled = true;
+    async function detectCountriesForIPs(e) {
+      const btn = e && e.target ? e.target.closest('button') : null;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '\u{1F30D} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0634\u062E\u06CC\u0635...';
+        btn.disabled = true;
+      }
 
-          try {
-            // Detection runs on the Worker (browser can't reach http-only ip-api due to
-            // mixed-content/CORS). Backend uses ip-api batch endpoint \u2192 fast, up to 100/req.
-            const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
-            const data = await res.json();
-            if (data.ok) {
-              alert('\u2705 \u06A9\u0634\u0648\u0631\u0650 ' + (data.updated || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F');
-              loadProxyIP();
-            } else {
-              alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
-            }
-          } catch (e) {
-            alert('\u062E\u0637\u0627: ' + e.message);
-          }
+      try {
+        const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('\u2705 \u06A9\u0634\u0648\u0631\u0650 ' + (data.updated || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F', 'ok');
+          loadProxyIP();
+        } else {
+          showToast('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
+        }
+      } catch (e) {
+        showToast('\u062E\u0637\u0627: ' + e.message, 'err');
+      } finally {
+        if (btn) {
           btn.innerHTML = originalText;
           btn.disabled = false;
         }
+      }
+    }
 
-        function toggleProxyIPSelection(checkbox) {
-          const val = checkbox.value;
-          if (checkbox.checked) proxyIPSelectedRows.add(val);
-          else proxyIPSelectedRows.delete(val);
-          updateSelectionToolbar();
-        }
+    function toggleProxyIPSelection(checkbox) {
+      const val = checkbox.value;
+      if (checkbox.checked) proxyIPSelectedRows.add(val);
+      else proxyIPSelectedRows.delete(val);
+      updateSelectionToolbar();
+    }
 
-        function toggleSelectAllProxyIP(selectAllCheckbox) {
-          const isChecked = selectAllCheckbox.checked;
-          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
-          checkboxes.forEach(cb => {
-            cb.checked = isChecked;
-            const val = cb.value;
-            if (isChecked) proxyIPSelectedRows.add(val);
-            else proxyIPSelectedRows.delete(val);
-          });
-          updateSelectionToolbar();
-        }
+    function toggleSelectAllProxyIP(selectAllCheckbox) {
+      const isChecked = selectAllCheckbox.checked;
+      const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+      checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+        const val = cb.value;
+        if (isChecked) proxyIPSelectedRows.add(val);
+        else proxyIPSelectedRows.delete(val);
+      });
+      updateSelectionToolbar();
+    }
 
-        function selectAllProxyIP(select) {
-          const checkboxes = document.querySelectorAll('.proxyip-checkbox');
-          const selectAllCheckbox = document.getElementById('proxyip-select-all');
-          if (select) {
-            checkboxes.forEach(cb => {
-              cb.checked = true;
-              proxyIPSelectedRows.add(cb.value);
-            });
-            if (selectAllCheckbox) selectAllCheckbox.checked = true;
-          } else {
-            checkboxes.forEach(cb => {
-              cb.checked = false;
-              proxyIPSelectedRows.delete(cb.value);
-            });
-            if (selectAllCheckbox) selectAllCheckbox.checked = false;
-          }
-          updateSelectionToolbar();
-        }
+    function updateSelectionToolbar() {
+      const count = proxyIPSelectedRows.size;
+      const toolbar = document.getElementById('proxyip-selection-toolbar');
+      const countEl = document.getElementById('proxyip-selected-count');
+      const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
+      const selectAllCheckbox = document.getElementById('proxyip-select-all');
+  
+      if (count > 0) {
+        toolbar.classList.add('show');
+        countEl.textContent = '\u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
+        toolbarCountEl.textContent = count;
+      } else {
+        toolbar.classList.remove('show');
+        countEl.textContent = '\u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
+        toolbarCountEl.textContent = 0;
+      }
 
-        function updateSelectionToolbar() {
-          const count = proxyIPSelectedRows.size;
-          const toolbar = document.getElementById('proxyip-selection-toolbar');
-          const countEl = document.getElementById('proxyip-selected-count');
-          const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
-          const selectAllCheckbox = document.getElementById('proxyip-select-all');
-      
-          if (count > 0) {
-            toolbar.classList.add('show');
-            countEl.textContent = '\u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
-            toolbarCountEl.textContent = count;
-          } else {
-            toolbar.classList.remove('show');
-            countEl.textContent = '\u0622\u06CC\u200C\u067E\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F\u0647';
-            toolbarCountEl.textContent = 0;
-          }
-
-      
-          // Update select-all checkbox state
-          const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
-          if (visibleCheckboxes.length > 0) {
-            const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
-            selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
-            selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
-          } else {
-            selectAllCheckbox.checked = false;
-            selectAllCheckbox.indeterminate = false;
-          }
-        }
+      const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
+      if (visibleCheckboxes.length > 0) {
+        const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
+        selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
+        selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+    }
 
     function openProxyIPAddModal() {
       document.getElementById('proxyip-add-modal-title').textContent = '\u0627\u0641\u0632\u0648\u062F\u0646 Proxy IP \u062C\u062F\u06CC\u062F';
@@ -2716,7 +3734,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       const city = document.getElementById('pi-city').value.trim();
       const isp = document.getElementById('pi-isp').value.trim();
       
-      if (!ip) { alert('\u0622\u06CC\u200C\u067E\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A'); return; }
+      if (!ip) { showToast('\u0622\u06CC\u200C\u067E\u06CC \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A', 'err'); return; }
       
       try {
         const res = await fetch(basePath + '/proxyip', {
