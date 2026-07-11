@@ -1001,8 +1001,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           tbody.innerHTML += \`<tr>
             <td style="font-weight:600">
               \${u.name} 
-              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/
-?\n/g, '\\\\n')}')">✏️</span>
+              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/\\r?\\n/g, '\\\\n')}')">✏️</span>
             </td>
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
             <td>\${statusBadge} <span class="badge" style="color:\${activeConnsColor}; background:rgba(255,255,255,0.02)">👥 \${activeConnsLabel}/\${connLimitLabel}</span></td>

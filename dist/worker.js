@@ -183,7 +183,7 @@ for (let i = 0; i < 256; ++i) {
 function unsafeStringify(arr, offset = 0) {
   return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
 }
-function stringify2(arr, offset = 0) {
+function stringify(arr, offset = 0) {
   const uuid = unsafeStringify(arr, offset);
   if (!isValidUUID(uuid)) {
     throw TypeError("Stringified UUID is invalid");
@@ -542,7 +542,7 @@ function processVlessHeader(vlessBuffer) {
   }
   const version = new Uint8Array(vlessBuffer.slice(0, 1));
   let isUDP = false;
-  const userID = stringify2(new Uint8Array(vlessBuffer.slice(1, 17)));
+  const userID = stringify(new Uint8Array(vlessBuffer.slice(1, 17)));
   const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
   const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
   if (command === 1) {
@@ -663,6 +663,10 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         isUDP,
         userID
       } = processVlessHeader(chunk);
+      if (hasError) {
+        log("header parse error: " + message);
+        throw new Error(message);
+      }
       const userObj = await authenticate(userID);
       if (!userObj || !userObj.enabled) {
         log("user auth failed or disabled");
@@ -678,10 +682,6 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
-      if (hasError) {
-        log("header parse error: " + message);
-        throw new Error(message);
-      }
       isHeaderParsed = true;
       if (isUDP) {
         isDns = true;
@@ -841,6 +841,10 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
         rawDataIndex,
         isUDP
       } = processTrojanHeader(chunk, clientHash);
+      if (hasError) {
+        log("header parse error: " + message);
+        throw new Error(message);
+      }
       const userObj = await authenticate(clientHash);
       if (!userObj || !userObj.enabled) {
         log("user auth failed or disabled");
@@ -856,10 +860,6 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
       const proxyIP = userObj.proxy_ip || defaultProxyIP;
       address = addressRemote;
       portWithRandomLog = "" + portRemote + "--" + Math.random() + " " + (isUDP ? "udp" : "tcp");
-      if (hasError) {
-        log("header parse error: " + message);
-        throw new Error(message);
-      }
       isHeaderParsed = true;
       if (isUDP) {
         isDns = true;
@@ -1904,9 +1904,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           tbody.innerHTML += \`<tr>
             <td style="font-weight:600">
               \${u.name} 
-              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/
-?
-/g, '\\\\n')}')">\u270F\uFE0F</span>
+              <span style="cursor:pointer; margin-right:6px;" onclick="editUser('\${u.id}', '\${u.name}', \${u.limit_bytes}, \${u.expiry_date}, '\${u.clean_ip}', \${u.conn_limit || 0}, '\${(u.proxy_ip || '').replace(/\\r?\\n/g, '\\\\n')}')">\u270F\uFE0F</span>
             </td>
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
             <td>\${statusBadge} <span class="badge" style="color:\${activeConnsColor}; background:rgba(255,255,255,0.02)">\u{1F465} \${activeConnsLabel}/\${connLimitLabel}</span></td>
@@ -2428,7 +2426,8 @@ ${vlessWS.replace("#VLESS-", `#VLESS-${user.name}-${pipLabel}`)}
       });
     } catch (err) {
       console.error(err);
-      return new Response("Internal Server Error: " + err.stack || err.message || err, { status: 500 });
+      const msg = err && (err.stack || err.message) || String(err);
+      return new Response("Internal Server Error: " + msg, { status: 500 });
     }
   }
 };

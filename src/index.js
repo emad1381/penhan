@@ -388,7 +388,9 @@ export default {
       });
     } catch (err) {
       console.error(err);
-      return new Response('Internal Server Error: ' + err.stack || err.message || err, { status: 500 });
+      const msg = (err && (err.stack || err.message)) || String(err);
+      return new Response('Internal Server Error: ' + msg, { status: 500 });
     }
+
   },
 };

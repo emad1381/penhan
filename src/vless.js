@@ -323,7 +323,10 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
         rawDataIndex, vlessVersion = new Uint8Array([0, 0]), isUDP,
         userID
       } = processVlessHeader(chunk);
-      
+
+      // Validate header BEFORE using userID for authentication
+      if (hasError) { log('header parse error: ' + message); throw new Error(message); }
+
       const userObj = await authenticate(userID);
       if (!userObj || !userObj.enabled) {
         log('user auth failed or disabled');
@@ -346,9 +349,8 @@ async function vlessOverWSHandler(request, authenticate, defaultProxyIP, onUsage
       address = addressRemote;
       portWithRandomLog = '' + portRemote + '--' + Math.random() + ' ' + (isUDP ? 'udp' : 'tcp');
 
-      if (hasError) { log('header parse error: ' + message); throw new Error(message); }
-
       isHeaderParsed = true;
+
 
       if (isUDP) {
         isDns = true;
