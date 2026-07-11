@@ -2481,7 +2481,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           '<td>' +
             '<div style="display:flex; gap:8px; justify-content:center;">' +
               '<button class="pip-act" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644" onclick="testProxyIP('' + p.ip + '', ' + p.port + ', event)">\u26A1</button>' +
-              '<button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP('' + p.ip + '', ' + p.port + '')">\u{1F5D1}\uFE0F</button>' +
+              '<button class="pip-act del" title="\u062D\u0630\u0641" onclick="deleteProxyIP('' + p.ip + '', ' + p.port + ')"' + '>\u{1F5D1}\uFE0F</button>' +
             '</div>' +
           '</td>' +
         '</tr>';
