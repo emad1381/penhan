@@ -1204,7 +1204,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -1593,7 +1593,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -2039,7 +2039,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -2525,7 +2525,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -2717,7 +2717,6 @@ void main() {
       <div class="flex flex-wrap items-center gap-3">
         <select id="proxyip-filter-country" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
           <option value="" class="bg-surface">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
-          <option value="IR" class="bg-surface">\u{1F1EE}\u{1F1F7} \u0627\u06CC\u0631\u0627\u0646</option>
           <option value="DE" class="bg-surface">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
           <option value="US" class="bg-surface">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
           <option value="NL" class="bg-surface">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
@@ -2776,12 +2775,11 @@ void main() {
             <th class="py-4 px-6 font-medium">ISP \u067E\u0631\u0648\u0648\u0627\u06CC\u062F\u0631</th>
             <th class="py-4 px-6 font-medium">\u067E\u06CC\u0646\u06AF</th>
             <th class="py-4 px-6 font-medium">\u0648\u0636\u0639\u06CC\u062A</th>
-            <th class="py-4 px-6 font-medium">\u0622\u062E\u0631\u06CC\u0646 \u0628\u0631\u0631\u0633\u06CC</th>
             <th class="py-4 px-6 text-left">\u0639\u0645\u0644\u06CC\u0627\u062A</th>
           </tr>
         </thead>
         <tbody id="proxyip-tbody" class="divide-y divide-white/5 text-sm">
-          <tr><td colspan="10" class="py-10 text-center text-on-surface-variant/50">\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0644\u06CC\u0633\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627...</td></tr>
+          <tr><td colspan="9" class="py-10 text-center text-on-surface-variant/50">\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0644\u06CC\u0633\u062A \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627...</td></tr>
         </tbody>
       </table>
     </div>
@@ -3415,7 +3413,7 @@ curl -X GET https://${hostname}/api/users \\
     }
 
     const COUNTRY_NAMES_FA = {
-      IR: '\u0627\u06CC\u0631\u0627\u0646', US: '\u0622\u0645\u0631\u06CC\u06A9\u0627', DE: '\u0622\u0644\u0645\u0627\u0646', NL: '\u0647\u0644\u0646\u062F', FR: '\u0641\u0631\u0627\u0646\u0633\u0647',
+      US: '\u0622\u0645\u0631\u06CC\u06A9\u0627', DE: '\u0622\u0644\u0645\u0627\u0646', NL: '\u0647\u0644\u0646\u062F', FR: '\u0641\u0631\u0627\u0646\u0633\u0647',
       GB: '\u0627\u0646\u06AF\u0644\u0633\u062A\u0627\u0646', SG: '\u0633\u0646\u06AF\u0627\u067E\u0648\u0631', JP: '\u0698\u0627\u067E\u0646', TR: '\u062A\u0631\u06A9\u06CC\u0647', CA: '\u06A9\u0627\u0646\u0627\u062F\u0627',
       FI: '\u0641\u0646\u0644\u0627\u0646\u062F', SE: '\u0633\u0648\u0626\u062F', RU: '\u0631\u0648\u0633\u06CC\u0647', PL: '\u0644\u0647\u0633\u062A\u0627\u0646', CH: '\u0633\u0648\u0626\u06CC\u0633',
       AT: '\u0627\u062A\u0631\u06CC\u0634', IT: '\u0627\u06CC\u062A\u0627\u0644\u06CC\u0627', ES: '\u0627\u0633\u067E\u0627\u0646\u06CC\u0627', AE: '\u0627\u0645\u0627\u0631\u0627\u062A', IN: '\u0647\u0646\u062F',
@@ -3465,7 +3463,7 @@ curl -X GET https://${hostname}/api/users \\
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">\u{1F30D}</div>\u0647\u06CC\u0686 \u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">\u{1F30D}</div>\u0647\u06CC\u0686 \u0622\u06CC\u200C\u067E\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC\u06CC \u06CC\u0627\u0641\u062A \u0646\u0634\u062F</td></tr>';
         updateSelectionToolbar();
         return;
       }
@@ -3476,7 +3474,6 @@ curl -X GET https://${hostname}/api/users \\
         const flag = countryToFlag(p.country);
         const cname = countryName(p.country);
         const loc = p.city ? cname + ' \xB7 ' + p.city : cname;
-        const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '\u2014';
         const key = p.ip + ':' + p.port;
         const isSel = proxyIPSelectedRows.has(key);
         const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
@@ -3499,13 +3496,13 @@ curl -X GET https://${hostname}/api/users \\
               \${stText}
             </span>
           </td>
-          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/50">\${lastCheck}</td>
+
           <td class="py-4 px-6">
             <div class="flex items-center justify-end gap-2">
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\\'\${p.ip}\\'', \${p.port}, event)" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\${p.ip}', \${p.port}, event)" title="\u062A\u0633\u062A \u0627\u062A\u0635\u0627\u0644">
                 <span class="material-symbols-outlined text-sm">bolt</span>
               </button>
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\\'\${p.ip}\\'', \${p.port})" title="\u062D\u0630\u0641">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\${p.ip}', \${p.port})" title="\u062D\u0630\u0641">
                 <span class="material-symbols-outlined text-sm">delete</span>
               </button>
             </div>

@@ -246,7 +246,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -641,7 +641,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -1095,7 +1095,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -1582,7 +1582,7 @@ void main() {
     if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
     if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    requestAnimationFrame(render);
+    // requestAnimationFrame(render); // Disabled for performance
   }
   render(0);
 })();
@@ -1774,7 +1774,6 @@ void main() {
       <div class="flex flex-wrap items-center gap-3">
         <select id="proxyip-filter-country" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
           <option value="" class="bg-surface">🌍 همه کشورها</option>
-          <option value="IR" class="bg-surface">🇮🇷 ایران</option>
           <option value="DE" class="bg-surface">🇩🇪 آلمان</option>
           <option value="US" class="bg-surface">🇺🇸 آمریکا</option>
           <option value="NL" class="bg-surface">🇳🇱 هلند</option>
@@ -1833,12 +1832,11 @@ void main() {
             <th class="py-4 px-6 font-medium">ISP پرووایدر</th>
             <th class="py-4 px-6 font-medium">پینگ</th>
             <th class="py-4 px-6 font-medium">وضعیت</th>
-            <th class="py-4 px-6 font-medium">آخرین بررسی</th>
             <th class="py-4 px-6 text-left">عملیات</th>
           </tr>
         </thead>
         <tbody id="proxyip-tbody" class="divide-y divide-white/5 text-sm">
-          <tr><td colspan="10" class="py-10 text-center text-on-surface-variant/50">در حال بارگذاری لیست پروکسی‌ها...</td></tr>
+          <tr><td colspan="9" class="py-10 text-center text-on-surface-variant/50">در حال بارگذاری لیست پروکسی‌ها...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2472,7 +2470,7 @@ curl -X GET https://${hostname}/api/users \\
     }
 
     const COUNTRY_NAMES_FA = {
-      IR: 'ایران', US: 'آمریکا', DE: 'آلمان', NL: 'هلند', FR: 'فرانسه',
+      US: 'آمریکا', DE: 'آلمان', NL: 'هلند', FR: 'فرانسه',
       GB: 'انگلستان', SG: 'سنگاپور', JP: 'ژاپن', TR: 'ترکیه', CA: 'کانادا',
       FI: 'فنلاند', SE: 'سوئد', RU: 'روسیه', PL: 'لهستان', CH: 'سوئیس',
       AT: 'اتریش', IT: 'ایتالیا', ES: 'اسپانیا', AE: 'امارات', IN: 'هند',
@@ -2522,7 +2520,7 @@ curl -X GET https://${hostname}/api/users \\
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">🌍</div>هیچ آی‌پی پروکسیی یافت نشد</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">🌍</div>هیچ آی‌پی پروکسیی یافت نشد</td></tr>';
         updateSelectionToolbar();
         return;
       }
@@ -2533,7 +2531,6 @@ curl -X GET https://${hostname}/api/users \\
         const flag = countryToFlag(p.country);
         const cname = countryName(p.country);
         const loc = p.city ? cname + ' · ' + p.city : cname;
-        const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '—';
         const key = p.ip + ':' + p.port;
         const isSel = proxyIPSelectedRows.has(key);
         const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
@@ -2556,13 +2553,13 @@ curl -X GET https://${hostname}/api/users \\
               \${stText}
             </span>
           </td>
-          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/50">\${lastCheck}</td>
+
           <td class="py-4 px-6">
             <div class="flex items-center justify-end gap-2">
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\\'\${p.ip}\\'', \${p.port}, event)" title="تست اتصال">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\${p.ip}', \${p.port}, event)" title="تست اتصال">
                 <span class="material-symbols-outlined text-sm">bolt</span>
               </button>
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\\'\${p.ip}\\'', \${p.port})" title="حذف">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\${p.ip}', \${p.port})" title="حذف">
                 <span class="material-symbols-outlined text-sm">delete</span>
               </button>
             </div>
