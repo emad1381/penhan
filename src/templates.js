@@ -712,7 +712,81 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .flex-gap { display: flex; gap: 8px; }
     .docs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 32px; }
     pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; font-size: 13px; color: #e2e8f0; margin-top: 10px; border: 1px solid var(--border); }
+
+    /* ===== Proxy IP Manager (redesigned) ===== */
+    .pip-stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap:16px; margin-bottom:22px; }
+    .pip-stat { position:relative; overflow:hidden; background:linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); border:1px solid var(--border); border-radius:16px; padding:18px 20px; transition:.25s; }
+    .pip-stat:hover { transform:translateY(-3px); border-color:var(--primary); box-shadow:0 10px 30px -12px rgba(139,92,246,0.5); }
+    .pip-stat .lbl { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+    .pip-stat .val { font-size:26px; font-weight:800; margin-top:10px; letter-spacing:.5px; }
+    .pip-stat .ic { position:absolute; left:16px; top:16px; font-size:26px; opacity:.18; }
+    .pip-stat.accent-green .val { color:#34d399; }
+    .pip-stat.accent-purple .val { color:#a78bfa; }
+    .pip-stat.accent-blue .val { color:#38bdf8; }
+
+    .pip-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin-bottom:16px; }
+    .pip-toolbar .sep { width:1px; height:26px; background:var(--border); margin:0 2px; }
+    .pip-toolbar .spacer { flex:1; }
+    .pip-chip { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--bg); color:var(--text); transition:.18s; white-space:nowrap; }
+    .pip-chip:hover { border-color:var(--primary); color:#fff; background:rgba(139,92,246,0.12); }
+    .pip-chip.solid { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .pip-chip.solid:hover { filter:brightness(1.1); }
+    .pip-chip.danger { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4); color:#f87171; }
+    .pip-chip.danger:hover { background:#ef4444; color:#fff; }
+    .pip-chip:disabled { opacity:.5; cursor:not-allowed; }
+    .pip-select { padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; font-family:inherit; outline:none; cursor:pointer; transition:.18s; }
+    .pip-select:hover, .pip-select:focus { border-color:var(--primary); }
+
+    /* Selection bar: sits above the table, animated */
+    .pip-selbar { display:flex; align-items:center; gap:14px; padding:0 18px; margin-bottom:0; height:0; overflow:hidden; background:linear-gradient(90deg, rgba(139,92,246,0.16), rgba(139,92,246,0.04)); border:1px solid transparent; border-radius:14px 14px 0 0; opacity:0; transition:.25s ease; }
+    .pip-selbar.show { height:56px; opacity:1; margin-bottom:-1px; border-color:var(--primary); border-bottom:none; }
+    .pip-selbar .cnt { font-weight:700; color:#c4b5fd; display:flex; align-items:center; gap:8px; }
+    .pip-selbar .cnt .num { background:var(--primary); color:#fff; border-radius:20px; padding:2px 12px; font-size:13px; }
+
+    .pip-tablewrap { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .pip-selbar.show + .pip-tablewrap { border-top-left-radius:0; border-top-right-radius:0; }
+    .pip-table { width:100%; border-collapse:collapse; }
+    .pip-table thead th { background:rgba(255,255,255,0.02); font-size:12px; font-weight:700; color:var(--muted); text-align:right; padding:14px 16px; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .pip-table tbody td { padding:13px 16px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; vertical-align:middle; }
+    .pip-table tbody tr { transition:.15s; }
+    .pip-table tbody tr:hover { background:rgba(139,92,246,0.06); }
+    .pip-table tbody tr.sel { background:rgba(139,92,246,0.1); }
+    .pip-table tbody tr:last-child td { border-bottom:none; }
+    .pip-ip { font-family:'Courier New', monospace; font-size:13.5px; font-weight:600; direction:ltr; display:inline-block; }
+    .pip-port { font-family:monospace; color:var(--muted); background:rgba(255,255,255,0.05); padding:2px 9px; border-radius:6px; font-size:12px; }
+    .pip-loc { display:inline-flex; align-items:center; gap:7px; }
+    .pip-loc .flag { font-size:17px; line-height:1; }
+    .pip-isp { font-size:12px; color:var(--muted); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; }
+    .pip-ping { font-family:monospace; font-weight:700; }
+    .pip-ping.good { color:#34d399; } .pip-ping.mid { color:#fbbf24; } .pip-ping.bad { color:#f87171; }
+
+    .pip-badge { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:20px; font-size:12px; font-weight:700; white-space:nowrap; }
+    .pip-badge.on { background:rgba(16,185,129,0.12); color:#34d399; border:1px solid rgba(16,185,129,0.25); }
+    .pip-badge.off { background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.22); }
+    .pip-badge.slow { background:rgba(251,191,36,0.12); color:#fbbf24; border:1px solid rgba(251,191,36,0.25); }
+    .pip-badge.unk { background:rgba(148,163,184,0.1); color:#94a3b8; border:1px solid rgba(148,163,184,0.22); }
+    .pip-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+    .pip-badge.on .pip-dot { background:#34d399; box-shadow:0 0 6px #34d399; }
+    .pip-badge.off .pip-dot { background:#f87171; }
+    .pip-badge.slow .pip-dot { background:#fbbf24; }
+    .pip-badge.unk .pip-dot { background:#94a3b8; }
+
+    .pip-act { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:9px; border:1px solid var(--border); background:var(--bg); cursor:pointer; transition:.18s; font-size:14px; }
+    .pip-act:hover { border-color:var(--primary); background:rgba(139,92,246,0.12); }
+    .pip-act.del:hover { border-color:#ef4444; background:rgba(239,68,68,0.15); }
+    .pip-date { font-size:11.5px; color:var(--muted); direction:ltr; display:inline-block; }
+
+    /* Custom checkbox */
+    .pip-check { appearance:none; -webkit-appearance:none; width:18px; height:18px; border:2px solid var(--border); border-radius:5px; cursor:pointer; position:relative; transition:.15s; vertical-align:middle; background:var(--bg); }
+    .pip-check:hover { border-color:var(--primary); }
+    .pip-check:checked { background:var(--primary); border-color:var(--primary); }
+    .pip-check:checked::after { content:'✓'; position:absolute; top:50%; left:50%; transform:translate(-50%,-52%); color:#fff; font-size:12px; font-weight:900; }
+    .pip-check:indeterminate { background:var(--primary); border-color:var(--primary); }
+    .pip-check:indeterminate::after { content:'–'; position:absolute; top:50%; left:50%; transform:translate(-50%,-58%); color:#fff; font-size:13px; font-weight:900; }
+    .pip-empty { text-align:center; padding:56px 20px; color:var(--muted); }
+    .pip-empty .big { font-size:40px; opacity:.4; margin-bottom:12px; }
   </style>
+
 </head>
 <body>
 
@@ -868,95 +942,88 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
 
       <!-- Stats Cards -->
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
-          <div style="font-size:12px; color:var(--muted)">کل Proxy IPها</div>
-          <div id="stat-total-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px;">0</div>
+      <div class="pip-stats">
+        <div class="pip-stat accent-purple">
+          <span class="ic">🌐</span>
+          <div class="lbl">کل Proxy IPها</div>
+          <div id="stat-total-proxyip" class="val">0</div>
         </div>
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
-          <div style="font-size:12px; color:var(--muted)">آی‌پی‌های فعال</div>
-          <div id="stat-active-proxyip" style="font-size:22px; font-weight:bold; margin-top:8px; color:var(--success)">0</div>
+        <div class="pip-stat accent-green">
+          <span class="ic">✅</span>
+          <div class="lbl">آی‌پی‌های فعال</div>
+          <div id="stat-active-proxyip" class="val">0</div>
         </div>
-        <div class="stat-box-mini" style="background:var(--surface); border:1px solid var(--border); padding:16px; border-radius:12px;">
-          <div style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;">
+        <div class="pip-stat accent-blue">
+          <span class="ic">⚡</span>
+          <div class="lbl">
             میانگین پینگ
-            <span style="cursor:pointer; font-size:11px;" onclick="refreshAllProxyIP(); this.style.transform='rotate(360deg)'; setTimeout(()=>this.style.transform='', 300); transition='0.3s';" title="بروزرسانی">🔄</span>
+            <span style="cursor:pointer;" onclick="refreshAllProxyIP()" title="بروزرسانی">🔄</span>
           </div>
-          <div id="stat-avg-ping" style="font-size:18px; font-weight:bold; margin-top:8px;">--</div>
+          <div id="stat-avg-ping" class="val">--</div>
         </div>
       </div>
 
-      <!-- Filters & Actions -->
-                  <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;">
-                    <select id="proxyip-filter-country" class="form-control" style="width:auto; min-width:180px;" onchange="filterProxyIP()">
-                      <option value="">🌍 همه کشورها</option>
-                      <option value="IR">🇮🇷 ایران</option>
-                      <option value="DE">🇩🇪 آلمان</option>
-                      <option value="US">🇺🇸 آمریکا</option>
-                      <option value="NL">🇳🇱 هلند</option>
-                      <option value="FR">🇫🇷 فرانسه</option>
-                      <option value="SG">🇸🇬 سنگاپور</option>
-                      <option value="JP">🇯🇵 ژاپن</option>
-                      <option value="TR">🇹🇷 ترکیه</option>
-                    </select>
-                    <select id="proxyip-filter-status" class="form-control" style="width:auto; min-width:150px;" onchange="filterProxyIP()">
-                      <option value="">⚡ همه وضعیت‌ها</option>
-                      <option value="active">✅ فعال</option>
-                      <option value="slow">🐢 کند</option>
-                      <option value="dead">❌ مرده</option>
-                    </select>
-                    <button class="btn btn-outline" onclick="refreshAllProxyIP()" style="display:flex; align-items:center; gap:6px;">
-                      🔄 بروزرسانی همه
-                    </button>
-                    <button class="btn btn-outline" onclick="fetchProxyIPFromSources()" style="display:flex; align-items:center; gap:6px;">
-                      ☁️ دریافت از منابع عمومی
-                    </button>
-                    <button class="btn btn-outline" onclick="detectCountriesForIPs()" style="display:flex; align-items:center; gap:6px;">
-                      🌍 تشخیص کشورها
-                    </button>
-                    <div style="flex:1"></div>
-                    <button class="btn" onclick="openProxyIPImportModal()" style="display:flex; align-items:center; gap:6px;">
-                      📥 وارد کردن لیست
-                    </button>
-                  </div>
+      <!-- Toolbar: filters + actions -->
+      <div class="pip-toolbar">
+        <select id="proxyip-filter-country" class="pip-select" onchange="filterProxyIP()">
+          <option value="">🌍 همه کشورها</option>
+          <option value="IR">🇮🇷 ایران</option>
+          <option value="DE">🇩🇪 آلمان</option>
+          <option value="US">🇺🇸 آمریکا</option>
+          <option value="NL">🇳🇱 هلند</option>
+          <option value="FR">🇫🇷 فرانسه</option>
+          <option value="SG">🇸🇬 سنگاپور</option>
+          <option value="JP">🇯🇵 ژاپن</option>
+          <option value="TR">🇹🇷 ترکیه</option>
+        </select>
+        <select id="proxyip-filter-status" class="pip-select" onchange="filterProxyIP()">
+          <option value="">⚡ همه وضعیت‌ها</option>
+          <option value="active">✅ فعال</option>
+          <option value="slow">🐢 کند</option>
+          <option value="dead">❌ مرده</option>
+        </select>
+        <span class="sep"></span>
+        <button class="pip-chip" onclick="refreshAllProxyIP()">🔄 بروزرسانی همه</button>
+        <button class="pip-chip" onclick="fetchProxyIPFromSources()">☁️ دریافت از منابع</button>
+        <button class="pip-chip" onclick="detectCountriesForIPs()">🌍 تشخیص کشورها</button>
+        <span class="spacer"></span>
+        <button class="pip-chip solid" onclick="openProxyIPImportModal()">📥 وارد کردن لیست</button>
+      </div>
 
-            <!-- Selection Toolbar (appears when items selected) -->
-            <div id="proxyip-selection-toolbar" style="display:none; gap:12px; margin-bottom:16px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; align-items:center; flex-wrap:wrap;">
-              <span id="proxyip-selected-count" style="font-weight:600; color:var(--primary);">۰ آی‌پی انتخاب شده</span>
-              <div style="flex:1"></div>
-              <button class="btn btn-outline" onclick="selectAllProxyIP(true)" style="font-size:12px;">✅ انتخاب همه</button>
-              <button class="btn btn-outline" onclick="selectAllProxyIP(false)" style="font-size:12px;">❌ لغو انتخاب</button>
-              <button class="btn btn-danger" onclick="deleteSelectedProxyIP()" style="display:flex; align-items:center; gap:6px; font-weight:600;">
-                🗑️ حذف انتخاب‌ها (<span id="proxyip-toolbar-count">0</span>)
-              </button>
-            </div>
+      <!-- Selection bar (slides in when rows are selected) -->
+      <div id="proxyip-selection-toolbar" class="pip-selbar">
+        <span class="cnt"><span class="num" id="proxyip-toolbar-count">0</span> <span id="proxyip-selected-count">آی‌پی انتخاب شده</span></span>
+        <span class="spacer"></span>
+        <button class="pip-chip" onclick="selectAllProxyIP(true)">✅ انتخاب همه</button>
+        <button class="pip-chip" onclick="selectAllProxyIP(false)">❌ لغو انتخاب</button>
+        <button class="pip-chip danger" onclick="deleteSelectedProxyIP()">🗑️ حذف انتخاب‌شده‌ها</button>
+      </div>
 
-            <!-- Proxy IP Table -->
-            <div class="table-container">
-              <!-- Proxy IP Table -->
-                    <div class="table-container">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th style="width:50px; text-align:center;">
-                              <input type="checkbox" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="انتخاب/لغو همه آی‌پی‌های قابل مشاهده">
-                            </th>
-                            <th>آی‌پی / هاست</th>
-                            <th>پورت</th>
-                            <th>کشور / شهر</th>
-                            <th>اسن / ISP</th>
-                            <th>پینگ (ms)</th>
-                            <th>وضعیت</th>
-                            <th>آخرین چک</th>
-                            <th>عملیات</th>
-                          </tr>
-                        </thead>
-                        <tbody id="proxyip-tbody">
-                          <tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">در حال دریافت...</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
+      <!-- Proxy IP Table -->
+      <div class="pip-tablewrap">
+        <table class="pip-table">
+          <thead>
+            <tr>
+              <th style="width:46px; text-align:center;">
+                <input type="checkbox" class="pip-check" id="proxyip-select-all" onchange="toggleSelectAllProxyIP(this)" title="انتخاب/لغو همه">
+              </th>
+              <th>آی‌پی / هاست</th>
+              <th>پورت</th>
+              <th>موقعیت</th>
+              <th>ISP</th>
+              <th>پینگ</th>
+              <th>وضعیت</th>
+              <th>آخرین بررسی</th>
+              <th style="text-align:center;">عملیات</th>
+            </tr>
+          </thead>
+          <tbody id="proxyip-tbody">
+            <tr><td colspan="9" class="pip-empty">در حال دریافت...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
+
 
 <!-- Modals -->
   <div class="modal-overlay" id="user-modal">
@@ -1400,38 +1467,43 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 40px; color:var(--muted)">هیچ Proxy IPی یافت نشد</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="pip-empty"><div class="big">🌐</div>هیچ Proxy IPی یافت نشد</td></tr>';
+        updateSelectionToolbar();
         return;
       }
 
       tbody.innerHTML = filtered.map(p => {
-        const statusClass = p.status === 'active' ? 'green' : (p.status === 'slow' ? 'yellow' : 'red');
-        const statusText = p.status === 'active' ? '✅ فعال' : (p.status === 'slow' ? '🐢 کند' : (p.status === 'unknown' ? '❔ نامشخص' : '❌ مرده'));
+        const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
+        const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
         const flag = countryToFlag(p.country);
         const cname = countryName(p.country);
         const loc = p.city ? cname + ' · ' + p.city : cname;
         const lastCheck = p.last_check ? new Date(p.last_check).toLocaleString('fa-IR') : '—';
-        const checked = proxyIPSelectedRows.has(p.ip + ':' + p.port) ? 'checked' : '';
+        const key = p.ip + ':' + p.port;
+        const isSel = proxyIPSelectedRows.has(key);
+        const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
+        const pingTxt = p.ping != null ? p.ping + ' ms' : '—';
 
-        return \`<tr>
-          <td style="text-align:center;"><input type="checkbox" class="proxyip-checkbox" value="\${p.ip}:\${p.port}" \${checked} onchange="toggleProxyIPSelection(this)"></td>
-          <td style="font-family:monospace; font-size:13px;">\${p.ip}</td>
-          <td>\${p.port}</td>
-          <td><span style="font-size:16px;">\${flag}</span> \${loc}</td>
-          <td style="font-size:12px; color:var(--muted);">\${p.isp || '—'}</td>
-          <td style="font-family:monospace;">\${p.ping != null ? p.ping : '—'}</td>
-          <td><span class="badge \${statusClass}">\${statusText}</span></td>
-          <td style="font-size:12px; color:var(--muted);">\${lastCheck}</td>
+        return \`<tr class="\${isSel ? 'sel' : ''}">
+          <td style="text-align:center;"><input type="checkbox" class="pip-check proxyip-checkbox" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)"></td>
+          <td><span class="pip-ip">\${p.ip}</span></td>
+          <td><span class="pip-port">\${p.port}</span></td>
+          <td><span class="pip-loc"><span class="flag">\${flag}</span> \${loc}</span></td>
+          <td><span class="pip-isp" title="\${p.isp || ''}">\${p.isp || '—'}</span></td>
+          <td><span class="pip-ping \${pingCls}">\${pingTxt}</span></td>
+          <td><span class="pip-badge \${st}"><span class="pip-dot"></span>\${stText}</span></td>
+          <td><span class="pip-date">\${lastCheck}</span></td>
           <td>
-            <div class="flex-gap">
-              <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="testProxyIP('\${p.ip}', \${p.port})">تست</button>
-              <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteProxyIP('\${p.ip}', \${p.port})">🗑️</button>
+            <div style="display:flex; gap:8px; justify-content:center;">
+              <button class="pip-act" title="تست اتصال" onclick="testProxyIP('\${p.ip}', \${p.port})">⚡</button>
+              <button class="pip-act del" title="حذف" onclick="deleteProxyIP('\${p.ip}', \${p.port})">🗑️</button>
             </div>
           </td>
         </tr>\`;
       }).join('');
       updateSelectionToolbar();
     }
+
 
     function filterProxyIP() {
       renderProxyIPTable();
@@ -1571,14 +1643,15 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           const selectAllCheckbox = document.getElementById('proxyip-select-all');
       
           if (count > 0) {
-            toolbar.style.display = 'flex';
-            countEl.textContent = count + ' آی‌پی انتخاب شده';
+            toolbar.classList.add('show');
+            countEl.textContent = 'آی‌پی انتخاب شده';
             toolbarCountEl.textContent = count;
           } else {
-            toolbar.style.display = 'none';
-            countEl.textContent = '۰ آی‌پی انتخاب شده';
+            toolbar.classList.remove('show');
+            countEl.textContent = 'آی‌پی انتخاب شده';
             toolbarCountEl.textContent = 0;
           }
+
       
           // Update select-all checkbox state
           const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
