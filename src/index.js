@@ -377,69 +377,24 @@ export default {
                 }
               }
 
-              if (path === '/api/proxyip/refresh' && request.method === 'POST') {
-                              // Refresh all proxy IPs using the cmliu-style socket checker.
-                              // Runs in batches to stay within Worker subrequest/time limits.
-                              if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
-                              const { results: dbResults } = await env.DB.prepare('SELECT * FROM proxyip').all();
-
-                              const BATCH = 20;   // concurrent socket checks per wave
-                              const MAX = 200;     // cap per refresh to avoid CPU/time limits
-                              const targets = dbResults.slice(0, MAX);
-                              let tested = 0, active = 0;
-
-                              for (let i = 0; i < targets.length; i += BATCH) {
-                                const wave = targets.slice(i, i + BATCH);
-                                const results = await Promise.all(wave.map(async (p) => {
-                                  const r = await checkProxyIP(p.ip, p.port, 5000);
-                                  if (!r.success) return { ip: p.ip, port: p.port, ping: null, status: 'dead', country: '' };
-                                  const status = r.ping == null ? 'dead' : (r.ping < 800 ? 'active' : 'slow');
-                                  return { ip: p.ip, port: p.port, ping: r.ping, status, country: r.country || '' };
-                                }));
-                                for (const r of results) {
-                                  tested++;
-                                  if (r.status === 'active') active++;
-                                  if (r.country) {
-                                    await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`)
-                                      .bind(r.status, r.ping, r.country, Date.now(), r.ip, r.port).run();
-                                  } else {
-                                    await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`)
-                                      .bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
-                                  }
-                                }
-                              }
-
-                              proxyPoolCache = null;
-                              return new Response(JSON.stringify({ok: true, tested, active}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                            }
-
-              if (path === '/api/proxyip/test' && request.method === 'POST') {
-
+              if (path === '/api/proxyip/bulk-update' && request.method === 'POST') {
                 if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
                 const b = await request.json();
-                const { ip, port } = b;
-                if (!ip) return new Response(JSON.stringify({ok: false, error: 'IP is required'}), {status: 400, headers: {'Content-Type': 'application/json'}});
-                const p = parseInt(port) || 443;
+                const { results } = b; // Array of { ip, port, ping, status }
+                if (!Array.isArray(results) || results.length === 0) {
+                  return new Response(JSON.stringify({ok: false, error: 'Invalid data format'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+                }
+
+                const statements = results.map(r => {
+                  return env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`)
+                    .bind(r.status, r.ping, Date.now(), r.ip, r.port);
+                });
 
                 try {
-                  // cmliu-style socket check: real TCP+TLS /cdn-cgi/trace → ping + country(loc=)
-                  const r = await checkProxyIP(ip, p, 5000);
-                  if (!r.success) {
-                    await env.DB.prepare(`UPDATE proxyip SET status = 'dead', ping = NULL, last_check = ? WHERE ip = ? AND port = ?`)
-                      .bind(Date.now(), ip, p).run();
-                    return new Response(JSON.stringify({ok: false, status: 'dead', error: r.error || 'unreachable'}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                  }
-                  const status = r.ping == null ? 'dead' : (r.ping < 800 ? 'active' : 'slow');
-                  // Update ping/status always; update country only if the trace gave us one.
-                  if (r.country) {
-                    await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`)
-                      .bind(status, r.ping, r.country, Date.now(), ip, p).run();
-                  } else {
-                    await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`)
-                      .bind(status, r.ping, Date.now(), ip, p).run();
-                  }
-                  return new Response(JSON.stringify({ok: true, ping: r.ping, status, country: r.country || '', colo: r.colo || ''}), {status: 200, headers: {'Content-Type': 'application/json'}});
-                } catch(e) {
+                  await env.DB.batch(statements);
+                  proxyPoolCache = null;
+                  return new Response(JSON.stringify({ok: true, updated: results.length}), {status: 200, headers: {'Content-Type': 'application/json'}});
+                } catch (e) {
                   return new Response(JSON.stringify({ok: false, error: e.message}), {status: 500, headers: {'Content-Type': 'application/json'}});
                 }
               }

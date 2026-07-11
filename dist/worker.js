@@ -31,89 +31,6 @@ async function fetchColoProxyIPs(domain, colo) {
     out.push(...await dohResolveA(d));
   return [...new Set(out)];
 }
-async function checkProxyIP(ip, port = 443, timeoutMs = 5e3) {
-  const p = parseInt(port) || 443;
-  const start = Date.now();
-  const TRACE_HOST = "speed.cloudflare.com";
-  let socket = null;
-  try {
-    socket = connect({ hostname: ip, port: p }, { secureTransport: "on", allowHalfOpen: false });
-    const writer = socket.writable.getWriter();
-    await writer.write(new TextEncoder().encode(
-      `GET /cdn-cgi/trace HTTP/1.1\r
-Host: ${TRACE_HOST}\r
-User-Agent: Mozilla/5.0\r
-Connection: close\r
-\r
-`
-    ));
-    writer.releaseLock();
-    const reader = socket.readable.getReader();
-    const decoder = new TextDecoder();
-    let buf = "";
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const remaining = deadline - Date.now();
-      const { value, done } = await Promise.race([
-        reader.read(),
-        new Promise((res) => setTimeout(() => res({ value: void 0, done: true }), remaining))
-      ]);
-      if (done)
-        break;
-      if (value)
-        buf += decoder.decode(value, { stream: true });
-      if (buf.includes("loc=") && buf.includes("colo="))
-        break;
-      if (buf.length > 16384)
-        break;
-    }
-    try {
-      reader.releaseLock();
-    } catch (e) {
-    }
-    try {
-      await socket.close();
-    } catch (e) {
-    }
-    socket = null;
-    const ping = Date.now() - start;
-    const loc = buf.match(/loc=([A-Za-z]{2})/);
-    const colo = buf.match(/colo=([A-Za-z]{3})/);
-    const tip = buf.match(/[\r\n]ip=([0-9a-fA-F:.]+)/);
-    if (loc || buf.includes("cf-ray") || buf.startsWith("HTTP/")) {
-      return {
-        success: true,
-        ping,
-        country: loc ? loc[1].toUpperCase() : "",
-        colo: colo ? colo[1].toUpperCase() : "",
-        ip: tip ? tip[1] : ip
-      };
-    }
-  } catch (e) {
-    try {
-      if (socket)
-        await socket.close();
-    } catch (er) {
-    }
-    socket = null;
-  }
-  try {
-    const t0 = Date.now();
-    const s2 = connect({ hostname: ip, port: p }, { secureTransport: "off", allowHalfOpen: false });
-    await Promise.race([
-      s2.opened,
-      new Promise((_, rej) => setTimeout(() => rej(new Error("connect timeout")), timeoutMs))
-    ]);
-    const ping = Date.now() - t0;
-    try {
-      await s2.close();
-    } catch (e) {
-    }
-    return { success: true, ping, country: "", colo: "", ip, degraded: true };
-  } catch (e2) {
-    return { success: false, ping: null, error: e2.message || "unreachable" };
-  }
-}
 function parseProxyIps(proxyIpString) {
   if (!proxyIpString || typeof proxyIpString !== "string")
     return [];
@@ -2576,56 +2493,92 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       renderProxyIPTable();
     }
 
+    async function pingIPClient(ip, port, timeoutMs = 2500) {
+      const start = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        await fetch('https://' + ip + ':' + port + '/cdn-cgi/trace', {
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        const ping = Date.now() - start;
+        return { ip, port, ping, status: 'active' };
+      } catch (e) {
+        clearTimeout(timeout);
+        return { ip, port, ping: null, status: 'dead' };
+      }
+    }
+
     async function refreshAllProxyIP() {
       const btn = event.target.closest('button');
       const originalText = btn.innerHTML;
       btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A...';
       btn.disabled = true;
-      
+
       try {
-        const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
+        const results = [];
+        const batchSize = 10;
+        
+        for (let i = 0; i < proxyIPData.length; i += batchSize) {
+          const batch = proxyIPData.slice(i, i + batchSize);
+          btn.innerHTML = '\u{1F504} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0633\u062A (' + i + '/' + proxyIPData.length + ')...';
+          const batchResults = await Promise.all(batch.map(p => pingIPClient(p.ip, p.port)));
+          results.push(...batchResults);
+        }
+
+        btn.innerHTML = '\u{1F4BE} \u062F\u0631 \u062D\u0627\u0644 \u0630\u062E\u06CC\u0631\u0647...';
+
+        const res = await fetch(basePath + '/proxyip/bulk-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results })
+        });
         const data = await res.json();
         if (data.ok) {
+          showToast('\u0628\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0645\u0648\u0641\u0642: ' + results.filter(r => r.status === 'active').length + ' \u0622\u06CC\u200C\u067E\u06CC \u0641\u0639\u0627\u0644', 'ok');
           await loadProxyIP();
         } else {
-          alert('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
+          alert('\u062E\u0637\u0627 \u062F\u0631 \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC \u0646\u062A\u0627\u06CC\u062C: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'));
         }
       } catch (e) {
-        alert('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A: ' + e.message);
+        alert('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627: ' + e.message);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
       }
-      btn.innerHTML = originalText;
-      btn.disabled = false;
     }
 
     async function testProxyIP(ip, port, ev) {
-      // Inline spinner on the clicked button (no blocking confirm/alert)
       const btn = ev && ev.target ? ev.target.closest('button') : null;
       let original = null;
       if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="pip-spinner"></span>'; }
 
       try {
-        const res = await fetch(basePath + '/proxyip/test', {
+        const r = await pingIPClient(ip, port);
+        const res = await fetch(basePath + '/proxyip/bulk-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip, port })
+          body: JSON.stringify({ results: [r] })
         });
         const data = await res.json();
         if (data.ok) {
-          showToast(ip + ' \u0641\u0639\u0627\u0644 \u0627\u0633\u062A \xB7 \u067E\u06CC\u0646\u06AF ' + data.ping + 'ms', 'ok');
-          // Update just this row locally, then re-render (fast, no full reload flicker)
+          if (r.status === 'active') {
+            showToast(ip + ' \u0641\u0639\u0627\u0644 \u0627\u0633\u062A \xB7 \u067E\u06CC\u0646\u06AF ' + r.ping + 'ms', 'ok');
+          } else {
+            showToast(ip + ' \u067E\u0627\u0633\u062E \u0646\u062F\u0627\u062F (\u0645\u0631\u062F\u0647)', 'err');
+          }
           const item = proxyIPData.find(p => p.ip === ip && p.port == port);
-          if (item) { item.status = data.status || 'active'; item.ping = data.ping; item.last_check = Date.now(); }
+          if (item) { item.status = r.status; item.ping = r.ping; item.last_check = Date.now(); }
           renderProxyIPTable();
           updateProxyIPStats();
         } else {
-          showToast(ip + ' \u067E\u0627\u0633\u062E \u0646\u062F\u0627\u062F: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
-          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
-          if (item) { item.status = 'dead'; item.last_check = Date.now(); }
-          renderProxyIPTable();
-          updateProxyIPStats();
+          showToast('\u062E\u0637\u0627 \u062F\u0631 \u0630\u062E\u06CC\u0631\u0647\u200C\u0633\u0627\u0632\u06CC: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
         }
       } catch (e) {
-        showToast('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A ' + ip + ': ' + e.message, 'err');
+        showToast('\u062E\u0637\u0627 \u062F\u0631 \u062A\u0633\u062A: ' + e.message, 'err');
+      } finally {
         if (btn && original !== null) { btn.classList.remove('spin'); btn.innerHTML = original; }
       }
     }
@@ -3208,58 +3161,21 @@ var src_default = {
             return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
           }
         }
-        if (path === "/api/proxyip/refresh" && request.method === "POST") {
-          if (!env.DB)
-            return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-          const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip").all();
-          const BATCH = 20;
-          const MAX = 200;
-          const targets = dbResults.slice(0, MAX);
-          let tested = 0, active = 0;
-          for (let i = 0; i < targets.length; i += BATCH) {
-            const wave = targets.slice(i, i + BATCH);
-            const results = await Promise.all(wave.map(async (p) => {
-              const r = await checkProxyIP(p.ip, p.port, 5e3);
-              if (!r.success)
-                return { ip: p.ip, port: p.port, ping: null, status: "dead", country: "" };
-              const status = r.ping == null ? "dead" : r.ping < 800 ? "active" : "slow";
-              return { ip: p.ip, port: p.port, ping: r.ping, status, country: r.country || "" };
-            }));
-            for (const r of results) {
-              tested++;
-              if (r.status === "active")
-                active++;
-              if (r.country) {
-                await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, r.country, Date.now(), r.ip, r.port).run();
-              } else {
-                await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port).run();
-              }
-            }
-          }
-          proxyPoolCache = null;
-          return new Response(JSON.stringify({ ok: true, tested, active }), { status: 200, headers: { "Content-Type": "application/json" } });
-        }
-        if (path === "/api/proxyip/test" && request.method === "POST") {
+        if (path === "/api/proxyip/bulk-update" && request.method === "POST") {
           if (!env.DB)
             return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
           const b = await request.json();
-          const { ip, port } = b;
-          if (!ip)
-            return new Response(JSON.stringify({ ok: false, error: "IP is required" }), { status: 400, headers: { "Content-Type": "application/json" } });
-          const p = parseInt(port) || 443;
+          const { results } = b;
+          if (!Array.isArray(results) || results.length === 0) {
+            return new Response(JSON.stringify({ ok: false, error: "Invalid data format" }), { status: 400, headers: { "Content-Type": "application/json" } });
+          }
+          const statements = results.map((r) => {
+            return env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(r.status, r.ping, Date.now(), r.ip, r.port);
+          });
           try {
-            const r = await checkProxyIP(ip, p, 5e3);
-            if (!r.success) {
-              await env.DB.prepare(`UPDATE proxyip SET status = 'dead', ping = NULL, last_check = ? WHERE ip = ? AND port = ?`).bind(Date.now(), ip, p).run();
-              return new Response(JSON.stringify({ ok: false, status: "dead", error: r.error || "unreachable" }), { status: 200, headers: { "Content-Type": "application/json" } });
-            }
-            const status = r.ping == null ? "dead" : r.ping < 800 ? "active" : "slow";
-            if (r.country) {
-              await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, country = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, r.ping, r.country, Date.now(), ip, p).run();
-            } else {
-              await env.DB.prepare(`UPDATE proxyip SET status = ?, ping = ?, last_check = ? WHERE ip = ? AND port = ?`).bind(status, r.ping, Date.now(), ip, p).run();
-            }
-            return new Response(JSON.stringify({ ok: true, ping: r.ping, status, country: r.country || "", colo: r.colo || "" }), { status: 200, headers: { "Content-Type": "application/json" } });
+            await env.DB.batch(statements);
+            proxyPoolCache = null;
+            return new Response(JSON.stringify({ ok: true, updated: results.length }), { status: 200, headers: { "Content-Type": "application/json" } });
           } catch (e) {
             return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
           }

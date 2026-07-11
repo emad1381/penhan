@@ -1549,56 +1549,92 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       renderProxyIPTable();
     }
 
+    async function pingIPClient(ip, port, timeoutMs = 2500) {
+      const start = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        await fetch('https://' + ip + ':' + port + '/cdn-cgi/trace', {
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        const ping = Date.now() - start;
+        return { ip, port, ping, status: 'active' };
+      } catch (e) {
+        clearTimeout(timeout);
+        return { ip, port, ping: null, status: 'dead' };
+      }
+    }
+
     async function refreshAllProxyIP() {
       const btn = event.target.closest('button');
       const originalText = btn.innerHTML;
       btn.innerHTML = '🔄 در حال تست...';
       btn.disabled = true;
-      
+
       try {
-        const res = await fetch(basePath + '/proxyip/refresh', { method: 'POST' });
+        const results = [];
+        const batchSize = 10;
+        
+        for (let i = 0; i < proxyIPData.length; i += batchSize) {
+          const batch = proxyIPData.slice(i, i + batchSize);
+          btn.innerHTML = '🔄 در حال تست (' + i + '/' + proxyIPData.length + ')...';
+          const batchResults = await Promise.all(batch.map(p => pingIPClient(p.ip, p.port)));
+          results.push(...batchResults);
+        }
+
+        btn.innerHTML = '💾 در حال ذخیره...';
+
+        const res = await fetch(basePath + '/proxyip/bulk-update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ results })
+        });
         const data = await res.json();
         if (data.ok) {
+          showToast('بروزرسانی موفق: ' + results.filter(r => r.status === 'active').length + ' آی‌پی فعال', 'ok');
           await loadProxyIP();
         } else {
-          alert('خطا: ' + (data.error || 'نامشخص'));
+          alert('خطا در ذخیره‌سازی نتایج: ' + (data.error || 'نامشخص'));
         }
       } catch (e) {
-        alert('خطا در تست: ' + e.message);
+        alert('خطا در تست آی‌پی‌ها: ' + e.message);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
       }
-      btn.innerHTML = originalText;
-      btn.disabled = false;
     }
 
     async function testProxyIP(ip, port, ev) {
-      // Inline spinner on the clicked button (no blocking confirm/alert)
       const btn = ev && ev.target ? ev.target.closest('button') : null;
       let original = null;
       if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="pip-spinner"></span>'; }
 
       try {
-        const res = await fetch(basePath + '/proxyip/test', {
+        const r = await pingIPClient(ip, port);
+        const res = await fetch(basePath + '/proxyip/bulk-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip, port })
+          body: JSON.stringify({ results: [r] })
         });
         const data = await res.json();
         if (data.ok) {
-          showToast(ip + ' فعال است · پینگ ' + data.ping + 'ms', 'ok');
-          // Update just this row locally, then re-render (fast, no full reload flicker)
+          if (r.status === 'active') {
+            showToast(ip + ' فعال است · پینگ ' + r.ping + 'ms', 'ok');
+          } else {
+            showToast(ip + ' پاسخ نداد (مرده)', 'err');
+          }
           const item = proxyIPData.find(p => p.ip === ip && p.port == port);
-          if (item) { item.status = data.status || 'active'; item.ping = data.ping; item.last_check = Date.now(); }
+          if (item) { item.status = r.status; item.ping = r.ping; item.last_check = Date.now(); }
           renderProxyIPTable();
           updateProxyIPStats();
         } else {
-          showToast(ip + ' پاسخ نداد: ' + (data.error || 'نامشخص'), 'err');
-          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
-          if (item) { item.status = 'dead'; item.last_check = Date.now(); }
-          renderProxyIPTable();
-          updateProxyIPStats();
+          showToast('خطا در ذخیره‌سازی: ' + (data.error || 'نامشخص'), 'err');
         }
       } catch (e) {
-        showToast('خطا در تست ' + ip + ': ' + e.message, 'err');
+        showToast('خطا در تست: ' + e.message, 'err');
+      } finally {
         if (btn && original !== null) { btn.classList.remove('spin'); btn.innerHTML = original; }
       }
     }
