@@ -18,9 +18,9 @@ async function testProxyIPConnection(ip, port = 443) {
     
     // Wait for the first chunk or timeout
     const readPromise = reader.read();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs));
+    let timeoutId; const timeoutPromise = new Promise((_, reject) => { timeoutId = setTimeout(() => reject(new Error('timeout')), timeoutMs); }); timeoutPromise.catch(()=>{});
     
-    const { value, done } = await Promise.race([readPromise, timeoutPromise]);
+    const { value, done } = await Promise.race([readPromise, timeoutPromise]); clearTimeout(timeoutId);
     
     reader.releaseLock();
     try { socket.close(); } catch(e) {}

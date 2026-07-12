@@ -3872,8 +3872,14 @@ Connection: close\r
     writer.releaseLock();
     const reader = socket.readable.getReader();
     const readPromise = reader.read();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs));
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    });
+    timeoutPromise.catch(() => {
+    });
     const { value, done } = await Promise.race([readPromise, timeoutPromise]);
+    clearTimeout(timeoutId);
     reader.releaseLock();
     try {
       socket.close();
