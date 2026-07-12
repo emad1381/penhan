@@ -638,7 +638,7 @@ export default {
               if (path === '/api/proxyip/detect-countries' && request.method === 'POST') {
                 if (!env.DB) return new Response(JSON.stringify({ok: false, error: 'DB not available'}), {status: 500, headers: {'Content-Type': 'application/json'}});
 
-                const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+                const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL LIMIT 100").all();
                 if (!dbResults.length) {
                   return new Response(JSON.stringify({ok: true, updated: 0}), {status: 200, headers: {'Content-Type': 'application/json'}});
                 }
@@ -651,8 +651,7 @@ export default {
                 try {
                   const updateStatements = [];
                   for (const item of dbResults) {
-                    const geo = geoMap.get(item.ip);
-                    if (!geo) continue;
+                    const geo = geoMap.get(item.ip) || { country: '🌍', city: '', isp: '' };
                     updateStatements.push(
                       env.DB.prepare('UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?')
                         .bind(geo.country, geo.city, geo.isp, item.ip, item.port)

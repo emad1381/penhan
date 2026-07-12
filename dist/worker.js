@@ -3686,19 +3686,43 @@ curl -X GET https://${hostname}/api/users \\
       let originalText = '';
       if (btn) {
         originalText = btn.innerHTML;
-        btn.innerHTML = '\u{1F30D} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0634\u062E\u06CC\u0635...';
         btn.disabled = true;
       }
 
       try {
-        const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('\u2705 \u06A9\u0634\u0648\u0631\u0650 ' + (data.updated || 0) + ' \u0622\u06CC\u200C\u067E\u06CC \u062A\u0634\u062E\u06CC\u0635 \u062F\u0627\u062F\u0647 \u0634\u062F', 'ok');
-          loadProxyIP();
-        } else {
-          showToast('\u062E\u0637\u0627: ' + (data.error || '\u0646\u0627\u0645\u0634\u062E\u0635'), 'err');
+        const totalMissing = proxyIPData.filter(p => !p.country || p.country === '').length;
+        if (totalMissing === 0) {
+          showToast('\u062A\u0645\u0627\u0645 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u062F\u0627\u0631\u0627\u06CC \u06A9\u0634\u0648\u0631 \u0647\u0633\u062A\u0646\u062F.', 'ok');
+          if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }
+          return;
         }
+
+        let totalUpdated = 0;
+        const chunks = Math.ceil(totalMissing / 100);
+
+        for (let i = 0; i < chunks; i++) {
+          if (btn) {
+            btn.innerHTML = '\u{1F30D} \u062F\u0631 \u062D\u0627\u0644 \u062A\u0634\u062E\u06CC\u0635... (' + (i * 100) + ' \u0627\u0632 ' + totalMissing + ')';
+          }
+
+          const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
+          const data = await res.json();
+          if (data.ok) {
+            totalUpdated += data.updated || 0;
+          } else {
+            throw new Error(data.error || '\u062E\u0637\u0627\u06CC \u0633\u0631\u0648\u0631');
+          }
+
+          if (i < chunks - 1) {
+            await new Promise(r => setTimeout(r, 4500));
+          }
+        }
+
+        showToast('\u2705 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A ' + totalUpdated + ' \u0622\u06CC\u200C\u067E\u06CC \u0634\u0646\u0627\u0633\u0627\u06CC\u06CC \u0634\u062F!', 'ok');
+        loadProxyIP();
       } catch (e) {
         showToast('\u062E\u0637\u0627: ' + e.message, 'err');
       } finally {
@@ -4465,7 +4489,7 @@ var src_default = {
         if (path === "/api/proxyip/detect-countries" && request.method === "POST") {
           if (!env.DB)
             return new Response(JSON.stringify({ ok: false, error: "DB not available" }), { status: 500, headers: { "Content-Type": "application/json" } });
-          const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL").all();
+          const { results: dbResults } = await env.DB.prepare("SELECT * FROM proxyip WHERE country = '' OR country IS NULL LIMIT 100").all();
           if (!dbResults.length) {
             return new Response(JSON.stringify({ ok: true, updated: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
           }
@@ -4475,9 +4499,7 @@ var src_default = {
           try {
             const updateStatements = [];
             for (const item of dbResults) {
-              const geo = geoMap.get(item.ip);
-              if (!geo)
-                continue;
+              const geo = geoMap.get(item.ip) || { country: "\u{1F30D}", city: "", isp: "" };
               updateStatements.push(
                 env.DB.prepare("UPDATE proxyip SET country = ?, city = ?, isp = ? WHERE ip = ? AND port = ?").bind(geo.country, geo.city, geo.isp, item.ip, item.port)
               );

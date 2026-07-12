@@ -2733,19 +2733,43 @@ curl -X GET https://${hostname}/api/users \\
       let originalText = '';
       if (btn) {
         originalText = btn.innerHTML;
-        btn.innerHTML = '🌍 در حال تشخیص...';
         btn.disabled = true;
       }
 
       try {
-        const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('✅ کشورِ ' + (data.updated || 0) + ' آی‌پی تشخیص داده شد', 'ok');
-          loadProxyIP();
-        } else {
-          showToast('خطا: ' + (data.error || 'نامشخص'), 'err');
+        const totalMissing = proxyIPData.filter(p => !p.country || p.country === '').length;
+        if (totalMissing === 0) {
+          showToast('تمام آی‌پی‌ها دارای کشور هستند.', 'ok');
+          if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }
+          return;
         }
+
+        let totalUpdated = 0;
+        const chunks = Math.ceil(totalMissing / 100);
+
+        for (let i = 0; i < chunks; i++) {
+          if (btn) {
+            btn.innerHTML = '🌍 در حال تشخیص... (' + (i * 100) + ' از ' + totalMissing + ')';
+          }
+
+          const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
+          const data = await res.json();
+          if (data.ok) {
+            totalUpdated += data.updated || 0;
+          } else {
+            throw new Error(data.error || 'خطای سرور');
+          }
+
+          if (i < chunks - 1) {
+            await new Promise(r => setTimeout(r, 4500));
+          }
+        }
+
+        showToast('✅ با موفقیت ' + totalUpdated + ' آی‌پی شناسایی شد!', 'ok');
+        loadProxyIP();
       } catch (e) {
         showToast('خطا: ' + e.message, 'err');
       } finally {
