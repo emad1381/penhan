@@ -2668,203 +2668,48 @@ curl -X GET https://${hostname}/api/users \\
     }
 
     async function testProxyIP(ip, port, ev) {
-      const btn = ev && ev.target ? ev.target.closest('button') : null;
-      let original = null;
-      if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="pip-spinner"></span>'; }
-
-      try {
-        const r = await pingIPClient(ip, port);
-        const res = await fetch(basePath + '/proxyip/bulk-update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ results: [r] })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          if (r.status === 'active') {
-            showToast(ip + ' فعال است · پینگ ' + r.ping + 'ms', 'ok');
-          } else {
-            showToast(ip + ' پاسخ نداد (مرده)', 'err');
-          }
-          const item = proxyIPData.find(p => p.ip === ip && p.port == port);
-          if (item) { item.status = r.status; item.ping = r.ping; item.last_check = Date.now(); }
-          renderProxyIPTable();
-          updateProxyIPStats();
-        } else {
-          showToast('خطا در ذخیره‌سازی: ' + (data.error || 'نامشخص'), 'err');
-        }
-      } catch (e) {
-        showToast('خطا در تست: ' + e.message, 'err');
-      } finally {
-        if (btn && original !== null) { btn.classList.remove('spin'); btn.innerHTML = original; }
-      }
-    }
-
-    async function fetchProxyIPFromSources(e) {
-      const btn = e && e.target ? e.target.closest('button') : null;
-      let originalText = '';
-      if (btn) {
-        originalText = btn.innerHTML;
-        btn.innerHTML = '☁️ در حال دریافت...';
-        btn.disabled = true;
-      }
+        const btn = ev && ev.target ? ev.target.closest('button') : null;
+        let original = null;
+        if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="material-symbols-outlined spin text-sm">sync</span>'; }
   
-      try {
-        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-          showToast('✅ ' + (data.count || 0) + ' آی‌پی جدید دریافت شد', 'ok');
-          loadProxyIP();
-        } else {
-          showToast('خطا: ' + (data.error || 'نامشخص'), 'err');
-        }
-      } catch (e) {
-        showToast('خطا: ' + e.message, 'err');
-      } finally {
-        if (btn) {
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-        }
-      }
-    }
+        try {
+          const resTest = await fetch(basePath + '/api/proxyip/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ips: [{ip, port}] })
+          });
+          const testData = await resTest.json();
+          if (!testData.ok || !testData.results || testData.results.length === 0) throw new Error('Test failed');
+          
+          const r = testData.results[0];
 
-    async function detectCountriesForIPs(e) {
-      const btn = e && e.target ? e.target.closest('button') : null;
-      let originalText = '';
-      if (btn) {
-        originalText = btn.innerHTML;
-        btn.disabled = true;
-      }
-
-      try {
-        const totalMissing = proxyIPData.filter(p => !p.country || p.country === '').length;
-        if (totalMissing === 0) {
-          showToast('تمام آی‌پی‌ها دارای کشور هستند.', 'ok');
-          if (btn) {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-          }
-          return;
-        }
-
-        let totalUpdated = 0;
-        const chunks = Math.ceil(totalMissing / 100);
-
-        for (let i = 0; i < chunks; i++) {
-          if (btn) {
-            btn.innerHTML = '🌍 در حال تشخیص... (' + (i * 100) + ' از ' + totalMissing + ')';
-          }
-
-          const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
+          const res = await fetch(basePath + '/proxyip/bulk-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: [r] })
+          });
           const data = await res.json();
           if (data.ok) {
-            totalUpdated += data.updated || 0;
+            if (r.status === 'active' || r.status === 'slow') {
+              showToast(ip + ' فعال است با پینگ ' + r.ping + 'ms', 'ok');
+            } else {
+              showToast(ip + ' پاسخ نداد (مرده)', 'err');
+            }
+            const item = proxyIPData.find(p => p.ip === ip && p.port == port);
+            if (item) { item.status = r.status; item.ping = r.ping; item.last_check = Date.now(); }
+            renderProxyIPTable();
+            updateProxyIPStats();
           } else {
-            throw new Error(data.error || 'خطای سرور');
+            alert('خطا در ذخیره‌سازی نتیجه: ' + (data.error || 'ناشناخته'));
           }
-
-          if (i < chunks - 1) {
-            await new Promise(r => setTimeout(r, 4500));
-          }
-        }
-
-        showToast('✅ با موفقیت ' + totalUpdated + ' آی‌پی شناسایی شد!', 'ok');
-        loadProxyIP();
-      } catch (e) {
-        showToast('خطا: ' + e.message, 'err');
-      } finally {
-        if (btn) {
-          btn.innerHTML = originalText;
-          btn.disabled = false;
+        } catch (e) {
+          alert('خطا: ' + e.message);
+        } finally {
+          if (btn) { btn.innerHTML = original; btn.classList.remove('spin'); }
         }
       }
-    }
 
-    function toggleProxyIPSelection(checkbox) {
-      const val = checkbox.value;
-      if (checkbox.checked) proxyIPSelectedRows.add(val);
-      else proxyIPSelectedRows.delete(val);
-      updateSelectionToolbar();
-    }
-
-    function toggleSelectAllProxyIP(selectAllCheckbox) {
-      const isChecked = selectAllCheckbox.checked;
-      const checkboxes = document.querySelectorAll('.proxyip-checkbox');
-      checkboxes.forEach(cb => {
-        cb.checked = isChecked;
-        const val = cb.value;
-        if (isChecked) proxyIPSelectedRows.add(val);
-        else proxyIPSelectedRows.delete(val);
-      });
-      updateSelectionToolbar();
-    }
-
-    function updateSelectionToolbar() {
-      const count = proxyIPSelectedRows.size;
-      const toolbar = document.getElementById('proxyip-selection-toolbar');
-      const countEl = document.getElementById('proxyip-selected-count');
-      const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
-      const selectAllCheckbox = document.getElementById('proxyip-select-all');
-  
-      if (count > 0) {
-        toolbar.classList.add('show');
-        countEl.textContent = 'آی‌پی انتخاب شده';
-        toolbarCountEl.textContent = count;
-      } else {
-        toolbar.classList.remove('show');
-        countEl.textContent = 'آی‌پی انتخاب شده';
-        toolbarCountEl.textContent = 0;
-      }
-
-      const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
-      if (visibleCheckboxes.length > 0) {
-        const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
-        selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
-        selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
-      } else {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-      }
-    }
-
-    function openProxyIPAddModal() {
-      document.getElementById('proxyip-add-modal-title').textContent = 'افزودن Proxy IP جدید';
-      document.getElementById('pi-ip').value = '';
-      document.getElementById('pi-port').value = '443';
-      document.getElementById('pi-country').value = '';
-      document.getElementById('pi-city').value = '';
-      document.getElementById('pi-isp').value = '';
-      openModal('proxyip-add-modal');
-    }
-
-    async function saveProxyIP() {
-      const ip = document.getElementById('pi-ip').value.trim();
-      const port = parseInt(document.getElementById('pi-port').value) || 443;
-      const country = document.getElementById('pi-country').value.trim();
-      const city = document.getElementById('pi-city').value.trim();
-      const isp = document.getElementById('pi-isp').value.trim();
-      
-      if (!ip) { showToast('آی‌پی الزامی است', 'err'); return; }
-      
-      try {
-        const res = await fetch(basePath + '/proxyip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip, port, country, city, isp })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          closeModal('proxyip-add-modal');
-          loadProxyIP();
-        } else {
-          alert('خطا: ' + (data.error || 'نامشخص'));
-        }
-      } catch (e) {
-        alert('خطا: ' + e.message);
-      }
-    }
-
-    async function deleteProxyIP(ip, port) {
+      async function deleteProxyIP(ip, port) {
       if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را حذف کنید؟\`)) return;
 
       try {

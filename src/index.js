@@ -1,3 +1,48 @@
+
+async function testProxyIPConnection(ip, port = 443) {
+  const start = Date.now();
+  const timeoutMs = 5000;
+  let socket;
+  
+  try {
+    socket = connect({ hostname: ip, port: parseInt(port) });
+    const writer = socket.writable.getWriter();
+    
+    // Send a plaintext HTTP GET request. We send Host: speed.cloudflare.com.
+    // When sent to port 443, CF expects TLS ClientHello. Plaintext will trigger a 400 Bad Request.
+    const req = `GET /__down?bytes=5000 HTTP/1.1\r\nHost: speed.cloudflare.com\r\nConnection: close\r\n\r\n`;
+    await writer.write(new TextEncoder().encode(req));
+    writer.releaseLock();
+
+    const reader = socket.readable.getReader();
+    
+    // Wait for the first chunk or timeout
+    const readPromise = reader.read();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs));
+    
+    const { value, done } = await Promise.race([readPromise, timeoutPromise]);
+    
+    reader.releaseLock();
+    try { socket.close(); } catch(e) {}
+    
+    if (!value || done) return { ok: false, ping: 0, status: 'dead' };
+    
+    const responseText = new TextDecoder().decode(value);
+    const isBadRequest = /^HTTP\/1\.[01] 400/.test(responseText);
+    const hasCFRay = /cf-ray:/i.test(responseText);
+    
+    if (isBadRequest && hasCFRay) {
+      const ping = Date.now() - start;
+      return { ok: true, ping, status: ping > 1500 ? 'slow' : 'active' };
+    } else {
+      return { ok: false, ping: 0, status: 'dead' };
+    }
+  } catch (e) {
+    if (socket) { try { socket.close(); } catch(e) {} }
+    return { ok: false, ping: 0, status: 'dead' };
+  }
+}
+import { connect } from 'cloudflare:sockets';
 import { 
   isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, 
   updateUsageD1, sha224_and_224, getSettingD1, setSettingD1,
@@ -330,6 +375,21 @@ export default {
               // Invalidate the fallback pool cache on any mutating proxyip call
               if (path.startsWith('/api/proxyip') && request.method !== 'GET') {
                 proxyPoolCache = null;
+              }
+
+              
+              if (path === '/api/proxyip/test' && request.method === 'POST') {
+                const b = await request.json();
+                const ips = b.ips; // Array of {ip, port}
+                if (!ips || !Array.isArray(ips)) return new Response(JSON.stringify({ok: false, error: 'invalid data'}), {status: 400});
+                
+                const testPromises = ips.map(async (p) => {
+                  const res = await testProxyIPConnection(p.ip, p.port);
+                  return { ip: p.ip, port: p.port, ...res };
+                });
+                
+                const results = await Promise.all(testPromises);
+                return new Response(JSON.stringify({ok: true, results}), {status: 200, headers: {'Content-Type': 'application/json'}});
               }
 
               if (path === '/api/proxyip' && request.method === 'GET') {
