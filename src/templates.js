@@ -1773,20 +1773,20 @@ void main() {
     <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
       <div class="flex flex-wrap items-center gap-3">
         <select id="proxyip-filter-country" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
-          <option value="" class="bg-surface">🌍 همه کشورها</option>
-          <option value="DE" class="bg-surface">🇩🇪 آلمان</option>
-          <option value="US" class="bg-surface">🇺🇸 آمریکا</option>
-          <option value="NL" class="bg-surface">🇳🇱 هلند</option>
-          <option value="FR" class="bg-surface">🇫🇷 فرانسه</option>
-          <option value="SG" class="bg-surface">🇸🇬 سنگاپور</option>
-          <option value="JP" class="bg-surface">🇯🇵 ژاپن</option>
-          <option value="TR" class="bg-surface">🇹🇷 ترکیه</option>
+          <option value="" class="bg-[#121212] text-white">🌍 همه کشورها</option>
+          <option value="DE" class="bg-[#121212] text-white">🇩🇪 آلمان</option>
+          <option value="US" class="bg-[#121212] text-white">🇺🇸 آمریکا</option>
+          <option value="NL" class="bg-[#121212] text-white">🇳🇱 هلند</option>
+          <option value="FR" class="bg-[#121212] text-white">🇫🇷 فرانسه</option>
+          <option value="SG" class="bg-[#121212] text-white">🇸🇬 سنگاپور</option>
+          <option value="JP" class="bg-[#121212] text-white">🇯🇵 ژاپن</option>
+          <option value="TR" class="bg-[#121212] text-white">🇹🇷 ترکیه</option>
         </select>
         <select id="proxyip-filter-status" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
-          <option value="" class="bg-surface">⚡ همه وضعیت‌ها</option>
-          <option value="active" class="bg-surface">✅ فعال</option>
-          <option value="slow" class="bg-surface">🐢 کند</option>
-          <option value="dead" class="bg-surface">❌ قطع</option>
+          <option value="" class="bg-[#121212] text-white">⚡ همه وضعیت‌ها</option>
+          <option value="active" class="bg-[#121212] text-white">✅ فعال</option>
+          <option value="slow" class="bg-[#121212] text-white">🐢 کند</option>
+          <option value="dead" class="bg-[#121212] text-white">❌ قطع</option>
         </select>
       </div>
       <div class="flex items-center gap-2">
@@ -2099,7 +2099,7 @@ curl -X GET https://${hostname}/api/users \\
       <div class="space-y-1">
         <label class="block text-xs font-bold text-on-surface-variant/80">فرمت لیست</label>
         <select id="pi-import-format" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50">
-          <option value="ip:port" class="bg-surface">ip:port (هر خط یک آی‌پی)</option>
+          <option value="ip:port" class="bg-[#121212] text-white">ip:port (هر خط یک آی‌پی)</option>
         </select>
       </div>
       <div class="space-y-1">

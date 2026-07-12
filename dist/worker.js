@@ -2726,20 +2726,20 @@ void main() {
     <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
       <div class="flex flex-wrap items-center gap-3">
         <select id="proxyip-filter-country" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
-          <option value="" class="bg-surface">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
-          <option value="DE" class="bg-surface">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
-          <option value="US" class="bg-surface">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
-          <option value="NL" class="bg-surface">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
-          <option value="FR" class="bg-surface">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
-          <option value="SG" class="bg-surface">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
-          <option value="JP" class="bg-surface">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
-          <option value="TR" class="bg-surface">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
+          <option value="" class="bg-[#121212] text-white">\u{1F30D} \u0647\u0645\u0647 \u06A9\u0634\u0648\u0631\u0647\u0627</option>
+          <option value="DE" class="bg-[#121212] text-white">\u{1F1E9}\u{1F1EA} \u0622\u0644\u0645\u0627\u0646</option>
+          <option value="US" class="bg-[#121212] text-white">\u{1F1FA}\u{1F1F8} \u0622\u0645\u0631\u06CC\u06A9\u0627</option>
+          <option value="NL" class="bg-[#121212] text-white">\u{1F1F3}\u{1F1F1} \u0647\u0644\u0646\u062F</option>
+          <option value="FR" class="bg-[#121212] text-white">\u{1F1EB}\u{1F1F7} \u0641\u0631\u0627\u0646\u0633\u0647</option>
+          <option value="SG" class="bg-[#121212] text-white">\u{1F1F8}\u{1F1EC} \u0633\u0646\u06AF\u0627\u067E\u0648\u0631</option>
+          <option value="JP" class="bg-[#121212] text-white">\u{1F1EF}\u{1F1F5} \u0698\u0627\u067E\u0646</option>
+          <option value="TR" class="bg-[#121212] text-white">\u{1F1F9}\u{1F1F7} \u062A\u0631\u06A9\u06CC\u0647</option>
         </select>
         <select id="proxyip-filter-status" class="bg-white/5 border border-white/10 rounded-lg text-xs py-2 px-4 focus:ring-0 focus:border-primary text-white" onchange="filterProxyIP()">
-          <option value="" class="bg-surface">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
-          <option value="active" class="bg-surface">\u2705 \u0641\u0639\u0627\u0644</option>
-          <option value="slow" class="bg-surface">\u{1F422} \u06A9\u0646\u062F</option>
-          <option value="dead" class="bg-surface">\u274C \u0642\u0637\u0639</option>
+          <option value="" class="bg-[#121212] text-white">\u26A1 \u0647\u0645\u0647 \u0648\u0636\u0639\u06CC\u062A\u200C\u0647\u0627</option>
+          <option value="active" class="bg-[#121212] text-white">\u2705 \u0641\u0639\u0627\u0644</option>
+          <option value="slow" class="bg-[#121212] text-white">\u{1F422} \u06A9\u0646\u062F</option>
+          <option value="dead" class="bg-[#121212] text-white">\u274C \u0642\u0637\u0639</option>
         </select>
       </div>
       <div class="flex items-center gap-2">
@@ -3052,7 +3052,7 @@ curl -X GET https://${hostname}/api/users \\
       <div class="space-y-1">
         <label class="block text-xs font-bold text-on-surface-variant/80">\u0641\u0631\u0645\u062A \u0644\u06CC\u0633\u062A</label>
         <select id="pi-import-format" class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none focus:border-primary/50">
-          <option value="ip:port" class="bg-surface">ip:port (\u0647\u0631 \u062E\u0637 \u06CC\u06A9 \u0622\u06CC\u200C\u067E\u06CC)</option>
+          <option value="ip:port" class="bg-[#121212] text-white">ip:port (\u0647\u0631 \u062E\u0637 \u06CC\u06A9 \u0622\u06CC\u200C\u067E\u06CC)</option>
         </select>
       </div>
       <div class="space-y-1">
