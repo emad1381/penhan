@@ -2512,6 +2512,8 @@ curl -X GET https://${hostname}/api/users \\
       document.getElementById('stat-avg-ping').textContent = avgPing > 0 ? avgPing + ' ms' : '--';
     }
 
+    let proxyTableRenderId = 0;
+
     function renderProxyIPTable() {
       const tbody = document.getElementById('proxyip-tbody');
       const countryFilter = document.getElementById('proxyip-filter-country')?.value || '';
@@ -2521,24 +2523,42 @@ curl -X GET https://${hostname}/api/users \\
       if (countryFilter) filtered = filtered.filter(p => p.country === countryFilter);
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
 
+      proxyTableRenderId++;
+      const currentRenderId = proxyTableRenderId;
+
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">🌍</div>هیچ آی‌پی پروکسیی یافت نشد</td></tr>';
         updateSelectionToolbar();
         return;
       }
 
-      tbody.innerHTML = filtered.map((p, idx) => {
-        const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
-        const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
-        const flag = countryToFlag(p.country);
-        const cname = countryName(p.country);
-        const loc = p.city ? cname + ' · ' + p.city : cname;
-        const key = p.ip + ':' + p.port;
-        const isSel = proxyIPSelectedRows.has(key);
-        const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
-        const pingTxt = p.ping != null ? p.ping + ' ms' : '—';
+      tbody.innerHTML = '';
+      
+      const CHUNK_SIZE = 50;
+      let currentIndex = 0;
 
-        return \`
+      function renderChunk() {
+        if (currentRenderId !== proxyTableRenderId) return;
+
+        const chunk = filtered.slice(currentIndex, currentIndex + CHUNK_SIZE);
+        if (chunk.length === 0) {
+          updateSelectionToolbar();
+          return;
+        }
+
+        const html = chunk.map((p, offset) => {
+          const idx = currentIndex + offset;
+          const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
+          const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
+          const flag = countryToFlag(p.country);
+          const cname = countryName(p.country);
+          const loc = p.city ? cname + ' · ' + p.city : cname;
+          const key = p.ip + ':' + p.port;
+          const isSel = proxyIPSelectedRows.has(key);
+          const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
+          const pingTxt = p.ping != null ? p.ping + ' ms' : '—';
+
+          return \`
         <tr class="group hover:bg-white/5 transition-all \${isSel ? 'bg-primary/5' : ''}">
           <td class="py-4 px-6 text-center">
             <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)">
@@ -2567,10 +2587,20 @@ curl -X GET https://${hostname}/api/users \\
             </div>
           </td>
         </tr>\`;
-      }).join('');
-      updateSelectionToolbar();
+        }).join('');
+        
+        tbody.insertAdjacentHTML('beforeend', html);
+        currentIndex += CHUNK_SIZE;
+        
+        if (currentIndex < filtered.length) {
+          setTimeout(renderChunk, 10);
+        } else {
+          updateSelectionToolbar();
+        }
+      }
+      
+      renderChunk();
     }
-
     function filterProxyIP() {
       renderProxyIPTable();
     }
