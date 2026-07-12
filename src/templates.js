@@ -2578,7 +2578,7 @@ curl -X GET https://${hostname}/api/users \\
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
       if (proxyIPSearchVal) {
         filtered = filtered.filter(p => {
-          const txt = `${p.ip} ${p.port} ${p.country || ''} ${p.city || ''} ${p.isp || ''}`.toLowerCase();
+          const txt = (p.ip + ' ' + p.port + ' ' + (p.country || '') + ' ' + (p.city || '') + ' ' + (p.isp || '')).toLowerCase();
           return txt.includes(proxyIPSearchVal);
         });
       }
