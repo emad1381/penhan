@@ -2647,18 +2647,17 @@ tbody.innerHTML = html;
       // Update Pagination UI
       const pagination = document.getElementById('proxyip-pagination');
       if (pagination) {
-          const paginationHtml = `
-            <div class="flex items-center justify-between w-full p-4 bg-white/5 border-t border-white/5 text-sm text-on-surface-variant">
-              <div>نمایش ${startIdx + 1} تا ${Math.min(startIdx + PROXY_IP_PER_PAGE, filtered.length)} از ${filtered.length} آی‌پی</div>
-              <div class="flex items-center gap-2">
-                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-                  onclick="changeProxyIPPage(-1)" ${currentProxyIPPage === 1 ? 'disabled' : ''}>قبلی</button>
-                <span class="px-3">صفحه ${currentProxyIPPage} از ${totalPages}</span>
-                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
-                  onclick="changeProxyIPPage(1)" ${currentProxyIPPage === totalPages ? 'disabled' : ''}>بعدی</button>
-              </div>
-            </div>
-          `;
+          const paginationHtml = '\n' +
+            '            <div class="flex items-center justify-between w-full p-4 bg-white/5 border-t border-white/5 text-sm text-on-surface-variant">\n' +
+            '              <div>نمایش ' + (startIdx + 1) + ' تا ' + Math.min(startIdx + PROXY_IP_PER_PAGE, filtered.length) + ' از ' + filtered.length + ' آی‌پی</div>\n' +
+            '              <div class="flex items-center gap-2">\n' +
+            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \n' +
+            '                  onclick="changeProxyIPPage(-1)" ' + (currentProxyIPPage === 1 ? 'disabled' : '') + '>قبلی</button>\n' +
+            '                <span class="px-3">صفحه ' + currentProxyIPPage + ' از ' + totalPages + '</span>\n' +
+            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \n' +
+            '                  onclick="changeProxyIPPage(1)" ' + (currentProxyIPPage === totalPages ? 'disabled' : '') + '>بعدی</button>\n' +
+            '              </div>\n' +
+            '            </div>';
           pagination.innerHTML = paginationHtml;
       }
     }
