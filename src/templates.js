@@ -2611,37 +2611,37 @@ curl -X GET https://${hostname}/api/users \\
         const key = p.ip + ':' + p.port;
         const isSel = proxyIPSelectedRows.has(key);
 
-        return `
-        <tr class="group hover:bg-white/5 transition-all ${isSel ? 'bg-primary/5' : ''}">
-          <td class="py-4 px-6 text-center">
-            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="${key}" ${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)">
-          </td>
-          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">${idx + 1}</td>
-          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">${p.ip}</td>
-          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">${p.port}</span></td>
-          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">${flag}</span> ${loc}</td>
-          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="${p.isp || ''}">${p.isp || '-'}</td>
-          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="${pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')}">${pingTxt}</span></td>
-          <td class="py-4 px-6">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))}">
-              <span class="w-1.5 h-1.5 rounded-full ${st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))}"></span>
-              ${stText}
-            </span>
-          </td>
-          <td class="py-4 px-6">
-            <div class="flex items-center justify-end gap-2">
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('${p.ip}', ${p.port}, event)" title="تست اتصال">
-                <span class="material-symbols-outlined text-sm">bolt</span>
-              </button>
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('${p.ip}', ${p.port})" title="حذف">
-                <span class="material-symbols-outlined text-sm">delete</span>
-              </button>
-            </div>
-          </td>
-        </tr>`;
+        return '\n' +
+        '        <tr class="group hover:bg-white/5 transition-all ' + (isSel ? 'bg-primary/5' : '') + '">\n' +
+        '          <td class="py-4 px-6 text-center">\n' +
+        '            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)">\n' +
+        '          </td>\n' +
+        '          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">' + (idx + 1) + '</td>\n' +
+        '          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">' + p.ip + '</td>\n' +
+        '          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">' + p.port + '</span></td>\n' +
+        '          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">' + flag + '</span> ' + loc + '</td>\n' +
+        '          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="' + (p.isp || '') + '">' + (p.isp || '-') + '</td>\n' +
+        '          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="' + (pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')) + '">' + pingTxt + '</span></td>\n' +
+        '          <td class="py-4 px-6">\n' +
+        '            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ' + (st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))) + '">\n' +
+        '              <span class="w-1.5 h-1.5 rounded-full ' + (st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))) + '"></span>\n' +
+        '              ' + stText + '\n' +
+        '            </span>\n' +
+        '          </td>\n' +
+        '          <td class="py-4 px-6">\n' +
+        '            <div class="flex items-center justify-end gap-2">\n' +
+        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP(\'' + p.ip + '\', ' + p.port + ', event)" title="تست اتصال">\n' +
+        '                <span class="material-symbols-outlined text-sm">bolt</span>\n' +
+        '              </button>\n' +
+        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP(\'' + p.ip + '\', ' + p.port + ')" title="حذف">\n' +
+        '                <span class="material-symbols-outlined text-sm">delete</span>\n' +
+        '              </button>\n' +
+        '            </div>\n' +
+        '          </td>\n' +
+        '        </tr>';
       }).join('');
       
-      tbody.innerHTML = html;
+tbody.innerHTML = html;
       updateSelectionToolbar();
 
       // Update Pagination UI
