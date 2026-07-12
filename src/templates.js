@@ -1,7 +1,56 @@
 function nginxPage() {
   return `<!DOCTYPE html>\n<html>\n<head>\n<title>Welcome to nginx!</title>\n<style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
-\nhtml { color-scheme: light dark; }\nbody { width: 35em; margin: 0 auto; font-family: Vazirmatn, Tahoma, sans-serif; }\n</style>\n  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>\n</head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and\nworking. Further configuration is required.</p>\n<p>For online documentation and support please refer to\n<a href="http://nginx.org/">nginx.org</a>.<br/>\nCommercial support is available at\n<a href="http://nginx.com/">nginx.com</a>.</p>\n<p><em>Thank you for using nginx.</em></p>\n</body>\n</html>`;
+\nhtml { color-scheme: light dark; }\nbody { width: 35em; margin: 0 auto; font-family: Vazirmatn, Tahoma, sans-serif; }\n</style>\n  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
+      function updateSelectionToolbar() {
+        const toolbar = document.getElementById('proxyip-selection-toolbar');
+        const countSpan = document.getElementById('proxyip-toolbar-count');
+        if (!toolbar || !countSpan) return;
+        
+        const count = proxyIPSelectedRows.size;
+        countSpan.textContent = count;
+        if (count > 0) {
+          toolbar.classList.add('show');
+        } else {
+          toolbar.classList.remove('show');
+        }
+      }
+
+      function toggleProxyIPSelection(checkbox) {
+        const key = checkbox.value;
+        if (checkbox.checked) {
+          proxyIPSelectedRows.add(key);
+        } else {
+          proxyIPSelectedRows.delete(key);
+        }
+        updateSelectionToolbar();
+        const tr = checkbox.closest('tr');
+        if (tr) {
+          if (checkbox.checked) tr.classList.add('bg-primary/5');
+          else tr.classList.remove('bg-primary/5');
+        }
+      }
+
+      function toggleSelectAllProxyIP(checkbox) {
+        const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+        checkboxes.forEach(cb => {
+          cb.checked = checkbox.checked;
+          const key = cb.value;
+          if (checkbox.checked) {
+            proxyIPSelectedRows.add(key);
+          } else {
+            proxyIPSelectedRows.delete(key);
+          }
+          const tr = cb.closest('tr');
+          if (tr) {
+            if (checkbox.checked) tr.classList.add('bg-primary/5');
+            else tr.classList.remove('bg-primary/5');
+          }
+        });
+        updateSelectionToolbar();
+      }
+
+  </script>\n</head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and\nworking. Further configuration is required.</p>\n<p>For online documentation and support please refer to\n<a href="http://nginx.org/">nginx.org</a>.<br/>\nCommercial support is available at\n<a href="http://nginx.com/">nginx.com</a>.</p>\n<p><em>Thank you for using nginx.</em></p>\n</body>\n</html>`;
 }
 
 function loginPage(uuid, host) {
@@ -2514,6 +2563,11 @@ curl -X GET https://${hostname}/api/users \\
 
     let proxyTableRenderId = 0;
 
+    
+    let proxyIPSearchVal = '';
+    let currentProxyIPPage = 1;
+    const PROXY_IP_PER_PAGE = 100;
+
     function renderProxyIPTable() {
       const tbody = document.getElementById('proxyip-tbody');
       const countryFilter = document.getElementById('proxyip-filter-country')?.value || '';
@@ -2522,85 +2576,98 @@ curl -X GET https://${hostname}/api/users \\
       let filtered = proxyIPData;
       if (countryFilter) filtered = filtered.filter(p => p.country === countryFilter);
       if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+      if (proxyIPSearchVal) {
+        filtered = filtered.filter(p => {
+          const txt = `${p.ip} ${p.port} ${p.country || ''} ${p.city || ''} ${p.isp || ''}`.toLowerCase();
+          return txt.includes(proxyIPSearchVal);
+        });
+      }
 
-      proxyTableRenderId++;
-      const currentRenderId = proxyTableRenderId;
+      const totalPages = Math.ceil(filtered.length / PROXY_IP_PER_PAGE) || 1;
+      if (currentProxyIPPage > totalPages) currentProxyIPPage = totalPages;
+      if (currentProxyIPPage < 1) currentProxyIPPage = 1;
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">🌍</div>هیچ آی‌پی پروکسیی یافت نشد</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="py-10 text-center text-on-surface-variant/40"><div class="text-3xl mb-2">☁️</div>هیچ پروکسی آی‌پی‌ای یافت نشد</td></tr>';
+        const pagination = document.getElementById('proxyip-pagination');
+        if (pagination) pagination.innerHTML = '';
         updateSelectionToolbar();
         return;
       }
 
-      tbody.innerHTML = '';
-      
-      const CHUNK_SIZE = 50;
-      let currentIndex = 0;
+      const startIdx = (currentProxyIPPage - 1) * PROXY_IP_PER_PAGE;
+      const pageData = filtered.slice(startIdx, startIdx + PROXY_IP_PER_PAGE);
 
-      function renderChunk() {
-        if (currentRenderId !== proxyTableRenderId) return;
+      const html = pageData.map((p, offset) => {
+        const idx = startIdx + offset;
+        const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
+        const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
+        const pingTxt = p.status === 'active' || p.status === 'slow' ? (p.ping || 0) + ' ms' : '-';
+        const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
+        
+        let flag = countryToFlag(p.country);
+        let cname = countryName(p.country);
+        let loc = p.city ? cname + ' — ' + p.city : cname;
+        const key = p.ip + ':' + p.port;
+        const isSel = proxyIPSelectedRows.has(key);
 
-        const chunk = filtered.slice(currentIndex, currentIndex + CHUNK_SIZE);
-        if (chunk.length === 0) {
-          updateSelectionToolbar();
-          return;
-        }
-
-        const html = chunk.map((p, offset) => {
-          const idx = currentIndex + offset;
-          const st = p.status === 'active' ? 'on' : (p.status === 'slow' ? 'slow' : (p.status === 'unknown' ? 'unk' : 'off'));
-          const stText = p.status === 'active' ? 'فعال' : (p.status === 'slow' ? 'کند' : (p.status === 'unknown' ? 'نامشخص' : 'مرده'));
-          const flag = countryToFlag(p.country);
-          const cname = countryName(p.country);
-          const loc = p.city ? cname + ' · ' + p.city : cname;
-          const key = p.ip + ':' + p.port;
-          const isSel = proxyIPSelectedRows.has(key);
-          const pingCls = p.ping == null ? '' : (p.ping < 300 ? 'good' : (p.ping < 800 ? 'mid' : 'bad'));
-          const pingTxt = p.ping != null ? p.ping + ' ms' : '—';
-
-          return \`
-        <tr class="group hover:bg-white/5 transition-all \${isSel ? 'bg-primary/5' : ''}">
+        return `
+        <tr class="group hover:bg-white/5 transition-all ${isSel ? 'bg-primary/5' : ''}">
           <td class="py-4 px-6 text-center">
-            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="\${key}" \${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)">
+            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="${key}" ${isSel ? 'checked' : ''} onchange="toggleProxyIPSelection(this)">
           </td>
-          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">\${idx + 1}</td>
-          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">\${p.ip}</td>
-          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">\${p.port}</span></td>
-          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">\${flag}</span> \${loc}</td>
-          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="\${p.isp || ''}">\${p.isp || '—'}</td>
-          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="\${pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')}">\${pingTxt}</span></td>
+          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">${idx + 1}</td>
+          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">${p.ip}</td>
+          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">${p.port}</span></td>
+          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">${flag}</span> ${loc}</td>
+          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="${p.isp || ''}">${p.isp || '-'}</td>
+          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="${pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')}">${pingTxt}</span></td>
           <td class="py-4 px-6">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold \${st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))}">
-              <span class="w-1.5 h-1.5 rounded-full \${st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))}"></span>
-              \${stText}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))}">
+              <span class="w-1.5 h-1.5 rounded-full ${st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))}"></span>
+              ${stText}
             </span>
           </td>
-
           <td class="py-4 px-6">
             <div class="flex items-center justify-end gap-2">
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('\${p.ip}', \${p.port}, event)" title="تست اتصال">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP('${p.ip}', ${p.port}, event)" title="تست اتصال">
                 <span class="material-symbols-outlined text-sm">bolt</span>
               </button>
-              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('\${p.ip}', \${p.port})" title="حذف">
+              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP('${p.ip}', ${p.port})" title="حذف">
                 <span class="material-symbols-outlined text-sm">delete</span>
               </button>
             </div>
           </td>
-        </tr>\`;
-        }).join('');
-        
-        tbody.insertAdjacentHTML('beforeend', html);
-        currentIndex += CHUNK_SIZE;
-        
-        if (currentIndex < filtered.length) {
-          setTimeout(renderChunk, 10);
-        } else {
-          updateSelectionToolbar();
-        }
-      }
+        </tr>`;
+      }).join('');
       
-      renderChunk();
+      tbody.innerHTML = html;
+      updateSelectionToolbar();
+
+      // Update Pagination UI
+      const pagination = document.getElementById('proxyip-pagination');
+      if (pagination) {
+          const paginationHtml = `
+            <div class="flex items-center justify-between w-full p-4 bg-white/5 border-t border-white/5 text-sm text-on-surface-variant">
+              <div>نمایش ${startIdx + 1} تا ${Math.min(startIdx + PROXY_IP_PER_PAGE, filtered.length)} از ${filtered.length} آی‌پی</div>
+              <div class="flex items-center gap-2">
+                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                  onclick="changeProxyIPPage(-1)" ${currentProxyIPPage === 1 ? 'disabled' : ''}>قبلی</button>
+                <span class="px-3">صفحه ${currentProxyIPPage} از ${totalPages}</span>
+                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                  onclick="changeProxyIPPage(1)" ${currentProxyIPPage === totalPages ? 'disabled' : ''}>بعدی</button>
+              </div>
+            </div>
+          `;
+          pagination.innerHTML = paginationHtml;
+      }
     }
+
+    window.changeProxyIPPage = function(delta) {
+      currentProxyIPPage += delta;
+      renderProxyIPTable();
+    }
+    
     function filterProxyIP() {
       renderProxyIPTable();
     }
@@ -2673,7 +2740,7 @@ curl -X GET https://${hostname}/api/users \\
         if (btn) { original = btn.innerHTML; btn.classList.add('spin'); btn.innerHTML = '<span class="material-symbols-outlined spin text-sm">sync</span>'; }
   
         try {
-          const resTest = await fetch(basePath + '/api/proxyip/test', {
+          const resTest = await fetch(basePath + '/proxyip/test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ips: [{ip, port}] })
