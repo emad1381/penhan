@@ -2154,7 +2154,9 @@ curl -X GET https://${hostname}/api/users \\
         targetNav.classList.remove('text-on-surface-variant', 'hover:bg-white/5', 'hover:text-primary');
       }
       
-      if (page === 'proxyip') loadProxyIP();
+      if (page === 'proxyip') {
+        setTimeout(loadProxyIP, 50);
+      }
     }
 
     function openModal(id) { document.getElementById(id).classList.add('active'); }

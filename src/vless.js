@@ -126,14 +126,20 @@ async function handleTCPOutBound(remoteSocketWrapper, userConnId, addressRemote,
 
     log('retrying with ' + proxyIps.length + ' proxy IP(s)');
     
-    // Shuffle proxy IPs for load distribution
-    const shuffled = [...proxyIps].sort(() => Math.random() - 0.5);
+    // Prioritize first IP (explicitly configured), pick up to 2 random from top 5 pool for fast fallback
+    const candidates = [];
+    if (proxyIps.length > 0) candidates.push(proxyIps[0]);
+    if (proxyIps.length > 1) {
+      const pool = proxyIps.slice(1, 6);
+      const shuffledPool = pool.sort(() => Math.random() - 0.5).slice(0, 2);
+      shuffledPool.forEach(ip => { if (!candidates.includes(ip)) candidates.push(ip); });
+    }
     
-    for (let i = 0; i < shuffled.length; i++) {
-      const currentProxyIp = shuffled[i];
+    for (let i = 0; i < candidates.length; i++) {
+      const currentProxyIp = candidates[i];
       if (!currentProxyIp) continue;
       
-      log(`retry attempt ${i + 1}/${shuffled.length} with proxy: ${currentProxyIp}`);
+      log(`retry attempt ${i + 1}/${candidates.length} with proxy: ${currentProxyIp}`);
       try {
         const tcpSocket = await connectAndWrite(currentProxyIp, portRemote);
         // Success! Stream data
