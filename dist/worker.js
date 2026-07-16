@@ -1124,7 +1124,7 @@ function loginPage(uuid, host) {
         body {
             background-color: #131319;
             margin: 0;
-            overflow: hidden;
+            overflow-y: auto;
             font-family: 'Vazirmatn', sans-serif;
         }
         
@@ -1178,9 +1178,9 @@ function loginPage(uuid, host) {
         ::-webkit-scrollbar-thumb { background: #ddb7ff; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-background text-on-background flex items-center justify-center h-screen w-screen relative overflow-hidden">
+<body class="bg-background text-on-background flex items-center justify-center min-h-screen w-screen p-6 relative overflow-y-auto">
 <!-- Full Screen Background Shader -->
-<div class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
+<div class="fixed inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
 <canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
 <script>
 (function() {
@@ -1442,7 +1442,7 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
         body {
             font-family: 'Vazirmatn', sans-serif;
             background-color: #131319;
-            overflow: hidden;
+            overflow-y: auto;
         }
         .glass-card {
             backdrop-filter: blur(24px);
@@ -1576,9 +1576,9 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
         }
     <\/script>
 </head>
-<body class="flex items-center justify-center min-h-screen p-6 relative overflow-hidden">
+<body class="flex items-center justify-center min-h-screen p-6 relative overflow-y-auto">
 <!-- Background Shader -->
-<div class="absolute inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
+<div class="fixed inset-0 w-full h-full z-0 pointer-events-none opacity-60" style="display:block;">
 <canvas id="shader-canvas-ANIMATION_2" style="display:block;width:100%;height:100%"></canvas>
 <script>
 (function() {
