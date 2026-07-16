@@ -2,3 +2,7 @@ node_modules/
 
 .wrangler/
 package-lock.json
+
+# Temporary code drafts
+proxy_html.txt
+render_func.txt
