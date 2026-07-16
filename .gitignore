@@ -6,3 +6,10 @@ package-lock.json
 # Temporary code drafts
 proxy_html.txt
 render_func.txt
+
+# Build artifacts - only _worker.js should be committed
+deploy_log.txt
+dist/worker.js
+dist/app.bundle.js
+dist/worker_obfuscated.js
+dist/test_obf.js

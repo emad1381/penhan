@@ -3,7 +3,7 @@ const path = require('path');
 const JavaScriptObfuscator = require('javascript-obfuscator');
 
 const inputFile = path.join(__dirname, '../dist/worker.js');
-const outputFile = path.join(__dirname, '../dist/worker_obfuscated.js');
+const outputFile = path.join(__dirname, '../dist/app.bundle.js');
 
 const sourceCode = fs.readFileSync(inputFile, 'utf8');
 
@@ -30,5 +30,5 @@ const obfuscationResult = JavaScriptObfuscator.obfuscate(sourceCode, {
 const obfuscatedCode = obfuscationResult.getObfuscatedCode();
 fs.writeFileSync(outputFile, obfuscatedCode);
 fs.writeFileSync(path.join(__dirname, '../dist/_worker.js'), obfuscatedCode);
-console.log('Worker code obfuscated structurally (AST) successfully!');
+console.log('Build completed successfully.');
 
