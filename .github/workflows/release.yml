@@ -83,7 +83,10 @@ jobs:
           fi
 
       - name: Create Cloudflare Pages Project (if not exists)
-        run: npx wrangler pages project create ${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} --production-branch penhan-experimental || true
+        run: |
+          # Temporarily remove wrangler.toml so project create runs without conflict
+          rm -f wrangler.toml
+          npx wrangler pages project create ${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} --production-branch penhan-experimental || true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -94,5 +97,6 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }}
+
 
 
