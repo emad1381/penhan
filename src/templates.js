@@ -1442,6 +1442,14 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
         margin: 0;
         overflow: hidden;
     }
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 30px #131319 inset !important;
+        -webkit-text-fill-color: #e4e1ea !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
     .glass-panel {
         background: rgba(25, 25, 32, 0.4);
         backdrop-filter: blur(24px);
@@ -2104,16 +2112,16 @@ curl -X GET https://${hostname}/api/users \\
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <form id="node-form" onsubmit="saveNode(event)" class="space-y-4">
+    <form id="node-form" onsubmit="saveNode(event)" class="space-y-4" autocomplete="off">
       <div>
         <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">نام نود (مثلاً نود هلند)</label>
-        <input type="text" id="node-name" required class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-body-lg text-white focus:outline-none focus:border-primary/50" placeholder="نام نود را وارد کنید">
+        <input type="text" id="node-name" required autocomplete="off" class="w-full bg-[#1b1b22] border border-white/10 rounded-xl py-3 px-4 text-sm font-body-lg text-white focus:outline-none focus:border-primary/50" placeholder="نام نود را وارد کنید">
       </div>
       <div>
         <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">روش راه‌اندازی</label>
-        <select id="node-deploy-type" class="w-full bg-surface-container-low border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-primary/50" onchange="toggleNodeDeployFields()">
-          <option value="auto">راه‌اندازی خودکار (با API کلادفلر - پیشنهادی)</option>
-          <option value="manual">راه‌اندازی دستی (با دامنه ورکر نود)</option>
+        <select id="node-deploy-type" class="w-full bg-[#1b1b22] border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-primary/50" onchange="toggleNodeDeployFields()">
+          <option value="auto" class="bg-[#1b1b22] text-white">راه‌اندازی خودکار (با API کلادفلر - پیشنهادی)</option>
+          <option value="manual" class="bg-[#1b1b22] text-white">راه‌اندازی دستی (با دامنه ورکر نود)</option>
         </select>
       </div>
       
@@ -2121,11 +2129,11 @@ curl -X GET https://${hostname}/api/users \\
       <div id="node-auto-fields" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">Cloudflare Account ID</label>
-          <input type="text" id="node-cf-account" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="مثال: 8e5f2...">
+          <input type="text" id="node-cf-account" autocomplete="off" class="w-full bg-[#1b1b22] border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="مثال: 8e5f2...">
         </div>
         <div>
           <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">Cloudflare API Token</label>
-          <input type="password" id="node-cf-token" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="توکن API با دسترسی Workers Edit">
+          <input type="password" id="node-cf-token" autocomplete="new-password" class="w-full bg-[#1b1b22] border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="توکن API با دسترسی Workers Edit">
           <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">توکن API باید دسترسی‌های <code>Account.Workers Scripts: Edit</code> را در اکانت مقصد داشته باشد.</p>
         </div>
       </div>
@@ -2134,7 +2142,7 @@ curl -X GET https://${hostname}/api/users \\
       <div id="node-manual-fields" class="hidden space-y-4">
         <div>
           <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">آدرس دامنه ورکر نود</label>
-          <input type="text" id="node-url" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="node1.example.workers.dev">
+          <input type="text" id="node-url" autocomplete="off" class="w-full bg-[#1b1b22] border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="node1.example.workers.dev">
           <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">دامنه ورکری که در کلادفلر دوم ساخته‌اید و کدهای نود را در آن قرار داده‌اید. نیازی به ورود پروتکل (http) نیست.</p>
         </div>
       </div>
