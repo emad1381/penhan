@@ -53,9 +53,133 @@ import {
 
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
+import nodeWorkerCode from './node_worker_code.txt';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';
 
 const rateLimitMap = new Map();
+
+async function deployNodeWorker(accountId, apiToken, scriptName, mainUrl, nodeKey) {
+  const metadata = {
+    main_module: "index.js",
+    compatibility_date: "2023-12-01",
+    bindings: [
+      {
+        name: "MAIN_URL",
+        type: "plain_text",
+        text: mainUrl
+      },
+      {
+        name: "NODE_KEY",
+        type: "secret_text",
+        text: nodeKey
+      }
+    ]
+  };
+
+  const formData = new FormData();
+  const scriptBlob = new Blob([nodeWorkerCode], { type: "application/javascript+module" });
+  formData.append("script", scriptBlob, "index.js");
+  
+  const metadataBlob = new Blob([JSON.stringify(metadata)], { type: "application/json" });
+  formData.append("metadata", metadataBlob, "metadata.json");
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${apiToken}`
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cloudflare API deployment failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(`Cloudflare deployment error: ${result.errors?.[0]?.message || 'Unknown error'}`);
+  }
+
+  const subdomainUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/subdomain`;
+  const subResponse = await fetch(subdomainUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ enabled: true })
+  });
+
+  if (!subResponse.ok) {
+    const errorText = await subResponse.text();
+    console.error(`Subdomain enabling failed: ${errorText}`);
+  }
+
+  const subGetUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`;
+  const subGetRes = await fetch(subGetUrl, {
+    headers: { "Authorization": `Bearer ${apiToken}` }
+  });
+  if (subGetRes.ok) {
+    const subGetData = await subGetRes.json();
+    if (subGetData.success && subGetData.result?.subdomain) {
+      return `${scriptName}.${subGetData.result.subdomain}.workers.dev`;
+    }
+  }
+
+  return `${scriptName}.workers.dev`;
+}
+
+async function fetchCfMetricsForNode(accountId, apiToken, scriptName) {
+  if (!accountId || !apiToken || !scriptName) return 0;
+  
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)).toISOString();
+  const end = now.toISOString();
+  
+  const query = `
+    query {
+      viewer {
+        accounts(filter: { accountTag: "${accountId}" }) {
+          workersInvocationsAdaptive(
+            limit: 1,
+            filter: {
+              datetime_geq: "${start}",
+              datetime_leq: "${end}",
+              scriptName: "${scriptName}"
+            }
+          ) {
+            sum {
+              requests
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const cfRes = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query })
+    });
+    const cfData = await cfRes.json();
+    const accounts = cfData?.data?.viewer?.accounts;
+    let requestsUsed = 0;
+    if (accounts && accounts.length > 0 && accounts[0].workersInvocationsAdaptive && accounts[0].workersInvocationsAdaptive.length > 0) {
+      requestsUsed = accounts[0].workersInvocationsAdaptive[0].sum.requests || 0;
+    }
+    return requestsUsed;
+  } catch(e) {
+    console.error("Error fetching metrics for node:", e);
+    return 0;
+  }
+}
 
 let usersCache = null;
 let usersCacheTime = 0;
@@ -258,21 +382,77 @@ export default {
         
         if (path === '/api/nodes') {
            if (request.method === 'GET') {
-             const { results } = await env.DB.prepare('SELECT * FROM nodes ORDER BY last_sync DESC').all();
-             return new Response(JSON.stringify({ok: true, nodes: results || []}), {status: 200, headers: {'Content-Type': 'application/json'}});
+             const { results } = await env.DB.prepare('SELECT id, name, url, status, last_sync, cf_account_id, (cf_api_token IS NOT NULL AND cf_api_token != "") as has_cf FROM nodes ORDER BY last_sync DESC').all();
+             const enrichedNodes = await Promise.all((results || []).map(async (n) => {
+               let requestsToday = 0;
+               if (n.has_cf) {
+                 const { results: secrets } = await env.DB.prepare('SELECT cf_account_id, cf_api_token FROM nodes WHERE id = ?').bind(n.id).all();
+                 if (secrets && secrets.length > 0) {
+                   const { cf_account_id, cf_api_token } = secrets[0];
+                   const scriptName = 'penhan-node-' + n.id.substring(0, 8);
+                   requestsToday = await fetchCfMetricsForNode(cf_account_id, cf_api_token, scriptName);
+                 }
+               }
+               return {
+                 id: n.id,
+                 name: n.name,
+                 url: n.url,
+                 status: n.status,
+                 last_sync: n.last_sync,
+                 requestsToday,
+                 cf_account_id: n.cf_account_id ? 'Configured' : null
+               };
+             }));
+             return new Response(JSON.stringify({ok: true, nodes: enrichedNodes}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
            if (request.method === 'POST') {
              const b = await request.json();
              const nodeId = crypto.randomUUID();
              const nodeKey = crypto.randomUUID().replace(/-/g, '');
-             // Clean URL (remove trailing slash)
-             let cleanUrl = (b.url || '').trim();
+             const scriptName = 'penhan-node-' + nodeId.substring(0, 8);
+             
+             let finalUrl = (b.url || '').trim();
+             let autoDeployed = false;
+             
+             if (b.cfAccountId && b.cfApiToken) {
+               try {
+                 const host = request.headers.get('Host');
+                 const mainUrl = 'https://' + host;
+                 const deployedSubdomain = await deployNodeWorker(
+                   b.cfAccountId.trim(),
+                   b.cfApiToken.trim(),
+                   scriptName,
+                   mainUrl,
+                   nodeKey
+                 );
+                 finalUrl = 'https://' + deployedSubdomain;
+                 autoDeployed = true;
+               } catch (err) {
+                 return new Response(JSON.stringify({ok: false, error: err.message}), {status: 400, headers: {'Content-Type': 'application/json'}});
+               }
+             }
+
+             if (!finalUrl) {
+               return new Response(JSON.stringify({ok: false, error: 'آدرس نود یا اطلاعات اکانت کلادفلر الزامی است.'}), {status: 400, headers: {'Content-Type': 'application/json'}});
+             }
+
+             let cleanUrl = finalUrl;
              if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
              if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
              
-             await env.DB.prepare('INSERT INTO nodes (id, name, url, node_key, status, last_sync) VALUES (?, ?, ?, ?, ?, ?)')
-               .bind(nodeId, b.name || 'Node', cleanUrl, nodeKey, 'pending', 0).run();
-             return new Response(JSON.stringify({ok: true, id: nodeId, key: nodeKey}), {status: 200, headers: {'Content-Type': 'application/json'}});
+             await env.DB.prepare('INSERT INTO nodes (id, name, url, node_key, status, last_sync, cf_account_id, cf_api_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+               .bind(
+                 nodeId, 
+                 b.name || 'Node', 
+                 cleanUrl, 
+                 nodeKey, 
+                 autoDeployed ? 'active' : 'pending', 
+                 autoDeployed ? Date.now() : 0,
+                 b.cfAccountId ? b.cfAccountId.trim() : null,
+                 b.cfApiToken ? b.cfApiToken.trim() : null
+               ).run();
+               
+             return new Response(JSON.stringify({ok: true, id: nodeId, key: nodeKey, url: cleanUrl, autoDeployed}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
         }
         if (path.startsWith('/api/nodes/') && request.method === 'DELETE') {

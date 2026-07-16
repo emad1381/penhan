@@ -2110,13 +2110,38 @@ curl -X GET https://${hostname}/api/users \\
         <input type="text" id="node-name" required class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-body-lg text-white focus:outline-none focus:border-primary/50" placeholder="نام نود را وارد کنید">
       </div>
       <div>
-        <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">آدرس دامنه ورکر نود</label>
-        <input type="text" id="node-url" required class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="node1.example.workers.dev">
-        <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">دامنه ورکری که در کلادفلر دوم ساخته‌اید و کدهای نود را در آن قرار داده‌اید. نیازی به ورود پروتکل (http) نیست.</p>
+        <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">روش راه‌اندازی</label>
+        <select id="node-deploy-type" class="w-full bg-surface-container-low border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-primary/50" onchange="toggleNodeDeployFields()">
+          <option value="auto">راه‌اندازی خودکار (با API کلادفلر - پیشنهادی)</option>
+          <option value="manual">راه‌اندازی دستی (با دامنه ورکر نود)</option>
+        </select>
       </div>
+      
+      <!-- Auto Deploy Fields -->
+      <div id="node-auto-fields" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">Cloudflare Account ID</label>
+          <input type="text" id="node-cf-account" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="مثال: 8e5f2...">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">Cloudflare API Token</label>
+          <input type="password" id="node-cf-token" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="توکن API با دسترسی Workers Edit">
+          <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">توکن API باید دسترسی‌های <code>Account.Workers Scripts: Edit</code> را در اکانت مقصد داشته باشد.</p>
+        </div>
+      </div>
+      
+      <!-- Manual Deploy Fields -->
+      <div id="node-manual-fields" class="hidden space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">آدرس دامنه ورکر نود</label>
+          <input type="text" id="node-url" class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="node1.example.workers.dev">
+          <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">دامنه ورکری که در کلادفلر دوم ساخته‌اید و کدهای نود را در آن قرار داده‌اید. نیازی به ورود پروتکل (http) نیست.</p>
+        </div>
+      </div>
+
       <div class="flex gap-3 pt-2">
         <button type="button" class="flex-1 py-3 bg-white/5 text-white rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all text-sm" onclick="closeModal('node-modal')">لغو</button>
-        <button type="submit" class="flex-1 py-3 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all text-sm">ثبت و دریافت کلید</button>
+        <button type="submit" class="flex-1 py-3 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all text-sm">ثبت و ایجاد نود</button>
       </div>
     </form>
   </div>
@@ -2480,32 +2505,72 @@ curl -X GET https://${hostname}/api/users \\
     }
 
     // --- Nodes Logic ---
+    function toggleNodeDeployFields() {
+      const type = document.getElementById('node-deploy-type').value;
+      const autoFields = document.getElementById('node-auto-fields');
+      const manualFields = document.getElementById('node-manual-fields');
+      const nodeUrl = document.getElementById('node-url');
+      const cfAccount = document.getElementById('node-cf-account');
+      const cfToken = document.getElementById('node-cf-token');
+      
+      if (type === 'auto') {
+        autoFields.classList.remove('hidden');
+        manualFields.classList.add('hidden');
+        nodeUrl.required = false;
+        cfAccount.required = true;
+        cfToken.required = true;
+      } else {
+        autoFields.classList.add('hidden');
+        manualFields.classList.remove('hidden');
+        nodeUrl.required = true;
+        cfAccount.required = false;
+        cfToken.required = false;
+      }
+    }
+
     function openAddNodeModal() {
       document.getElementById('node-name').value = '';
       document.getElementById('node-url').value = '';
+      document.getElementById('node-cf-account').value = '';
+      document.getElementById('node-cf-token').value = '';
+      document.getElementById('node-deploy-type').value = 'auto';
+      toggleNodeDeployFields();
       openModal('node-modal');
     }
 
     async function saveNode(e) {
       e.preventDefault();
       const name = document.getElementById('node-name').value;
-      const url = document.getElementById('node-url').value;
-      if (!name || !url) return;
+      const type = document.getElementById('node-deploy-type').value;
+      
+      let payload = { name };
+      if (type === 'auto') {
+        payload.cfAccountId = document.getElementById('node-cf-account').value;
+        payload.cfApiToken = document.getElementById('node-cf-token').value;
+      } else {
+        payload.url = document.getElementById('node-url').value;
+      }
+
+      showToast('در حال راه‌اندازی و دیپلوی نود...', 'info');
 
       try {
         const res = await fetch(basePath + '/nodes', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ name, url })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.ok) {
           closeModal('node-modal');
           loadNodes();
-          showToast('نود ثبت شد. کلید اختصاصی: ' + data.key, 'ok');
-          prompt('کلید امنیتی نود زیر را کپی کنید. این کلید در سمت نود در تنظیمات NODE_KEY وارد می‌شود:', data.key);
+          if (data.autoDeployed) {
+            showToast('نود به صورت خودکار دیپلوی و فعال شد!', 'ok');
+          } else {
+            showToast('نود ثبت شد. کلید اختصاصی: ' + data.key, 'ok');
+            prompt('کلید امنیتی نود زیر را کپی کنید. این کلید در سمت نود در تنظیمات NODE_KEY وارد می‌شود:', data.key);
+          }
         } else {
-          showToast('خطا در ثبت نود', 'err');
+          showToast('خطا: ' + (data.error || 'خطا در ثبت نود'), 'err');
         }
       } catch(e) {
         showToast('خطا ارتباطی', 'err');
@@ -2529,6 +2594,8 @@ curl -X GET https://${hostname}/api/users \\
           const statusDot = isActive ? 'bg-tertiary' : (n.status === 'pending' ? 'bg-secondary' : 'bg-error');
           const statusText = isActive ? 'فعال' : (n.status === 'pending' ? 'در انتظار' : 'آفلاین');
           
+          const requestsHtml = n.cf_account_id ? \`<div class="flex justify-between items-center"><span class="text-on-surface-variant text-xs">درخواست‌های امروز کلادفلر:</span><span class="text-white text-xs font-mono">\${n.requestsToday.toLocaleString('fa-IR')}</span></div>\` : '';
+          
           grid.innerHTML += \`<div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 \${isActive ? 'border-tertiary' : 'border-error/50'} relative overflow-hidden group">
             <div class="flex justify-between items-start mb-6 relative z-10">
               <div>
@@ -2542,6 +2609,7 @@ curl -X GET https://${hostname}/api/users \\
             </div>
             <div class="space-y-3 text-sm border-t border-white/5 pt-4 relative z-10">
               <div class="flex justify-between items-center"><span class="text-on-surface-variant text-xs">آخرین همگام‌سازی:</span><span class="text-white text-xs" dir="ltr">\${syncDate}</span></div>
+              \${requestsHtml}
               <div class="pt-2 flex gap-2">
                 <button class="flex-1 py-2 bg-error/10 text-error rounded-xl font-bold hover:bg-error/20 transition-colors text-xs border border-error/20" onclick="deleteNode('\${n.id}')">حذف نود</button>
               </div>

@@ -509,7 +509,9 @@ async function setupD1Schema(env) {
         url TEXT NOT NULL,
         node_key TEXT NOT NULL,
         status TEXT DEFAULT 'unknown',
-        last_sync INTEGER
+        last_sync INTEGER,
+        cf_account_id TEXT,
+        cf_api_token TEXT
       );`
     ];
   for (const q of queries) {
@@ -519,6 +521,14 @@ async function setupD1Schema(env) {
       console.error("D1 Schema setup error:", e);
     }
   }
+  
+  // Alter statements for existing tables
+  try {
+    await env.DB.prepare("ALTER TABLE nodes ADD COLUMN cf_account_id TEXT;").run();
+  } catch (e) {}
+  try {
+    await env.DB.prepare("ALTER TABLE nodes ADD COLUMN cf_api_token TEXT;").run();
+  } catch (e) {}
 }
 
 async function getSettingD1(env, key) {
