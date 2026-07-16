@@ -361,7 +361,11 @@ export default {
 
         if (path === '/api/node/users' && request.method === 'GET') {
           const users = await getAllUsers(env);
-          return new Response(JSON.stringify({ok: true, users}), {status: 200, headers: {'Content-Type': 'application/json'}});
+          const currentProxyIPRaw = env.PROXYIP || '';
+          const pool = await getProxyIPsFromPool(env);
+          const poolStr = pool.join(',');
+          const effectiveProxyIP = currentProxyIPRaw + (currentProxyIPRaw && poolStr ? ',' : '') + poolStr;
+          return new Response(JSON.stringify({ok: true, users, proxy_ip: effectiveProxyIP}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
         if (path === '/api/node/usage' && request.method === 'POST') {
           const b = await request.json();

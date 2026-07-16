@@ -5,10 +5,11 @@ import { sha224_and_224 } from './helpers.js';
 
 let usersCache = null;
 let usersCacheTime = 0;
+let globalProxyIPCache = '';
 
 async function getAllUsers(env) {
-  if (usersCache && Date.now() - usersCacheTime < 60000) return usersCache;
-  if (!env.MAIN_URL || !env.NODE_KEY) return [];
+  if (usersCache && Date.now() - usersCacheTime < 60000) return { users: usersCache, proxy_ip: globalProxyIPCache };
+  if (!env.MAIN_URL || !env.NODE_KEY) return { users: [], proxy_ip: '' };
   
   try {
     const resp = await fetch(`${env.MAIN_URL}/api/node/users`, {
@@ -18,27 +19,28 @@ async function getAllUsers(env) {
       const data = await resp.json();
       if (data && data.users) {
         usersCache = data.users;
+        globalProxyIPCache = data.proxy_ip || '';
         usersCacheTime = Date.now();
-        return usersCache;
+        return { users: usersCache, proxy_ip: globalProxyIPCache };
       }
     }
   } catch (e) {
     console.error("Failed to fetch users from main:", e);
   }
-  return usersCache || [];
+  return { users: usersCache || [], proxy_ip: globalProxyIPCache };
 }
 
 let pendingUsage = [];
 let usageTimeout = null;
 
 function flushUsage(env) {
-  if (pendingUsage.length === 0) return;
-  if (!env.MAIN_URL || !env.NODE_KEY) return;
+  if (pendingUsage.length === 0) return Promise.resolve();
+  if (!env.MAIN_URL || !env.NODE_KEY) return Promise.resolve();
   
   const payload = [...pendingUsage];
   pendingUsage = [];
   
-  fetch(`${env.MAIN_URL}/api/node/usage`, {
+  return fetch(`${env.MAIN_URL}/api/node/usage`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${env.NODE_KEY}`,
@@ -76,7 +78,7 @@ export default {
       }
 
       const authenticate = async (identifier) => {
-        const users = await getAllUsers(env);
+        const { users } = await getAllUsers(env);
         for (const user of users) {
            if (!user || !user.id) continue;
            
@@ -102,10 +104,12 @@ export default {
         pendingUsage.push({ id: userID, upload, download });
         
         if (!usageTimeout) {
-          usageTimeout = setTimeout(() => {
-            flushUsage(env);
-            usageTimeout = null;
-          }, 5000);
+          usageTimeout = true;
+          ctx.waitUntil((async () => {
+            await new Promise(r => setTimeout(r, 5000));
+            await flushUsage(env);
+            usageTimeout = false;
+          })());
         }
         
         const now = Date.now();
@@ -117,7 +121,11 @@ export default {
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader === 'websocket') {
         const decodedPath = decodeURIComponent(path).toLowerCase();
-        const effectiveProxyIP = env.PROXYIP || '';
+        
+        // Ensure cache is warm and we have the latest proxy_ip from the main server
+        const { proxy_ip } = await getAllUsers(env);
+        const localProxy = env.PROXYIP || '';
+        const effectiveProxyIP = localProxy + (localProxy && proxy_ip ? ',' : '') + proxy_ip;
         
         if (decodedPath.includes('trojan-ws') || decodedPath.includes('trojan')) {
           return await trojanOverWSHandler(request, authenticate, effectiveProxyIP, onUsage);
