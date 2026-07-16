@@ -94,8 +94,10 @@ jobs:
       - name: Deploy to Cloudflare Pages
         id: deploy
         run: |
-          # Security: Delete EVERYTHING in dist except _worker.js so Cloudflare doesn't upload or scan test files or raw code!
+          # Security: Delete EVERYTHING in dist except _worker.js so Cloudflare doesn't upload raw code!
           find dist -type f -not -name '_worker.js' -delete
+          # Trick Cloudflare: Cloudflare Pages fails with Abuse Block if 0 static assets are uploaded. Add a dummy file.
+          echo "penhan deployed at $(date)" > dist/version.txt
           npx wrangler pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} > deploy_log.txt 2>&1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
