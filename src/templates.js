@@ -1970,6 +1970,37 @@ void main() {
     </div>
   </div>
 
+  <!-- ================= NODES PAGE ================= -->
+  <div id="page-nodes" class="page hidden space-y-6">
+    <div class="flex justify-between items-end">
+      <div>
+        <h2 class="font-headline-lg text-headline-lg text-white">مدیریت نودها</h2>
+        <p class="text-on-surface-variant mt-1 text-sm">اتصال سرورهای کمکی برای دور زدن محدودیت ترافیک کلادفلر و توزیع بار (Round Robin)</p>
+      </div>
+      <button class="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all text-xs" onclick="openAddNodeModal()">
+        <span class="material-symbols-outlined text-sm">add_link</span>
+        <span>افزودن نود جدید</span>
+      </button>
+    </div>
+
+    <div class="glass-panel p-6 rounded-2xl border border-primary/20 bg-primary/5 flex gap-4 items-start">
+      <span class="material-symbols-outlined text-primary text-2xl">info</span>
+      <div>
+        <h4 class="text-white font-bold mb-1">راهنمای راه‌اندازی نود کمکی (Edge Node)</h4>
+        <p class="text-on-surface-variant text-sm leading-relaxed mb-3">شما می‌توانید با ساخت یک کلادفلر ورکر جدید در یک اکانت دیگر، یک نود ایجاد کنید و محدودیت ۱۰۰ هزار ریکوئست روزانه را دور بزنید. لینک‌های سابسکریپشن کاربران به صورت خودکار ترافیک را بین نودها توزیع می‌کنند.</p>
+        <ol class="list-decimal list-inside text-sm text-on-surface-variant space-y-1">
+          <li>ابتدا از طریق دکمه «افزودن نود جدید»، نود را در پنل ثبت کنید تا کلید <code>NODE_KEY</code> اختصاصی برای شما ساخته شود.</li>
+          <li>یک ورکر جدید در اکانت کلادفلر دوم بسازید و کدهای برنچ <code>node</code> را در آن دیپلوی کنید.</li>
+          <li>در ورکر کلادفلر دوم، در بخش Variables متغیر <code>MAIN_URL</code> را برابر <b>https://${hostname}</b> و <code>NODE_KEY</code> را برابر کلیدی که سیستم به شما می‌دهد قرار دهید.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="nodes-grid">
+      <div class="col-span-full py-10 text-center text-on-surface-variant/50">در حال بارگذاری نودها...</div>
+    </div>
+  </div>
+
   <!-- ================= API TOKENS PAGE ================= -->
   <div id="page-api" class="page hidden space-y-6">
     <div class="flex justify-between items-end">
@@ -2103,6 +2134,33 @@ curl -X GET https://${hostname}/api/users \\
       </div>
       <button class="w-full bg-primary text-on-primary font-bold py-3 rounded-xl hover:brightness-110 active:scale-95 transition-all mt-4" onclick="saveUser()">ذخیره کاربر</button>
     </div>
+  </div>
+</div>
+
+<!-- Node Modal -->
+<div class="modal-overlay" id="node-modal" onclick="closeModal('node-modal')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-white font-bold text-lg">افزودن نود جدید</h3>
+      <button class="text-on-surface-variant hover:text-white" onclick="closeModal('node-modal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="node-form" onsubmit="saveNode(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">نام نود (مثلاً نود هلند)</label>
+        <input type="text" id="node-name" required class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-body-lg text-white focus:outline-none focus:border-primary/50" placeholder="نام نود را وارد کنید">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant/80 mb-2">آدرس دامنه ورکر نود</label>
+        <input type="text" id="node-url" required class="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm font-mono text-white focus:outline-none focus:border-primary/50 text-left" dir="ltr" placeholder="node1.example.workers.dev">
+        <p class="text-[10px] text-on-surface-variant mt-2 text-justify leading-relaxed">دامنه ورکری که در کلادفلر دوم ساخته‌اید و کدهای نود را در آن قرار داده‌اید. نیازی به ورود پروتکل (http) نیست.</p>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="button" class="flex-1 py-3 bg-white/5 text-white rounded-xl font-bold hover:bg-white/10 active:scale-95 transition-all text-sm" onclick="closeModal('node-modal')">لغو</button>
+        <button type="submit" class="flex-1 py-3 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all text-sm">ثبت و دریافت کلید</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -2241,6 +2299,8 @@ curl -X GET https://${hostname}/api/users \\
       
       if (page === 'proxyip') {
         setTimeout(loadProxyIP, 50);
+      } else if (page === 'nodes') {
+        setTimeout(loadNodes, 50);
       }
     }
 
@@ -2458,6 +2518,89 @@ curl -X GET https://${hostname}/api/users \\
        if (confirm('آیا مایل به حذف این توکن هستید؟')) {
          await fetch(basePath + '/tokens/' + key, {method: 'DELETE'});
          loadTokens();
+       }
+    }
+
+    // --- Nodes Logic ---
+    function openAddNodeModal() {
+      document.getElementById('node-name').value = '';
+      document.getElementById('node-url').value = '';
+      openModal('node-modal');
+    }
+
+    async function saveNode(e) {
+      e.preventDefault();
+      const name = document.getElementById('node-name').value;
+      const url = document.getElementById('node-url').value;
+      if (!name || !url) return;
+
+      try {
+        const res = await fetch(basePath + '/nodes', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, url })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeModal('node-modal');
+          loadNodes();
+          showToast('نود ثبت شد. کلید اختصاصی: ' + data.key, 'ok');
+          prompt('کلید امنیتی نود زیر را کپی کنید. این کلید در سمت نود در تنظیمات NODE_KEY وارد می‌شود:', data.key);
+        } else {
+          showToast('خطا در ثبت نود', 'err');
+        }
+      } catch(e) {
+        showToast('خطا ارتباطی', 'err');
+      }
+    }
+
+    async function loadNodes() {
+      try {
+        const res = await fetch(basePath + '/nodes');
+        const data = await res.json();
+        const grid = document.getElementById('nodes-grid');
+        grid.innerHTML = '';
+        if (!data.nodes || data.nodes.length === 0) {
+          grid.innerHTML = '<div class="col-span-full py-10 text-center text-on-surface-variant/50">هنوز نودی ثبت نشده است.</div>';
+          return;
+        }
+        
+        data.nodes.forEach(n => {
+          const syncDate = n.last_sync > 0 ? new Date(n.last_sync).toLocaleString('fa-IR') : 'هیچ‌وقت';
+          const isActive = Date.now() - n.last_sync < 120000; // 2 minutes
+          const statusDot = isActive ? 'bg-tertiary' : (n.status === 'pending' ? 'bg-secondary' : 'bg-error');
+          const statusText = isActive ? 'فعال' : (n.status === 'pending' ? 'در انتظار' : 'آفلاین');
+          
+          grid.innerHTML += \`<div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 \${isActive ? 'border-tertiary' : 'border-error/50'} relative overflow-hidden group">
+            <div class="flex justify-between items-start mb-6 relative z-10">
+              <div>
+                <h4 class="text-white font-bold text-lg mb-1">\${n.name}</h4>
+                <p class="text-xs text-on-surface-variant/80 truncate w-32" dir="ltr" title="\${n.url}">\${n.url.replace(/^https?:\\/\\//, '')}</p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold \${isActive ? 'bg-tertiary/10 text-tertiary' : 'bg-surface-variant text-on-surface-variant'}">
+                <span class="w-1.5 h-1.5 rounded-full \${statusDot}"></span>
+                \${statusText}
+              </span>
+            </div>
+            <div class="space-y-3 text-sm border-t border-white/5 pt-4 relative z-10">
+              <div class="flex justify-between items-center"><span class="text-on-surface-variant text-xs">آخرین همگام‌سازی:</span><span class="text-white text-xs" dir="ltr">\${syncDate}</span></div>
+              <div class="pt-2 flex gap-2">
+                <button class="flex-1 py-2 bg-error/10 text-error rounded-xl font-bold hover:bg-error/20 transition-colors text-xs border border-error/20" onclick="deleteNode('\${n.id}')">حذف نود</button>
+              </div>
+            </div>
+            <div class="absolute -left-6 -bottom-6 opacity-5 text-white pointer-events-none">
+              <span class="material-symbols-outlined text-[120px]">lan</span>
+            </div>
+          </div>\`;
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    async function deleteNode(id) {
+       if (confirm('آیا مایل به حذف این نود هستید؟')) {
+         await fetch(basePath + '/nodes/' + id, {method: 'DELETE'});
+         loadNodes();
+         showToast('نود حذف شد', 'ok');
        }
     }
 

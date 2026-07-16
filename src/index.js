@@ -225,9 +225,60 @@ export default {
         return await checkMasterAuth(req, env, currentPanelPass);
       };
 
+      if (path.startsWith('/api/node/')) {
+        const authHeader = request.headers.get('Authorization') || '';
+        const token = authHeader.replace('Bearer ', '').trim();
+        if (!token) return new Response('Unauthorized', {status: 401});
+        
+        const { results } = await env.DB.prepare('SELECT id FROM nodes WHERE node_key = ?').bind(token).all();
+        if (!results || results.length === 0) return new Response('Unauthorized', {status: 401});
+        
+        await env.DB.prepare('UPDATE nodes SET last_sync = ?, status = ? WHERE id = ?').bind(Date.now(), 'active', results[0].id).run();
+
+        if (path === '/api/node/users' && request.method === 'GET') {
+          const users = await getAllUsers(env);
+          return new Response(JSON.stringify({ok: true, users}), {status: 200, headers: {'Content-Type': 'application/json'}});
+        }
+        if (path === '/api/node/usage' && request.method === 'POST') {
+          const b = await request.json();
+          if (b && Array.isArray(b.usage)) {
+            for (const u of b.usage) {
+              await updateUsageD1(env, u.id, (u.upload || 0) + (u.download || 0)).catch(()=>null);
+            }
+          }
+          return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
+        }
+        return new Response('Not Found', {status: 404});
+      }
+
       if (path.startsWith('/api/')) {
         if (!(await checkApiAuth(request))) {
            return new Response(JSON.stringify({ok: false, error: 'Unauthorized'}), {status: 401, headers: {'Content-Type': 'application/json'}});
+        }
+        
+        if (path === '/api/nodes') {
+           if (request.method === 'GET') {
+             const { results } = await env.DB.prepare('SELECT * FROM nodes ORDER BY last_sync DESC').all();
+             return new Response(JSON.stringify({ok: true, nodes: results || []}), {status: 200, headers: {'Content-Type': 'application/json'}});
+           }
+           if (request.method === 'POST') {
+             const b = await request.json();
+             const nodeId = crypto.randomUUID();
+             const nodeKey = crypto.randomUUID().replace(/-/g, '');
+             // Clean URL (remove trailing slash)
+             let cleanUrl = (b.url || '').trim();
+             if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
+             if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
+             
+             await env.DB.prepare('INSERT INTO nodes (id, name, url, node_key, status, last_sync) VALUES (?, ?, ?, ?, ?, ?)')
+               .bind(nodeId, b.name || 'Node', cleanUrl, nodeKey, 'pending', 0).run();
+             return new Response(JSON.stringify({ok: true, id: nodeId, key: nodeKey}), {status: 200, headers: {'Content-Type': 'application/json'}});
+           }
+        }
+        if (path.startsWith('/api/nodes/') && request.method === 'DELETE') {
+           const id = path.split('/').pop();
+           await env.DB.prepare('DELETE FROM nodes WHERE id = ?').bind(id).run();
+           return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
         
         if (path === '/api/users') {
@@ -787,8 +838,38 @@ export default {
               });
             }
             
+            // Nodes export
+            let nodes = [];
+            if (env.DB) {
+              try {
+                const { results } = await env.DB.prepare("SELECT name, url FROM nodes WHERE status = 'active'").all();
+                if (results) nodes = results;
+              } catch (e) {}
+            }
+            
+            let nodeExport = '';
+            nodes.forEach((n) => {
+              const nodeHost = n.url.replace(/^https?:\/\//, '').split('/')[0];
+              const nodeRandomSNI = randomizeCase(nodeHost);
+              const nodeAddr = user.clean_ip || nodeHost;
+              
+              const nodeVlessWS = `vless://${user.id}@${nodeAddr}:443?encryption=none&security=tls&sni=${nodeRandomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${nodeHost}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#${n.name}-VLESS-${user.name}${proxyIpNote}`;
+              const nodeTrojanWS = `trojan://${user.id}@${nodeAddr}:443?security=tls&sni=${nodeRandomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${nodeHost}&path=${encodeURIComponent(trojanObfuscatedPath)}#${n.name}-Trojan-${user.name}${proxyIpNote}`;
+              
+              nodeExport += `\n${nodeVlessWS}\n${nodeTrojanWS}\n`;
+              
+              if (userProxyIPs.length > 0) {
+                userProxyIPs.forEach((pip) => {
+                  if (!pip) return;
+                  const pipLabel = pip.includes(':') ? pip.split(':')[0] : pip;
+                  nodeExport += `${nodeVlessWS.replace(`#${n.name}-VLESS-${user.name}`, `#${n.name}-VLESS-${user.name}-${pipLabel}`)}\n`;
+                  nodeExport += `${nodeTrojanWS.replace(`#${n.name}-Trojan-${user.name}`, `#${n.name}-Trojan-${user.name}-${pipLabel}`)}\n`;
+                });
+              }
+            });
+
             // URI format for all proxy clients (v2rayNG, Nekobox, Streisand, etc.)
-            const uriOutput = vlessWS + '\n' + trojanWS + (multiProxyExport ? '\n' + multiProxyExport : '');
+            const uriOutput = vlessWS + '\n' + trojanWS + (multiProxyExport ? '\n' + multiProxyExport : '') + (nodeExport ? '\n' + nodeExport : '');
             
             if (isBrowser) {
               return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });

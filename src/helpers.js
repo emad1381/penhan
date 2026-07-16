@@ -502,6 +502,14 @@ async function setupD1Schema(env) {
         status TEXT DEFAULT 'unknown',
         last_check INTEGER,
         PRIMARY KEY (ip, port)
+      );`,
+      `CREATE TABLE IF NOT EXISTS nodes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        node_key TEXT NOT NULL,
+        status TEXT DEFAULT 'unknown',
+        last_sync INTEGER
       );`
     ];
   for (const q of queries) {
