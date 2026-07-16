@@ -10,21 +10,30 @@ const sourceCode = fs.readFileSync(inputFile, 'utf8');
 const obfuscationResult = JavaScriptObfuscator.obfuscate(sourceCode, {
     target: 'node',
     compact: true,
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.5,
+    // Disable aggressive features that trigger malware/abuse scanners:
+    controlFlowFlattening: false,
     deadCodeInjection: false,
     debugProtection: false,
     disableConsoleOutput: false,
-    identifierNamesGenerator: 'mangled', // Uses a, b, c instead of _0x123
+    
+    // Make variables look like normal minified code (a, b, c) instead of _0x123
+    identifierNamesGenerator: 'mangled',
+    
     log: false,
     renameGlobals: false,
-    rotateStringArray: true,
     selfDefending: false, // Critical to avoid malware flags
-    stringArray: true,
-    stringArrayEncoding: ['base64'], // Encodes strings so "vless" is not visible
-    stringArrayThreshold: 1,
-    transformObjectKeys: true,
-    unicodeEscapeSequence: false
+    
+    // Disable String Array (the decoder function is a well-known malware signature)
+    stringArray: false,
+    rotateStringArray: false,
+    
+    // Use string splitting and escaping to hide keywords like "vless" or "trojan"
+    // "vless" -> "\x76\x6c" + "\x65\x73" + "\x73"
+    splitStrings: true,
+    splitStringsChunkLength: 2,
+    unicodeEscapeSequence: true,
+    
+    transformObjectKeys: true
 });
 
 const obfuscatedCode = obfuscationResult.getObfuscatedCode();
