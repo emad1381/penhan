@@ -64,6 +64,15 @@ function loginPage(uuid, host) {
 <!-- Vazirmatn & Plus Jakarta Sans -->
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
+<script>
+  (function() {
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      originalWarn.apply(console, args);
+    };
+  })();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
       tailwind.config = {
@@ -451,6 +460,15 @@ function setupPage(hasD1, hasPassword, hasUUID, currentUUID, currentProxyIP) {
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>پنهان | راه‌اندازی اولیه</title>
+<script>
+  (function() {
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      originalWarn.apply(console, args);
+    };
+  })();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
@@ -892,6 +910,15 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>پنهان | پنل کاربری - ${name}</title>
+<script>
+  (function() {
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      originalWarn.apply(console, args);
+    };
+  })();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono&amp;display=swap" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css"/>
@@ -1393,6 +1420,15 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
 <title>پنل مدیریت پنهان</title>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <!-- Tailwind CDN with forms and container queries -->
+<script>
+  (function() {
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+      originalWarn.apply(console, args);
+    };
+  })();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <!-- Icons & Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -2611,33 +2647,33 @@ curl -X GET https://${hostname}/api/users \\
         const key = p.ip + ':' + p.port;
         const isSel = proxyIPSelectedRows.has(key);
 
-        return '\n' +
-        '        <tr class="group hover:bg-white/5 transition-all ' + (isSel ? 'bg-primary/5' : '') + '">\n' +
-        '          <td class="py-4 px-6 text-center">\n' +
-        '            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)">\n' +
-        '          </td>\n' +
-        '          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">' + (idx + 1) + '</td>\n' +
-        '          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">' + p.ip + '</td>\n' +
-        '          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">' + p.port + '</span></td>\n' +
-        '          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">' + flag + '</span> ' + loc + '</td>\n' +
-        '          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="' + (p.isp || '') + '">' + (p.isp || '-') + '</td>\n' +
-        '          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="' + (pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')) + '">' + pingTxt + '</span></td>\n' +
-        '          <td class="py-4 px-6">\n' +
-        '            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ' + (st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))) + '">\n' +
-        '              <span class="w-1.5 h-1.5 rounded-full ' + (st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))) + '"></span>\n' +
-        '              ' + stText + '\n' +
-        '            </span>\n' +
-        '          </td>\n' +
-        '          <td class="py-4 px-6">\n' +
-        '            <div class="flex items-center justify-end gap-2">\n' +
-        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP(\'' + p.ip + '\', ' + p.port + ', event)" title="تست اتصال">\n' +
-        '                <span class="material-symbols-outlined text-sm">bolt</span>\n' +
-        '              </button>\n' +
-        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP(\'' + p.ip + '\', ' + p.port + ')" title="حذف">\n' +
-        '                <span class="material-symbols-outlined text-sm">delete</span>\n' +
-        '              </button>\n' +
-        '            </div>\n' +
-        '          </td>\n' +
+        return '\\n' +
+        '        <tr class="group hover:bg-white/5 transition-all ' + (isSel ? 'bg-primary/5' : '') + '">\\n' +
+        '          <td class="py-4 px-6 text-center">\\n' +
+        '            <input type="checkbox" class="pip-check proxyip-checkbox rounded border-white/10 bg-white/5 text-primary focus:ring-primary/30" value="' + key + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleProxyIPSelection(this)">\\n' +
+        '          </td>\\n' +
+        '          <td class="py-4 px-6 text-center text-on-surface-variant/60 font-semibold text-xs">' + (idx + 1) + '</td>\\n' +
+        '          <td class="py-4 px-6 font-mono text-sm tracking-wide text-white">' + p.ip + '</td>\\n' +
+        '          <td class="py-4 px-6 font-mono text-xs text-on-surface-variant/70"><span class="bg-white/5 px-2 py-1 rounded">' + p.port + '</span></td>\\n' +
+        '          <td class="py-4 px-6 text-sm text-on-surface-variant"><span class="mr-2">' + flag + '</span> ' + loc + '</td>\\n' +
+        '          <td class="py-4 px-6 text-xs text-on-surface-variant/80 max-w-[150px] truncate" title="' + (p.isp || '') + '">' + (p.isp || '-') + '</td>\\n' +
+        '          <td class="py-4 px-6 font-mono font-bold text-xs"><span class="' + (pingCls === 'good' ? 'text-tertiary' : (pingCls === 'mid' ? 'text-secondary' : 'text-error')) + '">' + pingTxt + '</span></td>\\n' +
+        '          <td class="py-4 px-6">\\n' +
+        '            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ' + (st === 'on' ? 'bg-tertiary/10 text-tertiary' : (st === 'slow' ? 'bg-secondary/10 text-secondary' : (st === 'unk' ? 'bg-white/5 text-on-surface-variant/60' : 'bg-error/10 text-error'))) + '">\\n' +
+        '              <span class="w-1.5 h-1.5 rounded-full ' + (st === 'on' ? 'bg-tertiary' : (st === 'slow' ? 'bg-secondary' : (st === 'unk' ? 'bg-on-surface-variant/60' : 'bg-error'))) + '"></span>\\n' +
+        '              ' + stText + '\\n' +
+        '            </span>\\n' +
+        '          </td>\\n' +
+        '          <td class="py-4 px-6">\\n' +
+        '            <div class="flex items-center justify-end gap-2">\\n' +
+        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors" onclick="testProxyIP(\\\'' + p.ip + '\\\', ' + p.port + ', event)" title="تست اتصال">\\n' +
+        '                <span class="material-symbols-outlined text-sm">bolt</span>\\n' +
+        '              </button>\\n' +
+        '              <button class="w-8 h-8 rounded-lg flex items-center justify-center text-error hover:bg-error/10 transition-colors" onclick="deleteProxyIP(\\\'' + p.ip + '\\\', ' + p.port + ')" title="حذف">\\n' +
+        '                <span class="material-symbols-outlined text-sm">delete</span>\\n' +
+        '              </button>\\n' +
+        '            </div>\\n' +
+        '          </td>\\n' +
         '        </tr>';
       }).join('');
       
@@ -2647,16 +2683,16 @@ tbody.innerHTML = html;
       // Update Pagination UI
       const pagination = document.getElementById('proxyip-pagination');
       if (pagination) {
-          const paginationHtml = '\n' +
-            '            <div class="flex items-center justify-between w-full p-4 bg-white/5 border-t border-white/5 text-sm text-on-surface-variant">\n' +
-            '              <div>نمایش ' + (startIdx + 1) + ' تا ' + Math.min(startIdx + PROXY_IP_PER_PAGE, filtered.length) + ' از ' + filtered.length + ' آی‌پی</div>\n' +
-            '              <div class="flex items-center gap-2">\n' +
-            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \n' +
-            '                  onclick="changeProxyIPPage(-1)" ' + (currentProxyIPPage === 1 ? 'disabled' : '') + '>قبلی</button>\n' +
-            '                <span class="px-3">صفحه ' + currentProxyIPPage + ' از ' + totalPages + '</span>\n' +
-            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \n' +
-            '                  onclick="changeProxyIPPage(1)" ' + (currentProxyIPPage === totalPages ? 'disabled' : '') + '>بعدی</button>\n' +
-            '              </div>\n' +
+          const paginationHtml = '\\n' +
+            '            <div class="flex items-center justify-between w-full p-4 bg-white/5 border-t border-white/5 text-sm text-on-surface-variant">\\n' +
+            '              <div>نمایش ' + (startIdx + 1) + ' تا ' + Math.min(startIdx + PROXY_IP_PER_PAGE, filtered.length) + ' از ' + filtered.length + ' آی‌پی</div>\\n' +
+            '              <div class="flex items-center gap-2">\\n' +
+            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \\n' +
+            '                  onclick="changeProxyIPPage(-1)" ' + (currentProxyIPPage === 1 ? 'disabled' : '') + '>قبلی</button>\\n' +
+            '                <span class="px-3">صفحه ' + currentProxyIPPage + ' از ' + totalPages + '</span>\\n' +
+            '                <button class="px-3 py-1.5 rounded-lg bg-surface-container hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" \\n' +
+            '                  onclick="changeProxyIPPage(1)" ' + (currentProxyIPPage === totalPages ? 'disabled' : '') + '>بعدی</button>\\n' +
+            '              </div>\\n' +
             '            </div>';
           pagination.innerHTML = paginationHtml;
       }
