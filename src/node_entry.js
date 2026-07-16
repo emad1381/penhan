@@ -78,7 +78,18 @@ export default {
       const authenticate = async (identifier) => {
         const users = await getAllUsers(env);
         for (const user of users) {
-           if (user.id === identifier || sha224_and_224(user.id, true) === identifier) return user;
+           if (!user || !user.id) continue;
+           
+           if (user.id === identifier) return user;
+           
+           try {
+             const hash = sha224_and_224(user.id, true);
+             if (hash === identifier || hash.toLowerCase() === identifier.toLowerCase()) {
+               return user;
+             }
+           } catch(e) {
+             // ignore any hashing errors for invalid IDs
+           }
         }
         return null;
       };
