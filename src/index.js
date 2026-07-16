@@ -802,7 +802,7 @@ export default {
                                 // Domains that serve colo-specific ProxyIPs as A records:
                                 // `{colo}.{domain}` resolves to IPs local to that datacenter.
                                 const coloDomains = [
-                                  'proxyip.cmliu.com',
+                                  'proxyip.cmliussss.net',
                                   'proxyip.fxxk.dedyn.io',
                                 ];
 
