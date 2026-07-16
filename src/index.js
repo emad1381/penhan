@@ -70,7 +70,7 @@ async function deployNodeWorker(accountId, apiToken, scriptName, mainUrl, nodeKe
       },
       {
         name: "NODE_KEY",
-        type: "secret_text",
+        type: "plain_text",
         text: nodeKey
       }
     ]
