@@ -1,56 +1,7 @@
 function nginxPage() {
   return `<!DOCTYPE html>\n<html>\n<head>\n<title>Welcome to nginx!</title>\n<style>
 @import url('https://cdn.jsdelivr.net/npm/vazirmatn@33.0.0/Vazirmatn-font-face.css');
-\nhtml { color-scheme: light dark; }\nbody { width: 35em; margin: 0 auto; font-family: Vazirmatn, Tahoma, sans-serif; }\n</style>\n  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
-      function updateSelectionToolbar() {
-        const toolbar = document.getElementById('proxyip-selection-toolbar');
-        const countSpan = document.getElementById('proxyip-toolbar-count');
-        if (!toolbar || !countSpan) return;
-        
-        const count = proxyIPSelectedRows.size;
-        countSpan.textContent = count;
-        if (count > 0) {
-          toolbar.classList.add('show');
-        } else {
-          toolbar.classList.remove('show');
-        }
-      }
-
-      function toggleProxyIPSelection(checkbox) {
-        const key = checkbox.value;
-        if (checkbox.checked) {
-          proxyIPSelectedRows.add(key);
-        } else {
-          proxyIPSelectedRows.delete(key);
-        }
-        updateSelectionToolbar();
-        const tr = checkbox.closest('tr');
-        if (tr) {
-          if (checkbox.checked) tr.classList.add('bg-primary/5');
-          else tr.classList.remove('bg-primary/5');
-        }
-      }
-
-      function toggleSelectAllProxyIP(checkbox) {
-        const checkboxes = document.querySelectorAll('.proxyip-checkbox');
-        checkboxes.forEach(cb => {
-          cb.checked = checkbox.checked;
-          const key = cb.value;
-          if (checkbox.checked) {
-            proxyIPSelectedRows.add(key);
-          } else {
-            proxyIPSelectedRows.delete(key);
-          }
-          const tr = cb.closest('tr');
-          if (tr) {
-            if (checkbox.checked) tr.classList.add('bg-primary/5');
-            else tr.classList.remove('bg-primary/5');
-          }
-        });
-        updateSelectionToolbar();
-      }
-
-  </script>\n</head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and\nworking. Further configuration is required.</p>\n<p>For online documentation and support please refer to\n<a href="http://nginx.org/">nginx.org</a>.<br/>\nCommercial support is available at\n<a href="http://nginx.com/">nginx.com</a>.</p>\n<p><em>Thank you for using nginx.</em></p>\n</body>\n</html>`;
+\nhtml { color-scheme: light dark; }\nbody { width: 35em; margin: 0 auto; font-family: Vazirmatn, Tahoma, sans-serif; }\n</style>\n</head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and\nworking. Further configuration is required.</p>\n<p>For online documentation and support please refer to\n<a href="http://nginx.org/">nginx.org</a>.<br/>\nCommercial support is available at\n<a href="http://nginx.com/">nginx.com</a>.</p>\n<p><em>Thank you for using nginx.</em></p>\n</body>\n</html>`;
 }
 
 function loginPage(uuid, host) {
@@ -3130,8 +3081,190 @@ tbody.innerHTML = html;
     }
 
 
-// Init
+// Proxy IP missing functions
 
+    async function fetchProxyIPFromSources(e) {
+      const btn = e && e.target ? e.target.closest('button') : null;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined spin text-sm">sync</span> در حال دریافت...';
+        btn.disabled = true;
+      }
+  
+      try {
+        const res = await fetch(basePath + '/api/proxyip/fetch', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('✅ ' + (data.count || 0) + ' آی‌پی جدید دریافت شد', 'ok');
+          loadProxyIP();
+        } else {
+          showToast('خطا: ' + (data.error || 'نامشخص'), 'err');
+        }
+      } catch (err) {
+        showToast('خطا: ' + err.message, 'err');
+      } finally {
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    async function detectCountriesForIPs(e) {
+      const btn = e && e.target ? e.target.closest('button') : null;
+      let originalText = '';
+      if (btn) {
+        originalText = btn.innerHTML;
+        btn.disabled = true;
+      }
+
+      try {
+        const totalMissing = proxyIPData.filter(p => !p.country || p.country === '').length;
+        if (totalMissing === 0) {
+          showToast('تمام آی‌پی‌ها دارای کشور هستند.', 'ok');
+          if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+          }
+          return;
+        }
+
+        let totalUpdated = 0;
+        const chunks = Math.ceil(totalMissing / 100);
+
+        for (let i = 0; i < chunks; i++) {
+          if (btn) {
+            btn.innerHTML = '🌍 در حال تشخیص... (' + (i * 100) + ' از ' + totalMissing + ')';
+          }
+
+          const res = await fetch(basePath + '/api/proxyip/detect-countries', { method: 'POST' });
+          const data = await res.json();
+          if (data.ok) {
+            totalUpdated += data.updated || 0;
+          } else {
+            throw new Error(data.error || 'خطای سرور');
+          }
+
+          if (i < chunks - 1) {
+            await new Promise(r => setTimeout(r, 4500));
+          }
+        }
+
+        showToast('✅ با موفقیت ' + totalUpdated + ' آی‌پی شناسایی شد!', 'ok');
+        loadProxyIP();
+      } catch (err) {
+        showToast('خطا: ' + err.message, 'err');
+      } finally {
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+    }
+
+    function toggleProxyIPSelection(checkbox) {
+      const val = checkbox.value;
+      if (checkbox.checked) proxyIPSelectedRows.add(val);
+      else proxyIPSelectedRows.delete(val);
+      updateSelectionToolbar();
+    }
+
+    function toggleSelectAllProxyIP(selectAllCheckbox) {
+      const isChecked = selectAllCheckbox.checked;
+      const checkboxes = document.querySelectorAll('.proxyip-checkbox');
+      checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+        const val = cb.value;
+        if (isChecked) proxyIPSelectedRows.add(val);
+        else proxyIPSelectedRows.delete(val);
+      });
+      updateSelectionToolbar();
+    }
+
+    function updateSelectionToolbar() {
+      const count = proxyIPSelectedRows.size;
+      const toolbar = document.getElementById('proxyip-selection-toolbar');
+      const countEl = document.getElementById('proxyip-selected-count');
+      const toolbarCountEl = document.getElementById('proxyip-toolbar-count');
+      const selectAllCheckbox = document.getElementById('proxyip-select-all');
+  
+      if (count > 0) {
+        if(toolbar) toolbar.classList.add('show');
+        if(countEl) countEl.textContent = 'آی‌پی انتخاب شده';
+        if(toolbarCountEl) toolbarCountEl.textContent = count;
+      } else {
+        if(toolbar) toolbar.classList.remove('show');
+        if(countEl) countEl.textContent = 'آی‌پی انتخاب شده';
+        if(toolbarCountEl) toolbarCountEl.textContent = 0;
+      }
+
+      const visibleCheckboxes = document.querySelectorAll('.proxyip-checkbox');
+      if (visibleCheckboxes.length > 0 && selectAllCheckbox) {
+        const checkedVisible = Array.from(visibleCheckboxes).filter(cb => cb.checked).length;
+        selectAllCheckbox.checked = checkedVisible === visibleCheckboxes.length && checkedVisible > 0;
+        selectAllCheckbox.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+      } else if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+    }
+
+    function openProxyIPAddModal() {
+      const title = document.getElementById('proxyip-add-modal-title');
+      if(title) title.textContent = 'افزودن Proxy IP جدید';
+      document.getElementById('pi-ip').value = '';
+      document.getElementById('pi-port').value = '443';
+      document.getElementById('pi-country').value = '';
+      document.getElementById('pi-city').value = '';
+      document.getElementById('pi-isp').value = '';
+      openModal('proxyip-add-modal');
+    }
+
+    async function saveProxyIP() {
+      const ip = document.getElementById('pi-ip').value.trim();
+      const port = parseInt(document.getElementById('pi-port').value) || 443;
+      const country = document.getElementById('pi-country').value.trim();
+      const city = document.getElementById('pi-city').value.trim();
+      const isp = document.getElementById('pi-isp').value.trim();
+      
+      if (!ip) { showToast('آی‌پی الزامی است', 'err'); return; }
+      
+      try {
+        const res = await fetch(basePath + '/api/proxyip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip, port, country, city, isp })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          closeModal('proxyip-add-modal');
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+    async function deleteProxyIP(ip, port) {
+      if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را حذف کنید؟\`)) return;
+      try {
+        const res = await fetch(basePath + \`/api/proxyip/\${ip}/\${port}\`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('✅ حذف شد', 'ok');
+          loadProxyIP();
+        } else {
+          alert('خطا: ' + (data.error || 'نامشخص'));
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+// Init
     loadUsers();
     loadTokens();
     loadCfMetrics();
