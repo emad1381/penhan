@@ -3093,7 +3093,7 @@ tbody.innerHTML = html;
       }
   
       try {
-        const res = await fetch(basePath + '/api/proxyip/fetch', { method: 'POST' });
+        const res = await fetch(basePath + '/proxyip/fetch', { method: 'POST' });
         const data = await res.json();
         if (data.ok) {
           showToast('✅ ' + (data.count || 0) + ' آی‌پی جدید دریافت شد', 'ok');
@@ -3138,7 +3138,7 @@ tbody.innerHTML = html;
             btn.innerHTML = '🌍 در حال تشخیص... (' + (i * 100) + ' از ' + totalMissing + ')';
           }
 
-          const res = await fetch(basePath + '/api/proxyip/detect-countries', { method: 'POST' });
+          const res = await fetch(basePath + '/proxyip/detect-countries', { method: 'POST' });
           const data = await res.json();
           if (data.ok) {
             totalUpdated += data.updated || 0;
@@ -3231,7 +3231,7 @@ tbody.innerHTML = html;
       if (!ip) { showToast('آی‌پی الزامی است', 'err'); return; }
       
       try {
-        const res = await fetch(basePath + '/api/proxyip', {
+        const res = await fetch(basePath + '/proxyip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ip, port, country, city, isp })
@@ -3251,7 +3251,7 @@ tbody.innerHTML = html;
     async function deleteProxyIP(ip, port) {
       if (!confirm(\`آیا می‌خواهید \${ip}:\${port} را حذف کنید؟\`)) return;
       try {
-        const res = await fetch(basePath + \`/api/proxyip/\${ip}/\${port}\`, { method: 'DELETE' });
+        const res = await fetch(basePath + \`/proxyip/\${ip}/\${port}\`, { method: 'DELETE' });
         const data = await res.json();
         if (data.ok) {
           showToast('✅ حذف شد', 'ok');
