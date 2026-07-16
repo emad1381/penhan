@@ -37,8 +37,14 @@ jobs:
           git add dist/
           # Only commit if there are changes
           git diff --staged --quiet || git commit -m "chore: auto-build and obfuscate [skip ci]"
-          git pull --rebase origin ${{ github.ref_name }} || true
-          git push origin HEAD:${{ github.ref }}
+          # Pull remote changes; if rebase conflicts, abort and force push our fresh build
+          if ! git pull --rebase origin ${{ github.ref_name }}; then
+            echo "⚠️ Rebase conflict detected, aborting rebase and force pushing fresh build..."
+            git rebase --abort
+            git push --force origin HEAD:${{ github.ref }}
+          else
+            git push origin HEAD:${{ github.ref }}
+          fi
 
       - name: Generate Tag and Changelog
         id: tag_gen
