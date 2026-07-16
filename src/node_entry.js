@@ -1,6 +1,7 @@
 import { connect } from 'cloudflare:sockets';
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
+import { sha224_and_224 } from './helpers.js';
 
 let usersCache = null;
 let usersCacheTime = 0;
@@ -77,7 +78,7 @@ export default {
       const authenticate = async (identifier) => {
         const users = await getAllUsers(env);
         for (const user of users) {
-           if (user.id === identifier) return user;
+           if (user.id === identifier || sha224_and_224(user.id, true) === identifier) return user;
         }
         return null;
       };
