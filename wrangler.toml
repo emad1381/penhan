@@ -1,4 +1,5 @@
 name = "penhan-exp"
+main = "dist/_worker.js"
 compatibility_date = "2023-12-01"
 
 
