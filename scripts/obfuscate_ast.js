@@ -27,5 +27,8 @@ const obfuscationResult = JavaScriptObfuscator.obfuscate(sourceCode, {
     unicodeEscapeSequence: false
 });
 
-fs.writeFileSync(outputFile, obfuscationResult.getObfuscatedCode());
+const obfuscatedCode = obfuscationResult.getObfuscatedCode();
+fs.writeFileSync(outputFile, obfuscatedCode);
+fs.writeFileSync(path.join(__dirname, '../dist/_worker.js'), obfuscatedCode);
 console.log('Worker code obfuscated structurally (AST) successfully!');
+
