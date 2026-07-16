@@ -455,6 +455,40 @@ export default {
              return new Response(JSON.stringify({ok: true, id: nodeId, key: nodeKey, url: cleanUrl, autoDeployed}), {status: 200, headers: {'Content-Type': 'application/json'}});
            }
         }
+        if (path.startsWith('/api/nodes/') && path.endsWith('/diagnose') && request.method === 'GET') {
+           const id = path.split('/')[3];
+           const { results } = await env.DB.prepare('SELECT url FROM nodes WHERE id = ?').bind(id).all();
+           if (!results || results.length === 0) return new Response(JSON.stringify({ok: false, error: 'نود یافت نشد'}), {status: 404});
+           
+           const nodeUrl = results[0].url;
+           try {
+             const controller = new AbortController();
+             const timeoutId = setTimeout(() => controller.abort(), 6000);
+             
+             const res = await fetch(`${nodeUrl}/node-health`, { signal: controller.signal });
+             clearTimeout(timeoutId);
+             
+             const bodyText = await res.text();
+             if (res.status === 200) {
+               try {
+                 const data = JSON.parse(bodyText);
+                 if (data.status === 'active') {
+                   return new Response(JSON.stringify({ ok: true, status: 'active', message: 'نود فعال است و ارتباط برقرار است.' }), {status: 200, headers: {'Content-Type': 'application/json'}});
+                 }
+               } catch(e) {}
+             }
+             
+             if (bodyText.includes('1101') || bodyText.toLowerCase().includes('worker threw exception') || res.status === 500) {
+               return new Response(JSON.stringify({ ok: false, status: 'error_1101', message: 'خطای ۱۱۰۱: ورکر نود کرش کرده یا متغیرهای محیطی آن ست نشده‌اند.' }), {status: 200, headers: {'Content-Type': 'application/json'}});
+             }
+             
+             return new Response(JSON.stringify({ ok: false, status: 'error', message: `خطای کلادفلر (کد ${res.status}): ورکر پاسخ نامعتبر می‌دهد.` }), {status: 200, headers: {'Content-Type': 'application/json'}});
+             
+           } catch(e) {
+             return new Response(JSON.stringify({ ok: false, status: 'offline', message: 'خطای ارتباطی: نود در دسترس نیست یا تایم‌اوت شد.' }), {status: 200, headers: {'Content-Type': 'application/json'}});
+           }
+        }
+
         if (path.startsWith('/api/nodes/') && request.method === 'DELETE') {
            const id = path.split('/').pop();
            await env.DB.prepare('DELETE FROM nodes WHERE id = ?').bind(id).run();

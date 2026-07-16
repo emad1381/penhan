@@ -2602,24 +2602,30 @@ curl -X GET https://${hostname}/api/users \\
           const statusDot = isActive ? 'bg-tertiary' : (n.status === 'pending' ? 'bg-secondary' : 'bg-error');
           const statusText = isActive ? 'فعال' : (n.status === 'pending' ? 'در انتظار' : 'آفلاین');
           
-          const requestsHtml = n.cf_account_id ? \`<div class="flex justify-between items-center"><span class="text-on-surface-variant text-xs">درخواست‌های امروز کلادفلر:</span><span class="text-white text-xs font-mono">\${n.requestsToday.toLocaleString('fa-IR')}</span></div>\` : '';
+          const percent = Math.min(100, Math.round((n.requestsToday / 100000) * 100));
+          const requestsHtml = n.cf_account_id ? \`<div class="space-y-1 pt-1"><div class="flex justify-between items-center text-[11px] text-on-surface-variant"><span class="text-[11px]">درخواست‌های امروز:</span><span class="font-mono text-white">\${n.requestsToday.toLocaleString('fa-IR')} / ۱۰۰,۰۰۰</span></div><div class="w-full bg-white/5 rounded-full h-1 overflow-hidden"><div class="bg-primary h-full rounded-full transition-all duration-500" style="width: \${percent}%"></div></div></div>\` : '';
           
-          grid.innerHTML += \`<div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 \${isActive ? 'border-tertiary' : 'border-error/50'} relative overflow-hidden group">
+          grid.innerHTML += \`<div id="node-card-\${n.id}" class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 \${isActive ? 'border-tertiary' : (n.status === 'pending' ? 'border-secondary' : 'border-error/50')} relative overflow-hidden group">
             <div class="flex justify-between items-start mb-6 relative z-10">
               <div>
                 <h4 class="text-white font-bold text-lg mb-1">\${n.name}</h4>
                 <p class="text-xs text-on-surface-variant/80 truncate w-32" dir="ltr" title="\${n.url}">\${n.url.replace(/^https?:\\/\\//, '')}</p>
               </div>
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold \${isActive ? 'bg-tertiary/10 text-tertiary' : 'bg-surface-variant text-on-surface-variant'}">
+              <span id="node-status-badge-\${n.id}" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold \${isActive ? 'bg-tertiary/10 text-tertiary' : 'bg-surface-variant text-on-surface-variant'}">
                 <span class="w-1.5 h-1.5 rounded-full \${statusDot}"></span>
-                \${statusText}
+                <span class="status-text">\${statusText}</span>
               </span>
             </div>
             <div class="space-y-3 text-sm border-t border-white/5 pt-4 relative z-10">
               <div class="flex justify-between items-center"><span class="text-on-surface-variant text-xs">آخرین همگام‌سازی:</span><span class="text-white text-xs" dir="ltr">\${syncDate}</span></div>
               \${requestsHtml}
+              <div id="node-diag-msg-\${n.id}" class="text-[11px] text-justify hidden border-t border-white/5 pt-2 leading-relaxed"></div>
               <div class="pt-2 flex gap-2">
-                <button class="flex-1 py-2 bg-error/10 text-error rounded-xl font-bold hover:bg-error/20 transition-colors text-xs border border-error/20" onclick="deleteNode('\${n.id}')">حذف نود</button>
+                <button class="flex-1 py-2 bg-primary/10 text-primary rounded-xl font-bold hover:bg-primary/20 transition-colors text-xs border border-primary/20 flex items-center justify-center gap-1" onclick="diagnoseNode('\${n.id}', this)">
+                  <span class="material-symbols-outlined text-[14px]">query_stats</span>
+                  <span>عیب‌یابی</span>
+                </button>
+                <button class="py-2 px-3 bg-error/10 text-error rounded-xl font-bold hover:bg-error/20 transition-colors text-xs border border-error/20" onclick="deleteNode('\${n.id}')">حذف</button>
               </div>
             </div>
             <div class="absolute -left-6 -bottom-6 opacity-5 text-white pointer-events-none">
@@ -2636,6 +2642,66 @@ curl -X GET https://${hostname}/api/users \\
          loadNodes();
          showToast('نود حذف شد', 'ok');
        }
+    }
+
+    async function diagnoseNode(id, btn) {
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[14px]">sync</span><span>در حال عیب‌یابی...</span>';
+      
+      const badge = document.getElementById('node-status-badge-' + id);
+      const statusDot = badge.querySelector('span:first-child');
+      const statusText = badge.querySelector('.status-text');
+      const msgDiv = document.getElementById('node-diag-msg-' + id);
+      const card = document.getElementById('node-card-' + id);
+      
+      msgDiv.classList.add('hidden');
+      msgDiv.className = "text-[11px] text-justify border-t border-white/5 pt-2 leading-relaxed";
+      
+      try {
+        const res = await fetch(basePath + '/nodes/' + id + '/diagnose');
+        const data = await res.json();
+        
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        
+        msgDiv.textContent = data.message;
+        msgDiv.classList.remove('hidden');
+        
+        if (data.ok) {
+          showToast('ارتباط با نود برقرار است.', 'ok');
+          statusDot.className = "w-1.5 h-1.5 rounded-full bg-tertiary";
+          statusText.textContent = "فعال";
+          badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-tertiary/10 text-tertiary";
+          card.classList.remove('border-error/50', 'border-secondary');
+          card.classList.add('border-tertiary');
+          msgDiv.classList.add('text-tertiary');
+        } else {
+          if (data.status === 'error_1101') {
+            showToast('ورکر نود خطای ۱۱۰۱ دارد!', 'err');
+            card.classList.add('shake-error');
+            setTimeout(() => card.classList.remove('shake-error'), 500);
+            statusDot.className = "w-1.5 h-1.5 rounded-full bg-error animate-pulse";
+            statusText.textContent = "خطای ۱۱۰۱";
+            badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-error/10 text-error";
+            card.classList.remove('border-tertiary', 'border-secondary');
+            card.classList.add('border-error/50');
+            msgDiv.classList.add('text-error');
+          } else {
+            showToast(data.message, 'err');
+            statusDot.className = "w-1.5 h-1.5 rounded-full bg-error";
+            statusText.textContent = "آفلاین";
+            badge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-error/10 text-error";
+            card.classList.remove('border-tertiary', 'border-secondary');
+            card.classList.add('border-error/50');
+            msgDiv.classList.add('text-on-surface-variant');
+          }
+        }
+      } catch(e) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        showToast('خطا در ارتباط با سرور اصلی', 'err');
+      }
     }
 
     async function saveSettings() {
