@@ -94,8 +94,8 @@ jobs:
       - name: Deploy to Cloudflare Pages
         id: deploy
         run: |
-          # Security: Delete unobfuscated code so Cloudflare scanners don't ban the Pages project
-          rm -f dist/worker.js dist/worker_obfuscated.js
+          # Security: Delete EVERYTHING in dist except _worker.js so Cloudflare doesn't upload or scan test files or raw code!
+          find dist -type f -not -name '_worker.js' -delete
           npx wrangler pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} > deploy_log.txt 2>&1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
