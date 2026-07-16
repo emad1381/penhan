@@ -1927,48 +1927,6 @@ void main() {
     </div>
   </div>
 
-  <!-- ================= NODES PAGE (MOCKUP) ================= -->
-  <div id="page-nodes" class="page hidden space-y-6">
-    <div>
-      <h2 class="font-headline-lg text-headline-lg text-white">مدیریت نودها</h2>
-      <p class="text-on-surface-variant mt-1 text-sm">پیکربندی سرورهای مرزی (Edge Nodes) جهت توزیع ترافیک در آینده</p>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 border-primary">
-        <div class="flex justify-between items-start mb-6">
-          <div>
-            <h4 class="text-white font-bold text-lg mb-1">Edge Node #1 (تهران)</h4>
-            <p class="text-xs text-on-surface-variant/80">سرور پروکسی لبه ایران</p>
-          </div>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-tertiary/10 text-tertiary">
-            <span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
-            فعال
-          </span>
-        </div>
-        <div class="space-y-3 text-sm border-t border-white/5 pt-4">
-          <div class="flex justify-between"><span class="text-on-surface-variant">آدرس سرور:</span><span class="font-mono text-white">node1.penhan.space</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">پروتکل‌ها:</span><span class="text-white">VLESS WS, Trojan WS</span></div>
-        </div>
-      </div>
-      <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between border-t-2 border-secondary">
-        <div class="flex justify-between items-start mb-6">
-          <div>
-            <h4 class="text-white font-bold text-lg mb-1">Edge Node #2 (خارج)</h4>
-            <p class="text-xs text-on-surface-variant/80">سرور کمکی خارج کشور</p>
-          </div>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-secondary/10 text-secondary">
-            <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-            پشتیبان
-          </span>
-        </div>
-        <div class="space-y-3 text-sm border-t border-white/5 pt-4">
-          <div class="flex justify-between"><span class="text-on-surface-variant">آدرس سرور:</span><span class="font-mono text-white">node2.penhan.space</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">پروتکل‌ها:</span><span class="text-white">VLESS WS, Trojan WS</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ================= NODES PAGE ================= -->
   <div id="page-nodes" class="page hidden space-y-6">
