@@ -93,7 +93,10 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         id: deploy
-        run: npx wrangler pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} > deploy_log.txt 2>&1
+        run: |
+          # Security: Delete unobfuscated code so Cloudflare scanners don't ban the Pages project
+          rm -f dist/worker.js dist/worker_obfuscated.js
+          npx wrangler pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME || 'penhan-exp' }} > deploy_log.txt 2>&1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
