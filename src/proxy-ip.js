@@ -3,8 +3,8 @@ const PROXY_IP_DOMAIN_SUFFIX = 'proxyip.cmliussss.net';
 const DISCOVERY_CACHE_TTL_MIN = 60;
 const DISCOVERY_CACHE_TTL_MAX = 300;
 const METADATA_CACHE_TTL = 86400;
-const MAX_PROXY_RECORDS = 128;
-const MAX_ENRICHED_RECORDS = 64;
+const MAX_PROXY_RECORDS = 1000;
+const MAX_ENRICHED_RECORDS = 1000;
 const REQUEST_TIMEOUT_MS = 2500;
 
 class ProxyIpError extends Error {
