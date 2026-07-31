@@ -210,26 +210,46 @@ async function queryTxt(name) {
     .filter(Boolean);
 }
 
-function countryFlag(code) {
-  if (!code || !/^[A-Z]{2}$/.test(code)) return '🌐';
-  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
-  return String.fromCodePoint(...points);
-}
-
 function countryNameFa(code) {
   if (!code || !/^[A-Z]{2}$/.test(code)) return 'نامشخص';
   try {
-    const name = new Intl.DisplayNames(['fa'], { type: 'region' }).of(code) || code;
-    return `${countryFlag(code)} ${name}`;
+    return new Intl.DisplayNames(['fa'], { type: 'region' }).of(code) || code;
   } catch (error) {
-    return `${countryFlag(code)} ${code}`;
+    return code;
   }
 }
 
 async function getIpMetadata(address) {
   const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson('metadata-v1', cacheKey);
+  const cached = await getCachedJson('metadata-v2', cacheKey);
   if (cached) return cached;
+
+  try {
+    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2000);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        const countryCode = (data.country_code || '').toUpperCase();
+        const asnNum = data.connection && data.connection.asn ? data.connection.asn : '';
+        const metadata = {
+          metadataStatus: 'ok',
+          isp: {
+            asn: asnNum ? `AS${asnNum}` : '--',
+            name: (data.connection && (data.connection.isp || data.connection.org)) || 'نام شبکه در دسترس نیست',
+          },
+          country: {
+            code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : '--',
+            name: countryNameFa(countryCode),
+            city: data.city || '',
+          },
+        };
+        await putCachedJson('metadata-v2', cacheKey, metadata, METADATA_CACHE_TTL);
+        return metadata;
+      }
+    }
+  } catch (e) {
+    // Fallback to Team Cymru if ipwho.is fails or times out
+  }
 
   try {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
@@ -253,17 +273,17 @@ async function getIpMetadata(address) {
       },
       country: {
         code: validCountry || '--',
-        flag: countryFlag(validCountry),
         name: countryNameFa(validCountry),
+        city: '',
       },
     };
-    await putCachedJson('metadata-v1', cacheKey, metadata, METADATA_CACHE_TTL);
+    await putCachedJson('metadata-v2', cacheKey, metadata, METADATA_CACHE_TTL);
     return metadata;
   } catch (error) {
     return {
       metadataStatus: 'unavailable',
       isp: { asn: '--', name: 'اطلاعات شبکه در دسترس نیست' },
-      country: { code: '--', flag: '🌐', name: 'نامشخص' },
+      country: { code: '--', name: 'نامشخص', city: '' },
     };
   }
 }

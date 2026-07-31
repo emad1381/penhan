@@ -965,27 +965,45 @@ async function queryTxt(name) {
     return [];
   return (Array.isArray(result.Answer) ? result.Answer : []).filter((answer) => answer.type === 16 && typeof answer.data === "string").map((answer) => cleanTxtValue(answer.data)).filter(Boolean);
 }
-function countryFlag(code) {
-  if (!code || !/^[A-Z]{2}$/.test(code))
-    return "\u{1F310}";
-  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
-  return String.fromCodePoint(...points);
-}
 function countryNameFa(code) {
   if (!code || !/^[A-Z]{2}$/.test(code))
     return "\u0646\u0627\u0645\u0634\u062E\u0635";
   try {
-    const name = new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
-    return `${countryFlag(code)} ${name}`;
+    return new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
   } catch (error) {
-    return `${countryFlag(code)} ${code}`;
+    return code;
   }
 }
 async function getIpMetadata(address) {
   const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson("metadata-v1", cacheKey);
+  const cached = await getCachedJson("metadata-v2", cacheKey);
   if (cached)
     return cached;
+  try {
+    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2e3);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        const countryCode = (data.country_code || "").toUpperCase();
+        const asnNum = data.connection && data.connection.asn ? data.connection.asn : "";
+        const metadata = {
+          metadataStatus: "ok",
+          isp: {
+            asn: asnNum ? `AS${asnNum}` : "--",
+            name: data.connection && (data.connection.isp || data.connection.org) || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
+          },
+          country: {
+            code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : "--",
+            name: countryNameFa(countryCode),
+            city: data.city || ""
+          }
+        };
+        await putCachedJson("metadata-v2", cacheKey, metadata, METADATA_CACHE_TTL);
+        return metadata;
+      }
+    }
+  } catch (e) {
+  }
   try {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
@@ -1007,17 +1025,17 @@ async function getIpMetadata(address) {
       },
       country: {
         code: validCountry || "--",
-        flag: countryFlag(validCountry),
-        name: countryNameFa(validCountry)
+        name: countryNameFa(validCountry),
+        city: ""
       }
     };
-    await putCachedJson("metadata-v1", cacheKey, metadata, METADATA_CACHE_TTL);
+    await putCachedJson("metadata-v2", cacheKey, metadata, METADATA_CACHE_TTL);
     return metadata;
   } catch (error) {
     return {
       metadataStatus: "unavailable",
       isp: { asn: "--", name: "\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A" },
-      country: { code: "--", flag: "\u{1F310}", name: "\u0646\u0627\u0645\u0634\u062E\u0635" }
+      country: { code: "--", name: "\u0646\u0627\u0645\u0634\u062E\u0635", city: "" }
     };
   }
 }
@@ -2052,7 +2070,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
               <th>\u0622\u06CC\u200C\u067E\u06CC</th>
               <th>\u0646\u0648\u0639</th>
               <th>\u0634\u0628\u06A9\u0647 / ISP</th>
-              <th>\u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN</th>
+              <th>\u06A9\u0634\u0648\u0631 / \u0645\u0648\u0642\u0639\u06CC\u062A IP</th>
               <th>TTL</th>
             </tr>
           </thead>
@@ -2468,13 +2486,34 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         ispCell.append(asn, isp);
 
         const countryCell = document.createElement('td');
-        countryCell.dataset.label = '\u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN';
-        const country = document.createElement('span');
-        country.textContent = record.country && record.country.name ? record.country.name : '\u0646\u0627\u0645\u0634\u062E\u0635';
-        const countryCode = document.createElement('div');
-        countryCode.className = 'proxy-record-meta proxy-asn';
-        countryCode.textContent = record.country && record.country.code ? record.country.code : '--';
-        countryCell.append(country, countryCode);
+        countryCell.dataset.label = '\u06A9\u0634\u0648\u0631 / \u0645\u0648\u0642\u0639\u06CC\u062A IP';
+        const countryWrap = document.createElement('div');
+        countryWrap.style.display = 'flex';
+        countryWrap.style.alignItems = 'center';
+        countryWrap.style.gap = '8px';
+
+        const code = record.country && record.country.code ? record.country.code.toLowerCase() : '';
+        if (/^[a-z]{2}$/.test(code)) {
+          const flagImg = document.createElement('img');
+          flagImg.src = 'https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/flags/4x3/' + code + '.svg';
+          flagImg.alt = code.toUpperCase();
+          flagImg.style.width = '20px';
+          flagImg.style.height = '15px';
+          flagImg.style.borderRadius = '3px';
+          flagImg.style.objectFit = 'cover';
+          countryWrap.appendChild(flagImg);
+        }
+
+        const countryText = document.createElement('span');
+        countryText.textContent = record.country && record.country.name ? record.country.name : '\u0646\u0627\u0645\u0634\u062E\u0635';
+        countryWrap.appendChild(countryText);
+
+        const countrySub = document.createElement('div');
+        countrySub.className = 'proxy-record-meta proxy-asn';
+        const cityStr = record.country && record.country.city ? record.country.city + ' (' + (record.country.code || '') + ')' : (record.country && record.country.code ? record.country.code : '--');
+        countrySub.textContent = cityStr;
+
+        countryCell.append(countryWrap, countrySub);
 
         const ttlCell = document.createElement('td');
         ttlCell.dataset.label = 'TTL';

@@ -964,7 +964,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
               <th>آی‌پی</th>
               <th>نوع</th>
               <th>شبکه / ISP</th>
-              <th>کشور ثبت ASN</th>
+              <th>کشور / موقعیت IP</th>
               <th>TTL</th>
             </tr>
           </thead>
@@ -1380,13 +1380,34 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         ispCell.append(asn, isp);
 
         const countryCell = document.createElement('td');
-        countryCell.dataset.label = 'کشور ثبت ASN';
-        const country = document.createElement('span');
-        country.textContent = record.country && record.country.name ? record.country.name : 'نامشخص';
-        const countryCode = document.createElement('div');
-        countryCode.className = 'proxy-record-meta proxy-asn';
-        countryCode.textContent = record.country && record.country.code ? record.country.code : '--';
-        countryCell.append(country, countryCode);
+        countryCell.dataset.label = 'کشور / موقعیت IP';
+        const countryWrap = document.createElement('div');
+        countryWrap.style.display = 'flex';
+        countryWrap.style.alignItems = 'center';
+        countryWrap.style.gap = '8px';
+
+        const code = record.country && record.country.code ? record.country.code.toLowerCase() : '';
+        if (/^[a-z]{2}$/.test(code)) {
+          const flagImg = document.createElement('img');
+          flagImg.src = 'https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/flags/4x3/' + code + '.svg';
+          flagImg.alt = code.toUpperCase();
+          flagImg.style.width = '20px';
+          flagImg.style.height = '15px';
+          flagImg.style.borderRadius = '3px';
+          flagImg.style.objectFit = 'cover';
+          countryWrap.appendChild(flagImg);
+        }
+
+        const countryText = document.createElement('span');
+        countryText.textContent = record.country && record.country.name ? record.country.name : 'نامشخص';
+        countryWrap.appendChild(countryText);
+
+        const countrySub = document.createElement('div');
+        countrySub.className = 'proxy-record-meta proxy-asn';
+        const cityStr = record.country && record.country.city ? record.country.city + ' (' + (record.country.code || '') + ')' : (record.country && record.country.code ? record.country.code : '--');
+        countrySub.textContent = cityStr;
+
+        countryCell.append(countryWrap, countrySub);
 
         const ttlCell = document.createElement('td');
         ttlCell.dataset.label = 'TTL';
