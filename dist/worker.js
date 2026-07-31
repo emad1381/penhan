@@ -976,11 +976,11 @@ function countryNameFa(code) {
 }
 async function getIpMetadata(address) {
   const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson("metadata-v2", cacheKey);
+  const cached = await getCachedJson("metadata-v3", cacheKey);
   if (cached)
     return cached;
   try {
-    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2e3);
+    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 3e3);
     if (res.ok) {
       const data = await res.json();
       if (data && data.success) {
@@ -998,7 +998,7 @@ async function getIpMetadata(address) {
             city: data.city || ""
           }
         };
-        await putCachedJson("metadata-v2", cacheKey, metadata, METADATA_CACHE_TTL);
+        await putCachedJson("metadata-v3", cacheKey, metadata, METADATA_CACHE_TTL);
         return metadata;
       }
     }
@@ -1008,15 +1008,10 @@ async function getIpMetadata(address) {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
     const asnNumber = originFields[0];
-    let countryCode = (originFields[2] || "").toUpperCase();
     if (!/^\d+$/.test(asnNumber))
       throw new Error("Invalid ASN answer");
     const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
     const asnFields = (asnAnswers[0] || "").split("|").map((value) => value.trim());
-    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
-      countryCode = asnFields[1].toUpperCase();
-    }
-    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
     const metadata = {
       metadataStatus: "ok",
       isp: {
@@ -1024,12 +1019,12 @@ async function getIpMetadata(address) {
         name: asnFields[4] || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
       },
       country: {
-        code: validCountry || "--",
-        name: countryNameFa(validCountry),
+        code: "--",
+        name: "\u0646\u0627\u0645\u0634\u062E\u0635",
         city: ""
       }
     };
-    await putCachedJson("metadata-v2", cacheKey, metadata, METADATA_CACHE_TTL);
+    await putCachedJson("metadata-v3", cacheKey, metadata, METADATA_CACHE_TTL);
     return metadata;
   } catch (error) {
     return {
@@ -1851,6 +1846,11 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .proxy-status.info { background: rgba(168,85,247,.09); border-color: rgba(168,85,247,.25); color: #ddd6fe; }
     .proxy-status.warn { background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.28); color: #fcd34d; }
     .proxy-status.error { background: rgba(239,68,68,.09); border-color: rgba(239,68,68,.28); color: #fca5a5; }
+    .proxy-filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .proxy-filter-select { flex: 0 0 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 14px; font-size: 13px; outline: none; }
+    .proxy-filter-select:focus { border-color: var(--primary); }
+    .proxy-search-input { flex: 1; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 14px; font-size: 13px; outline: none; }
+    .proxy-search-input:focus { border-color: var(--primary); }
     .proxy-records { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
     .proxy-records-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid var(--border); }
     .proxy-records-title h3 { font-size: 15px; }
@@ -2057,6 +2057,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
 
       <div id="proxy-status" class="proxy-status" role="status" aria-live="polite"></div>
+
+      <div class="proxy-filters">
+        <select id="proxy-filter-country" class="proxy-filter-select" onchange="filterProxyRecords()">
+          <option value="">\u0647\u0645\u0647\u0654 \u06A9\u0634\u0648\u0631\u0647\u0627 (\u0647\u0645\u06AF\u06CC)</option>
+        </select>
+        <input type="text" id="proxy-search" class="proxy-search-input" placeholder="\u062C\u0633\u062A\u062C\u0648 \u0628\u0631 \u0627\u0633\u0627\u0633 \u0622\u06CC\u200C\u067E\u06CC\u060C ISP\u060C \u06A9\u0634\u0648\u0631\u060C \u0634\u0647\u0631 \u06CC\u0627 IPv4/IPv6..." oninput="filterProxyRecords()">
+      </div>
 
       <div class="proxy-records">
         <div class="proxy-records-title">
@@ -2410,19 +2417,68 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       apply.disabled = loading || !proxyIpState.selected;
     }
 
+    function populateCountryFilter() {
+      const select = document.getElementById('proxy-filter-country');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">\u0647\u0645\u0647\u0654 \u06A9\u0634\u0648\u0631\u0647\u0627 (\u0647\u0645\u06AF\u06CC)</option>';
+      const countries = new Map();
+
+      proxyIpState.records.forEach((record) => {
+        const code = record.country && record.country.code && record.country.code !== '--' ? record.country.code : 'UNKNOWN';
+        const name = record.country && record.country.name ? record.country.name : '\u0646\u0627\u0645\u0634\u062E\u0635';
+        if (!countries.has(code)) {
+          countries.set(code, { code, name, count: 0 });
+        }
+        countries.get(code).count++;
+      });
+
+      countries.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.code;
+        option.textContent = item.name + ' (' + item.count.toLocaleString('fa-IR') + ' \u0622\u06CC\u200C\u067E\u06CC)';
+        select.appendChild(option);
+      });
+
+      if (countries.has(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function filterProxyRecords() {
+      renderProxyRecords();
+    }
+
     function renderProxyRecords() {
       const body = document.getElementById('proxy-records-body');
       const count = document.getElementById('proxy-record-count');
       const apply = document.getElementById('proxy-apply');
       const current = document.getElementById('proxy-current-value').textContent.trim();
+      const countryFilter = document.getElementById('proxy-filter-country').value;
+      const searchQuery = document.getElementById('proxy-search').value.trim().toLowerCase();
       body.innerHTML = '';
 
-      if (!proxyIpState.records.length) {
+      const filtered = proxyIpState.records.filter((record) => {
+        const code = record.country && record.country.code && record.country.code !== '--' ? record.country.code : 'UNKNOWN';
+        if (countryFilter && code !== countryFilter) return false;
+
+        if (searchQuery) {
+          const matchIp = record.address.toLowerCase().includes(searchQuery);
+          const matchIsp = record.isp && record.isp.name && record.isp.name.toLowerCase().includes(searchQuery);
+          const matchAsn = record.isp && record.isp.asn && record.isp.asn.toLowerCase().includes(searchQuery);
+          const matchCountry = record.country && record.country.name && record.country.name.toLowerCase().includes(searchQuery);
+          const matchCity = record.country && record.country.city && record.country.city.toLowerCase().includes(searchQuery);
+          const matchFamily = record.family && record.family.toLowerCase().includes(searchQuery);
+          if (!matchIp && !matchIsp && !matchAsn && !matchCountry && !matchCity && !matchFamily) return false;
+        }
+        return true;
+      });
+
+      if (!filtered.length) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
         cell.colSpan = 6;
         cell.className = 'proxy-empty';
-        cell.textContent = '\u0628\u0631\u0627\u06CC \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC \u0647\u06CC\u0686 \u0631\u06A9\u0648\u0631\u062F A \u06CC\u0627 AAAA \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.';
+        cell.textContent = proxyIpState.records.length ? '\u0647\u06CC\u0686 \u0622\u06CC\u200C\u067E\u06CC \u0645\u0637\u0627\u0628\u0642 \u0628\u0627 \u0641\u06CC\u0644\u062A\u0631 \u06CC\u0627 \u062C\u0633\u062A\u062C\u0648\u06CC \u0634\u0645\u0627 \u06CC\u0627\u0641\u062A \u0646\u0634\u062F.' : '\u0628\u0631\u0627\u06CC \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC \u0647\u06CC\u0686 \u0631\u06A9\u0648\u0631\u062F A \u06CC\u0627 AAAA \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.';
         row.appendChild(cell);
         body.appendChild(row);
         count.textContent = '\u06F0 \u0631\u06A9\u0648\u0631\u062F';
@@ -2430,8 +2486,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         return;
       }
 
-      count.textContent = proxyIpState.records.length.toLocaleString('fa-IR') + ' \u0631\u06A9\u0648\u0631\u062F \u0622\u0645\u0627\u062F\u0647\u0654 \u0627\u0646\u062A\u062E\u0627\u0628';
-      proxyIpState.records.forEach((record) => {
+      count.textContent = filtered.length.toLocaleString('fa-IR') + ' \u0627\u0632 ' + proxyIpState.records.length.toLocaleString('fa-IR') + ' \u0631\u06A9\u0648\u0631\u062F \u0622\u0645\u0627\u062F\u0647\u0654 \u0627\u0646\u062A\u062E\u0627\u0628';
+      filtered.forEach((record) => {
         const row = document.createElement('tr');
         row.className = 'proxy-record-row' + (proxyIpState.selected === record.address ? ' selected' : '') + (current === record.address ? ' current' : '');
         row.tabIndex = 0;
@@ -2546,6 +2602,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         proxyIpState.loaded = true;
         proxyIpState.records = Array.isArray(data.records) ? data.records : [];
         proxyIpState.selected = proxyIpState.records.some((record) => record.address === proxyIpState.selected) ? proxyIpState.selected : null;
+        populateCountryFilter();
         document.getElementById('proxy-route').hidden = false;
         document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
         document.getElementById('proxy-source-label').textContent = '\u0645\u0646\u0628\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0641\u0639\u0627\u0644';

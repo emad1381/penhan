@@ -742,6 +742,11 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .proxy-status.info { background: rgba(168,85,247,.09); border-color: rgba(168,85,247,.25); color: #ddd6fe; }
     .proxy-status.warn { background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.28); color: #fcd34d; }
     .proxy-status.error { background: rgba(239,68,68,.09); border-color: rgba(239,68,68,.28); color: #fca5a5; }
+    .proxy-filters { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .proxy-filter-select { flex: 0 0 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 14px; font-size: 13px; outline: none; }
+    .proxy-filter-select:focus { border-color: var(--primary); }
+    .proxy-search-input { flex: 1; min-width: 220px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 10px 14px; font-size: 13px; outline: none; }
+    .proxy-search-input:focus { border-color: var(--primary); }
     .proxy-records { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
     .proxy-records-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid var(--border); }
     .proxy-records-title h3 { font-size: 15px; }
@@ -951,6 +956,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
 
       <div id="proxy-status" class="proxy-status" role="status" aria-live="polite"></div>
+
+      <div class="proxy-filters">
+        <select id="proxy-filter-country" class="proxy-filter-select" onchange="filterProxyRecords()">
+          <option value="">همهٔ کشورها (همگی)</option>
+        </select>
+        <input type="text" id="proxy-search" class="proxy-search-input" placeholder="جستجو بر اساس آی‌پی، ISP، کشور، شهر یا IPv4/IPv6..." oninput="filterProxyRecords()">
+      </div>
 
       <div class="proxy-records">
         <div class="proxy-records-title">
@@ -1304,19 +1316,68 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       apply.disabled = loading || !proxyIpState.selected;
     }
 
+    function populateCountryFilter() {
+      const select = document.getElementById('proxy-filter-country');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">همهٔ کشورها (همگی)</option>';
+      const countries = new Map();
+
+      proxyIpState.records.forEach((record) => {
+        const code = record.country && record.country.code && record.country.code !== '--' ? record.country.code : 'UNKNOWN';
+        const name = record.country && record.country.name ? record.country.name : 'نامشخص';
+        if (!countries.has(code)) {
+          countries.set(code, { code, name, count: 0 });
+        }
+        countries.get(code).count++;
+      });
+
+      countries.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.code;
+        option.textContent = item.name + ' (' + item.count.toLocaleString('fa-IR') + ' آی‌پی)';
+        select.appendChild(option);
+      });
+
+      if (countries.has(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function filterProxyRecords() {
+      renderProxyRecords();
+    }
+
     function renderProxyRecords() {
       const body = document.getElementById('proxy-records-body');
       const count = document.getElementById('proxy-record-count');
       const apply = document.getElementById('proxy-apply');
       const current = document.getElementById('proxy-current-value').textContent.trim();
+      const countryFilter = document.getElementById('proxy-filter-country').value;
+      const searchQuery = document.getElementById('proxy-search').value.trim().toLowerCase();
       body.innerHTML = '';
 
-      if (!proxyIpState.records.length) {
+      const filtered = proxyIpState.records.filter((record) => {
+        const code = record.country && record.country.code && record.country.code !== '--' ? record.country.code : 'UNKNOWN';
+        if (countryFilter && code !== countryFilter) return false;
+
+        if (searchQuery) {
+          const matchIp = record.address.toLowerCase().includes(searchQuery);
+          const matchIsp = record.isp && record.isp.name && record.isp.name.toLowerCase().includes(searchQuery);
+          const matchAsn = record.isp && record.isp.asn && record.isp.asn.toLowerCase().includes(searchQuery);
+          const matchCountry = record.country && record.country.name && record.country.name.toLowerCase().includes(searchQuery);
+          const matchCity = record.country && record.country.city && record.country.city.toLowerCase().includes(searchQuery);
+          const matchFamily = record.family && record.family.toLowerCase().includes(searchQuery);
+          if (!matchIp && !matchIsp && !matchAsn && !matchCountry && !matchCity && !matchFamily) return false;
+        }
+        return true;
+      });
+
+      if (!filtered.length) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
         cell.colSpan = 6;
         cell.className = 'proxy-empty';
-        cell.textContent = 'برای مرکز ورودی فعلی هیچ رکورد A یا AAAA پیدا نشد.';
+        cell.textContent = proxyIpState.records.length ? 'هیچ آی‌پی مطابق با فیلتر یا جستجوی شما یافت نشد.' : 'برای مرکز ورودی فعلی هیچ رکورد A یا AAAA پیدا نشد.';
         row.appendChild(cell);
         body.appendChild(row);
         count.textContent = '۰ رکورد';
@@ -1324,8 +1385,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         return;
       }
 
-      count.textContent = proxyIpState.records.length.toLocaleString('fa-IR') + ' رکورد آمادهٔ انتخاب';
-      proxyIpState.records.forEach((record) => {
+      count.textContent = filtered.length.toLocaleString('fa-IR') + ' از ' + proxyIpState.records.length.toLocaleString('fa-IR') + ' رکورد آمادهٔ انتخاب';
+      filtered.forEach((record) => {
         const row = document.createElement('tr');
         row.className = 'proxy-record-row' + (proxyIpState.selected === record.address ? ' selected' : '') + (current === record.address ? ' current' : '');
         row.tabIndex = 0;
@@ -1440,6 +1501,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         proxyIpState.loaded = true;
         proxyIpState.records = Array.isArray(data.records) ? data.records : [];
         proxyIpState.selected = proxyIpState.records.some((record) => record.address === proxyIpState.selected) ? proxyIpState.selected : null;
+        populateCountryFilter();
         document.getElementById('proxy-route').hidden = false;
         document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
         document.getElementById('proxy-source-label').textContent = 'منبع خودکار فعال';
