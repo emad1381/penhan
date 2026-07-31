@@ -13,23 +13,25 @@ try {
   } else { console.log('❌ nginxPage missing'); }
 
   if (typeof loginPage === 'function') {
-    const lp = loginPage('test-uuid', 'localhost');
+    const lp = loginPage('/panel', 'localhost');
     console.log('✅ loginPage() OK, length:', lp.length);
   } else { console.log('❌ loginPage missing'); }
 
   if (typeof panelPage === 'function') {
-    const pp = panelPage('localhost', 'test-uuid', '1.1.1.1', '2.2.2.2', '/vless', '/trojan', true, 'FRA', 'TLSv1.3');
+    const pp = panelPage('localhost', 'test-uuid', '1.1.1.1', '', '');
     console.log('✅ panelPage() OK, length:', pp.length);
   } else { console.log('❌ panelPage missing'); }
 
   if (typeof subscriptionPage === 'function') {
-    const sp = subscriptionPage('localhost', 'test-uuid', '1.1.1.1', '/vless', '/trojan');
+    const mockUser = { id: 'test-uuid', name: 'Test User', used_bytes: 0, limit_bytes: 0, expiry_date: 0 };
+    const sp = subscriptionPage('localhost', mockUser, 'vless://test', 'trojan://test');
     console.log('✅ subscriptionPage() OK, length:', sp.length);
   } else { console.log('❌ subscriptionPage missing'); }
 
-  if (typeof isApiAuthed === 'function') {
-    console.log('✅ isApiAuthed() OK');
-  } else { console.log('❌ isApiAuthed missing'); }
+  if (typeof setupPage === 'function') {
+    const spg = setupPage(true, true, true, 'test-uuid', '1.1.1.1');
+    console.log('✅ setupPage() OK, length:', spg.length);
+  } else { console.log('❌ setupPage missing'); }
 
   if (typeof vlessOverWSHandler === 'function') {
     console.log('✅ vlessOverWSHandler() OK');

@@ -1,4 +1,4 @@
-import { isValidUUID, isAuthed, isApiAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224, getSettingD1, setSettingD1 } from './helpers.js';
+import { isValidUUID, isAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224, getSettingD1, setSettingD1 } from './helpers.js';
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';

@@ -1109,7 +1109,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       if (expiryDate > 0) {
         const d = new Date(expiryDate);
         const pad = (n) => n.toString().padStart(2, '0');
-        document.getElementById('u-expiry').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        document.getElementById('u-expiry').value = \`\${d.getFullYear()}-\${pad(d.getMonth() + 1)}-\${pad(d.getDate())}T\${pad(d.getHours())}:\${pad(d.getMinutes())}\`;
       } else {
         document.getElementById('u-expiry').value = '';
       }

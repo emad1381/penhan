@@ -169,7 +169,7 @@ for (let i = 0; i < 256; ++i) {
 function unsafeStringify(arr, offset = 0) {
   return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
 }
-function stringify2(arr, offset = 0) {
+function stringify(arr, offset = 0) {
   const uuid = unsafeStringify(arr, offset);
   if (!isValidUUID(uuid)) {
     throw TypeError("Stringified UUID is invalid");
@@ -451,7 +451,7 @@ function processVlessHeader(vlessBuffer) {
   }
   const version = new Uint8Array(vlessBuffer.slice(0, 1));
   let isUDP = false;
-  const userID = stringify2(new Uint8Array(vlessBuffer.slice(1, 17)));
+  const userID = stringify(new Uint8Array(vlessBuffer.slice(1, 17)));
   const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
   const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
   if (command === 1) {
@@ -1204,14 +1204,23 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
   } else {
     usageText = `${formatBytes(used)} (\u0628\u062F\u0648\u0646 \u0633\u0642\u0641)`;
   }
-  let daysLeftText = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  let expiryAbsolute = "\u0646\u0627\u0645\u062D\u062F\u0648\u062F";
+  let expiryRelative = "\u221E";
   if (user.expiry_date > 0) {
+    const d = new Date(user.expiry_date);
+    const pad = (n) => n.toString().padStart(2, "0");
+    expiryAbsolute = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     const diff = user.expiry_date - Date.now();
     if (diff < 0) {
-      daysLeftText = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
+      expiryRelative = "\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647";
     } else {
-      const days = Math.ceil(diff / (1e3 * 60 * 60 * 24));
-      daysLeftText = days + " \u0631\u0648\u0632";
+      const days = Math.floor(diff / (1e3 * 60 * 60 * 24));
+      const hours = Math.floor(diff % (1e3 * 60 * 60 * 24) / (1e3 * 60 * 60));
+      if (days > 0) {
+        expiryRelative = `${days} \u0631\u0648\u0632 \u0648 ${hours} \u0633\u0627\u0639\u062A \u062F\u06CC\u06AF\u0631`;
+      } else {
+        expiryRelative = `${hours} \u0633\u0627\u0639\u062A \u062F\u06CC\u06AF\u0631`;
+      }
     }
   }
   let statusClass = "active";
@@ -1313,7 +1322,8 @@ function subscriptionPage(hostname, user, vlessWS, trojanWS) {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC</div>
-        <div class="stat-val">${daysLeftText}</div>
+        <div class="stat-val" style="font-size:14px; direction:ltr;">${expiryAbsolute}</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${expiryRelative}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">\u062A\u0631\u0627\u0641\u06CC\u06A9 \u0645\u0635\u0631\u0641\u06CC</div>
@@ -1653,8 +1663,8 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         <input type="number" id="u-limit" class="form-control" value="0">
       </div>
       <div class="form-group">
-        <label>\u0627\u0639\u062A\u0628\u0627\u0631 \u0632\u0645\u0627\u0646\u06CC (\u0631\u0648\u0632) - 0 \u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F</label>
-        <input type="number" id="u-days" class="form-control" value="0">
+        <label>\u062A\u0627\u0631\u06CC\u062E \u0627\u0646\u0642\u0636\u0627 (\u0628\u0631\u0627\u06CC \u0646\u0627\u0645\u062D\u062F\u0648\u062F\u060C \u062E\u0627\u0644\u06CC \u0628\u06AF\u0630\u0627\u0631\u06CC\u062F)</label>
+        <input type="datetime-local" id="u-expiry" class="form-control">
       </div>
       <div class="form-group">
         <label>Clean IP \u0627\u062E\u062A\u0635\u0627\u0635\u06CC (\u0627\u062E\u062A\u06CC\u0627\u0631\u06CC)</label>
@@ -1730,10 +1740,28 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         }
         data.users.forEach(u => {
           let usage = u.limit_bytes ? \`\${formatBytes(u.used_bytes)} / \${formatBytes(u.limit_bytes)}\` : \`\${formatBytes(u.used_bytes)} (\u221E)\`;
-          let days = '\u221E';
+          let expiryHTML = '<span style="color:#a1a1aa">\u0646\u0627\u0645\u062D\u062F\u0648\u062F (\u221E)</span>';
           if (u.expiry_date) {
-            let left = Math.ceil((u.expiry_date - Date.now()) / 86400000);
-            days = left < 0 ? '\u0645\u0646\u0642\u0636\u06CC' : left + ' \u0631\u0648\u0632';
+            const d = new Date(u.expiry_date);
+            const pad = (n) => n.toString().padStart(2, '0');
+            const abs = \`\${d.getFullYear()}/\${pad(d.getMonth() + 1)}/\${pad(d.getDate())} \${pad(d.getHours())}:\${pad(d.getMinutes())}\`;
+            
+            const diff = u.expiry_date - Date.now();
+            let rel = '';
+            let badgeClass = 'green';
+            if (diff < 0) {
+               rel = '\u0645\u0646\u0642\u0636\u06CC \u0634\u062F\u0647';
+               badgeClass = 'red';
+            } else {
+               const days = Math.floor(diff / 86400000);
+               const hours = Math.floor((diff % 86400000) / 3600000);
+               rel = days > 0 ? \`\${days} \u0631\u0648\u0632 \u0648 \${hours} \u0633\u0627\u0639\u062A\` : \`\${hours} \u0633\u0627\u0639\u062A\`;
+            }
+            
+            expiryHTML = \`<div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+              <span style="font-size:12px; font-weight:600; direction:ltr;">\${abs}</span>
+              <span class="badge \${badgeClass}" style="font-size:10px; padding:2px 6px;">\${rel}</span>
+            </div>\`;
           }
           let statusBadge = u.enabled ? '<span class="badge green">\u0641\u0639\u0627\u0644</span>' : '<span class="badge red">\u0645\u0633\u062F\u0648\u062F</span>';
           
@@ -1742,11 +1770,11 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
             <td><span class="code-span">\${u.id.substring(0,8)}...</span></td>
             <td>\${statusBadge}</td>
             <td style="direction:ltr; text-align:right">\${usage}</td>
-            <td>\${days}</td>
+            <td>\${expiryHTML}</td>
             <td>
               <div class="flex-gap">
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="toggleUser('\${u.id}')">\${u.enabled ? '\u0645\u0633\u062F\u0648\u062F' : '\u0622\u0632\u0627\u062F\u0633\u0627\u0632\u06CC'}</button>
-                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://${hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px" onclick="window.open('https://\${window.location.hostname}/\${u.id}/sub', '_blank')">\u0644\u06CC\u0646\u06A9 \u0633\u0627\u0628</button>
                 <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="deleteUser('\${u.id}')">\u{1F5D1}\uFE0F</button>
               </div>
             </td>
@@ -1759,13 +1787,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
        const id = document.getElementById('u-uuid').value;
        const name = document.getElementById('u-name').value;
        let gb = parseFloat(document.getElementById('u-limit').value) || 0;
-       let days = parseInt(document.getElementById('u-days').value) || 0;
+       const expiryVal = document.getElementById('u-expiry').value;
        const clean = document.getElementById('u-cleanip').value;
        
        if (!id || !name) { alert("\u0648\u0627\u0631\u062F \u06A9\u0631\u062F\u0646 \u0646\u0627\u0645 \u0648 UUID \u0627\u0644\u0632\u0627\u0645\u06CC \u0627\u0633\u062A!"); return; }
        
        const limit_bytes = gb * 1024 * 1024 * 1024;
-       const expiry_date = days > 0 ? Date.now() + (days * 86400000) : 0;
+       const expiry_date = expiryVal ? new Date(expiryVal).getTime() : 0;
        
        await fetch(basePath + '/users', {
          method: 'POST',
@@ -1845,7 +1873,7 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-uuid').disabled = false;
       document.getElementById('u-name').value = '';
       document.getElementById('u-limit').value = 0;
-      document.getElementById('u-days').value = 0;
+      document.getElementById('u-expiry').value = '';
       document.getElementById('u-cleanip').value = '';
       document.getElementById('user-modal-title').textContent = '\u0627\u0641\u0632\u0648\u062F\u0646 \u06A9\u0627\u0631\u0628\u0631 \u062C\u062F\u06CC\u062F';
       generateUUID();
@@ -1858,11 +1886,13 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-name').value = name;
       document.getElementById('u-limit').value = limitBytes ? (limitBytes / (1024 * 1024 * 1024)).toFixed(2) : 0;
       
-      let days = 0;
       if (expiryDate > 0) {
-        days = Math.max(0, Math.ceil((expiryDate - Date.now()) / 86400000));
+        const d = new Date(expiryDate);
+        const pad = (n) => n.toString().padStart(2, '0');
+        document.getElementById('u-expiry').value = \`\${d.getFullYear()}-\${pad(d.getMonth() + 1)}-\${pad(d.getDate())}T\${pad(d.getHours())}:\${pad(d.getMinutes())}\`;
+      } else {
+        document.getElementById('u-expiry').value = '';
       }
-      document.getElementById('u-days').value = days;
       document.getElementById('u-cleanip').value = cleanIp || '';
       document.getElementById('user-modal-title').textContent = '\u0648\u06CC\u0631\u0627\u06CC\u0634 \u06A9\u0627\u0631\u0628\u0631';
       openModal('user-modal');

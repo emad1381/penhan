@@ -160,28 +160,6 @@ async function isAuthed(request, pass) {
   return timingSafeEqual(match[1], hashedPass);
 }
 
-function isApiAuthed(request, currentPanelPass, currentUserID) {
-  const authHeader = request.headers.get('Authorization');
-  let token = '';
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.substring(7).trim();
-  } else {
-    const url = new URL(request.url);
-    token = url.searchParams.get('token') || '';
-  }
-  
-  if (currentPanelPass && timingSafeEqual(token, currentPanelPass)) {
-    return true;
-  }
-  if (timingSafeEqual(token, currentUserID)) {
-    return true;
-  }
-  if (!currentPanelPass && !token) {
-    return true;
-  }
-  return false;
-}
-
 // ============ D1 Database Helpers ============
 async function setupD1Schema(env) {
   if (!env.DB) return;
@@ -245,8 +223,8 @@ async function updateUsageD1(env, uuid, bytes) {
   } catch (e) { console.error("Usage update error", e); }
 }
 
-export { 
-  sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify, 
-  safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed, isApiAuthed,
+export {
+  sha224_and_224, base64ToArrayBuffer, isValidUUID, unsafeStringify, stringify,
+  safeCloseWebSocket, hashPassword, timingSafeEqual, isAuthed,
   setupD1Schema, getUserFromD1, updateUsageD1, getSettingD1, setSettingD1
 };

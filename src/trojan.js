@@ -68,55 +68,6 @@ function processTrojanHeader(buffer, trojanPasswordHash) {
   };
 }
 
-// ============ VLESS Header Parser ============
-function processVlessHeader(vlessBuffer, userID) {
-  if (vlessBuffer.byteLength < 24) { return { hasError: true, message: 'invalid data' }; }
-  const version = new Uint8Array(vlessBuffer.slice(0, 1));
-  let isValidUser = false;
-  let isUDP = false;
-  if (stringify(new Uint8Array(vlessBuffer.slice(1, 17))) === userID) { isValidUser = true; }
-  if (!isValidUser) { return { hasError: true, message: 'invalid user' }; }
-  const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
-  const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
-  if (command === 1) { /* TCP */ }
-  else if (command === 2) { isUDP = true; }
-  else { return { hasError: true, message: 'command ' + command + ' is not supported' }; }
-  const portIndex = 18 + optLength + 1;
-  const portBuffer = vlessBuffer.slice(portIndex, portIndex + 2);
-  const portRemote = new DataView(portBuffer).getUint16(0);
-  let addressIndex = portIndex + 2;
-  const addressBuffer = new Uint8Array(vlessBuffer.slice(addressIndex, addressIndex + 1));
-  const addressType = addressBuffer[0];
-  let addressLength = 0;
-  let addressValueIndex = addressIndex + 1;
-  let addressValue = '';
-  switch (addressType) {
-    case 1:
-      addressLength = 4;
-      addressValue = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join('.');
-      break;
-    case 2:
-      addressLength = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
-      addressValueIndex += 1;
-      addressValue = new TextDecoder().decode(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
-      break;
-    case 3:
-      addressLength = 16;
-      const dataView = new DataView(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
-      const ipv6 = [];
-      for (let i = 0; i < 8; i++) { ipv6.push(dataView.getUint16(i * 2).toString(16)); }
-      addressValue = ipv6.join(':');
-      break;
-    default:
-      return { hasError: true, message: 'invalid addressType is ' + addressType };
-  }
-  if (!addressValue) { return { hasError: true, message: 'addressValue is empty' }; }
-  return {
-    hasError: false, addressRemote: addressValue, addressType,
-    portRemote, rawDataIndex: addressValueIndex + addressLength, vlessVersion: version, isUDP,
-  };
-}
-
 async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsage) {
   // @ts-ignore
   const webSocketPair = new WebSocketPair();
@@ -236,7 +187,5 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
 
   return new Response(null, { status: 101, webSocket: client });
 }
-
-// ============ VLESS & Trojan Header Parsers ============
 
 export { trojanOverWSHandler };
