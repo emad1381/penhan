@@ -779,7 +779,8 @@ var PROXY_IP_DOMAIN_SUFFIX = "proxyip.cmliussss.net";
 var DISCOVERY_CACHE_TTL_MIN = 60;
 var DISCOVERY_CACHE_TTL_MAX = 300;
 var METADATA_CACHE_TTL = 86400;
-var MAX_PROXY_RECORDS = 32;
+var MAX_PROXY_RECORDS = 128;
+var MAX_ENRICHED_RECORDS = 64;
 var REQUEST_TIMEOUT_MS = 2500;
 var ProxyIpError = class extends Error {
   constructor(code, message, status = 503) {
@@ -1049,13 +1050,15 @@ async function resolveProxyRecords(request, { refresh = false, enrich = true } =
       warnings.push(`${family} records could not be retrieved.`);
     }
   }
-  const uniqueRecords = deduplicateRecords(records);
+  let uniqueRecords = deduplicateRecords(records);
   if (uniqueRecords.length > MAX_PROXY_RECORDS) {
-    throw new ProxyIpError("TOO_MANY_RECORDS", "The Proxy IP DNS response contains too many records.");
+    uniqueRecords = uniqueRecords.slice(0, MAX_PROXY_RECORDS);
+    warnings.push(`\u0646\u0645\u0627\u06CC\u0634 \u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0628\u0647 ${MAX_PROXY_RECORDS} \u0639\u062F\u062F \u0645\u062D\u062F\u0648\u062F \u0634\u062F.`);
   }
+  const recordsToEnrich = uniqueRecords.slice(0, MAX_ENRICHED_RECORDS);
   const response = {
     colo,
-    records: enrich ? await enrichRecords(uniqueRecords) : uniqueRecords,
+    records: enrich ? await enrichRecords(recordsToEnrich) : uniqueRecords,
     partial: warnings.length > 0,
     warnings
   };

@@ -3,7 +3,8 @@ const PROXY_IP_DOMAIN_SUFFIX = 'proxyip.cmliussss.net';
 const DISCOVERY_CACHE_TTL_MIN = 60;
 const DISCOVERY_CACHE_TTL_MAX = 300;
 const METADATA_CACHE_TTL = 86400;
-const MAX_PROXY_RECORDS = 32;
+const MAX_PROXY_RECORDS = 128;
+const MAX_ENRICHED_RECORDS = 64;
 const REQUEST_TIMEOUT_MS = 2500;
 
 class ProxyIpError extends Error {
@@ -301,14 +302,16 @@ async function resolveProxyRecords(request, { refresh = false, enrich = true } =
     }
   }
 
-  const uniqueRecords = deduplicateRecords(records);
+  let uniqueRecords = deduplicateRecords(records);
   if (uniqueRecords.length > MAX_PROXY_RECORDS) {
-    throw new ProxyIpError('TOO_MANY_RECORDS', 'The Proxy IP DNS response contains too many records.');
+    uniqueRecords = uniqueRecords.slice(0, MAX_PROXY_RECORDS);
+    warnings.push(`نمایش رکوردها به ${MAX_PROXY_RECORDS} عدد محدود شد.`);
   }
 
+  const recordsToEnrich = uniqueRecords.slice(0, MAX_ENRICHED_RECORDS);
   const response = {
     colo,
-    records: enrich ? await enrichRecords(uniqueRecords) : uniqueRecords,
+    records: enrich ? await enrichRecords(recordsToEnrich) : uniqueRecords,
     partial: warnings.length > 0,
     warnings,
   };
