@@ -225,42 +225,21 @@ function countryNameFa(code) {
   }
 }
 
-async function getIpMetadata(address) {
-  const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson('metadata-v4', cacheKey);
-  if (cached) return cached;
-
-  // 1. Try ipwho.is for accurate GeoIP (Netherlands NL, Germany DE, etc.)
+async function getIpApiBatch(addresses) {
   try {
-    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2500);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.success) {
-        const countryCode = (data.country_code || '').toUpperCase();
-        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
-        const asnNum = data.connection && data.connection.asn ? data.connection.asn : '';
-        const metadata = {
-          metadataStatus: 'ok',
-          isp: {
-            asn: asnNum ? `AS${asnNum}` : '--',
-            name: (data.connection && (data.connection.isp || data.connection.org)) || 'نام شبکه در دسترس نیست',
-          },
-          country: {
-            code: validCountry || '--',
-            flagEmoji: countryFlagEmoji(validCountry),
-            name: countryNameFa(validCountry),
-            city: data.city || '',
-          },
-        };
-        await putCachedJson('metadata-v4', cacheKey, metadata, METADATA_CACHE_TTL);
-        return metadata;
-      }
-    }
-  } catch (e) {
-    // Continue to fallback
+    const res = await fetchWithTimeout('http://ip-api.com/batch', {
+      method: 'POST',
+      body: JSON.stringify(addresses.map(ip => ({ query: ip, fields: 'status,country,countryCode,city,isp,as,org' }))),
+      headers: { 'Content-Type': 'application/json' },
+    }, 4000);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
   }
+}
 
-  // 2. Fallback to Team Cymru ASN metadata
+async function getIpMetadataFallback(address) {
   try {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || '').split('|').map((value) => value.trim());
@@ -275,7 +254,7 @@ async function getIpMetadata(address) {
     }
 
     const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
-    const metadata = {
+    return {
       metadataStatus: 'ok',
       isp: {
         asn: `AS${asnNumber}`,
@@ -288,8 +267,6 @@ async function getIpMetadata(address) {
         city: '',
       },
     };
-    await putCachedJson('metadata-v4', cacheKey, metadata, METADATA_CACHE_TTL);
-    return metadata;
   } catch (error) {
     return {
       metadataStatus: 'unavailable',
@@ -300,19 +277,83 @@ async function getIpMetadata(address) {
 }
 
 async function enrichRecords(records) {
-  const queue = [...records];
-  const workerCount = Math.min(5, queue.length);
   const enrichedMap = new Map();
+  const toFetch = [];
 
-  async function worker() {
-    while (queue.length) {
-      const record = queue.shift();
-      const metadata = await getIpMetadata(record.address);
-      enrichedMap.set(record.address, { ...record, ...metadata });
+  // Check cache first
+  for (const record of records) {
+    const cacheKey = record.address.toLowerCase();
+    const cached = await getCachedJson('metadata-v5', cacheKey);
+    if (cached) {
+      enrichedMap.set(record.address, { ...record, ...cached });
+    } else {
+      toFetch.push(record.address);
     }
   }
 
-  await Promise.all(Array.from({ length: workerCount }, worker));
+  // Batch query remaining IPs with ip-api.com (up to 100 per batch)
+  for (let i = 0; i < toFetch.length; i += 100) {
+    const batchIps = toFetch.slice(i, i + 100);
+    const batchResults = await getIpApiBatch(batchIps);
+
+    if (batchResults && Array.isArray(batchResults)) {
+      for (let j = 0; j < batchIps.length; j++) {
+        const ip = batchIps[j];
+        const data = batchResults[j];
+        if (data && data.status === 'success') {
+          const countryCode = (data.countryCode || '').toUpperCase();
+          const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+          let asnNum = '--';
+          let orgName = data.isp || data.org || 'نام شبکه در دسترس نیست';
+
+          if (data.as && typeof data.as === 'string') {
+            const match = data.as.match(/^AS(\d+)\s+(.*)$/);
+            if (match) {
+              asnNum = `AS${match[1]}`;
+              orgName = match[2];
+            } else if (data.as.startsWith('AS')) {
+              asnNum = data.as.split(' ')[0];
+            }
+          }
+
+          const metadata = {
+            metadataStatus: 'ok',
+            isp: { asn: asnNum, name: orgName },
+            country: {
+              code: validCountry || '--',
+              flagEmoji: countryFlagEmoji(validCountry),
+              name: countryNameFa(validCountry),
+              city: data.city || '',
+            },
+          };
+          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
+          const record = records.find(r => r.address === ip);
+          if (record) enrichedMap.set(ip, { ...record, ...metadata });
+        } else {
+          // If ip-api fails for a specific IP, fallback to Cymru
+          const metadata = await getIpMetadataFallback(ip);
+          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
+          const record = records.find(r => r.address === ip);
+          if (record) enrichedMap.set(ip, { ...record, ...metadata });
+        }
+      }
+    } else {
+      // If batch completely fails (e.g. rate limit), fallback to Cymru with concurrency
+      const queue = [...batchIps];
+      const workerCount = Math.min(10, queue.length);
+      async function fallbackWorker() {
+        while (queue.length) {
+          const ip = queue.shift();
+          const metadata = await getIpMetadataFallback(ip);
+          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
+          const record = records.find(r => r.address === ip);
+          if (record) enrichedMap.set(ip, { ...record, ...metadata });
+        }
+      }
+      await Promise.all(Array.from({ length: workerCount }, fallbackWorker));
+    }
+  }
+
   return records.map((record) => enrichedMap.get(record.address) || record);
 }
 
