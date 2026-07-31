@@ -965,13 +965,20 @@ async function queryTxt(name) {
     return [];
   return (Array.isArray(result.Answer) ? result.Answer : []).filter((answer) => answer.type === 16 && typeof answer.data === "string").map((answer) => cleanTxtValue(answer.data)).filter(Boolean);
 }
+function countryFlag(code) {
+  if (!code || !/^[A-Z]{2}$/.test(code))
+    return "\u{1F310}";
+  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
 function countryNameFa(code) {
   if (!code || !/^[A-Z]{2}$/.test(code))
     return "\u0646\u0627\u0645\u0634\u062E\u0635";
   try {
-    return new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
+    const name = new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
+    return `${countryFlag(code)} ${name}`;
   } catch (error) {
-    return code;
+    return `${countryFlag(code)} ${code}`;
   }
 }
 async function getIpMetadata(address) {
@@ -983,11 +990,15 @@ async function getIpMetadata(address) {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
     const asnNumber = originFields[0];
-    const countryCode = (originFields[1] || "").toUpperCase();
+    let countryCode = (originFields[2] || "").toUpperCase();
     if (!/^\d+$/.test(asnNumber))
       throw new Error("Invalid ASN answer");
     const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
     const asnFields = (asnAnswers[0] || "").split("|").map((value) => value.trim());
+    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
+      countryCode = asnFields[1].toUpperCase();
+    }
+    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
     const metadata = {
       metadataStatus: "ok",
       isp: {
@@ -995,8 +1006,9 @@ async function getIpMetadata(address) {
         name: asnFields[4] || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
       },
       country: {
-        code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : "--",
-        name: countryNameFa(countryCode)
+        code: validCountry || "--",
+        flag: countryFlag(validCountry),
+        name: countryNameFa(validCountry)
       }
     };
     await putCachedJson("metadata-v1", cacheKey, metadata, METADATA_CACHE_TTL);
@@ -1005,23 +1017,23 @@ async function getIpMetadata(address) {
     return {
       metadataStatus: "unavailable",
       isp: { asn: "--", name: "\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A" },
-      country: { code: "--", name: "\u0646\u0627\u0645\u0634\u062E\u0635" }
+      country: { code: "--", flag: "\u{1F310}", name: "\u0646\u0627\u0645\u0634\u062E\u0635" }
     };
   }
 }
 async function enrichRecords(records) {
-  const enriched = [];
   const queue = [...records];
-  const workerCount = Math.min(4, queue.length);
+  const workerCount = Math.min(10, queue.length);
+  const enrichedMap = /* @__PURE__ */ new Map();
   async function worker() {
     while (queue.length) {
       const record = queue.shift();
       const metadata = await getIpMetadata(record.address);
-      enriched.push({ ...record, ...metadata });
+      enrichedMap.set(record.address, { ...record, ...metadata });
     }
   }
   await Promise.all(Array.from({ length: workerCount }, worker));
-  return records.map((record) => enriched.find((item) => item.address === record.address) || record);
+  return records.map((record) => enrichedMap.get(record.address) || record);
 }
 async function resolveProxyRecords(request, { refresh = false, enrich = true } = {}) {
   const colo = getIngressColo(request);
