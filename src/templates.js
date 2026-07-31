@@ -1456,7 +1456,19 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           flagImg.style.height = '15px';
           flagImg.style.borderRadius = '3px';
           flagImg.style.objectFit = 'cover';
+          flagImg.onerror = function() {
+            this.style.display = 'none';
+            if (record.country && record.country.flagEmoji) {
+              const fallbackEmoji = document.createElement('span');
+              fallbackEmoji.textContent = record.country.flagEmoji;
+              countryWrap.insertBefore(fallbackEmoji, countryText);
+            }
+          };
           countryWrap.appendChild(flagImg);
+        } else if (record.country && record.country.flagEmoji) {
+          const emojiSpan = document.createElement('span');
+          emojiSpan.textContent = record.country.flagEmoji;
+          countryWrap.appendChild(emojiSpan);
         }
 
         const countryText = document.createElement('span');

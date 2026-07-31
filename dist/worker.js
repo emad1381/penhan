@@ -965,6 +965,12 @@ async function queryTxt(name) {
     return [];
   return (Array.isArray(result.Answer) ? result.Answer : []).filter((answer) => answer.type === 16 && typeof answer.data === "string").map((answer) => cleanTxtValue(answer.data)).filter(Boolean);
 }
+function countryFlagEmoji(code) {
+  if (!code || !/^[A-Z]{2}$/.test(code))
+    return "\u{1F310}";
+  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
 function countryNameFa(code) {
   if (!code || !/^[A-Z]{2}$/.test(code))
     return "\u0646\u0627\u0645\u0634\u062E\u0635";
@@ -976,15 +982,16 @@ function countryNameFa(code) {
 }
 async function getIpMetadata(address) {
   const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson("metadata-v3", cacheKey);
+  const cached = await getCachedJson("metadata-v4", cacheKey);
   if (cached)
     return cached;
   try {
-    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 3e3);
+    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2500);
     if (res.ok) {
       const data = await res.json();
       if (data && data.success) {
         const countryCode = (data.country_code || "").toUpperCase();
+        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
         const asnNum = data.connection && data.connection.asn ? data.connection.asn : "";
         const metadata = {
           metadataStatus: "ok",
@@ -993,12 +1000,13 @@ async function getIpMetadata(address) {
             name: data.connection && (data.connection.isp || data.connection.org) || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
           },
           country: {
-            code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : "--",
-            name: countryNameFa(countryCode),
+            code: validCountry || "--",
+            flagEmoji: countryFlagEmoji(validCountry),
+            name: countryNameFa(validCountry),
             city: data.city || ""
           }
         };
-        await putCachedJson("metadata-v3", cacheKey, metadata, METADATA_CACHE_TTL);
+        await putCachedJson("metadata-v4", cacheKey, metadata, METADATA_CACHE_TTL);
         return metadata;
       }
     }
@@ -1008,10 +1016,15 @@ async function getIpMetadata(address) {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
     const asnNumber = originFields[0];
+    let countryCode = (originFields[2] || "").toUpperCase();
     if (!/^\d+$/.test(asnNumber))
       throw new Error("Invalid ASN answer");
     const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
     const asnFields = (asnAnswers[0] || "").split("|").map((value) => value.trim());
+    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
+      countryCode = asnFields[1].toUpperCase();
+    }
+    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
     const metadata = {
       metadataStatus: "ok",
       isp: {
@@ -1019,24 +1032,25 @@ async function getIpMetadata(address) {
         name: asnFields[4] || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
       },
       country: {
-        code: "--",
-        name: "\u0646\u0627\u0645\u0634\u062E\u0635",
+        code: validCountry || "--",
+        flagEmoji: countryFlagEmoji(validCountry),
+        name: countryNameFa(validCountry),
         city: ""
       }
     };
-    await putCachedJson("metadata-v3", cacheKey, metadata, METADATA_CACHE_TTL);
+    await putCachedJson("metadata-v4", cacheKey, metadata, METADATA_CACHE_TTL);
     return metadata;
   } catch (error) {
     return {
       metadataStatus: "unavailable",
       isp: { asn: "--", name: "\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A" },
-      country: { code: "--", name: "\u0646\u0627\u0645\u0634\u062E\u0635", city: "" }
+      country: { code: "--", flagEmoji: "\u{1F310}", name: "\u0646\u0627\u0645\u0634\u062E\u0635", city: "" }
     };
   }
 }
 async function enrichRecords(records) {
   const queue = [...records];
-  const workerCount = Math.min(10, queue.length);
+  const workerCount = Math.min(5, queue.length);
   const enrichedMap = /* @__PURE__ */ new Map();
   async function worker() {
     while (queue.length) {
@@ -2557,7 +2571,19 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           flagImg.style.height = '15px';
           flagImg.style.borderRadius = '3px';
           flagImg.style.objectFit = 'cover';
+          flagImg.onerror = function() {
+            this.style.display = 'none';
+            if (record.country && record.country.flagEmoji) {
+              const fallbackEmoji = document.createElement('span');
+              fallbackEmoji.textContent = record.country.flagEmoji;
+              countryWrap.insertBefore(fallbackEmoji, countryText);
+            }
+          };
           countryWrap.appendChild(flagImg);
+        } else if (record.country && record.country.flagEmoji) {
+          const emojiSpan = document.createElement('span');
+          emojiSpan.textContent = record.country.flagEmoji;
+          countryWrap.appendChild(emojiSpan);
         }
 
         const countryText = document.createElement('span');

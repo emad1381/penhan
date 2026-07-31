@@ -210,6 +210,12 @@ async function queryTxt(name) {
     .filter(Boolean);
 }
 
+function countryFlagEmoji(code) {
+  if (!code || !/^[A-Z]{2}$/.test(code)) return '🌐';
+  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
+
 function countryNameFa(code) {
   if (!code || !/^[A-Z]{2}$/.test(code)) return 'نامشخص';
   try {
@@ -221,15 +227,17 @@ function countryNameFa(code) {
 
 async function getIpMetadata(address) {
   const cacheKey = address.toLowerCase();
-  const cached = await getCachedJson('metadata-v3', cacheKey);
+  const cached = await getCachedJson('metadata-v4', cacheKey);
   if (cached) return cached;
 
+  // 1. Try ipwho.is for accurate GeoIP (Netherlands NL, Germany DE, etc.)
   try {
-    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 3000);
+    const res = await fetchWithTimeout(`https://ipwho.is/${encodeURIComponent(address)}`, {}, 2500);
     if (res.ok) {
       const data = await res.json();
       if (data && data.success) {
         const countryCode = (data.country_code || '').toUpperCase();
+        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
         const asnNum = data.connection && data.connection.asn ? data.connection.asn : '';
         const metadata = {
           metadataStatus: 'ok',
@@ -238,29 +246,35 @@ async function getIpMetadata(address) {
             name: (data.connection && (data.connection.isp || data.connection.org)) || 'نام شبکه در دسترس نیست',
           },
           country: {
-            code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : '--',
-            name: countryNameFa(countryCode),
+            code: validCountry || '--',
+            flagEmoji: countryFlagEmoji(validCountry),
+            name: countryNameFa(validCountry),
             city: data.city || '',
           },
         };
-        await putCachedJson('metadata-v3', cacheKey, metadata, METADATA_CACHE_TTL);
+        await putCachedJson('metadata-v4', cacheKey, metadata, METADATA_CACHE_TTL);
         return metadata;
       }
     }
   } catch (e) {
-    // Retry with secondary GeoIP provider if needed
+    // Continue to fallback
   }
 
-  // Fallback to Team Cymru ASN only for ISP & ASN name, NOT for country code
+  // 2. Fallback to Team Cymru ASN metadata
   try {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
     const originFields = (originAnswers[0] || '').split('|').map((value) => value.trim());
     const asnNumber = originFields[0];
+    let countryCode = (originFields[2] || '').toUpperCase();
     if (!/^\d+$/.test(asnNumber)) throw new Error('Invalid ASN answer');
 
     const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
     const asnFields = (asnAnswers[0] || '').split('|').map((value) => value.trim());
+    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
+      countryCode = asnFields[1].toUpperCase();
+    }
 
+    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
     const metadata = {
       metadataStatus: 'ok',
       isp: {
@@ -268,25 +282,26 @@ async function getIpMetadata(address) {
         name: asnFields[4] || 'نام شبکه در دسترس نیست',
       },
       country: {
-        code: '--',
-        name: 'نامشخص',
+        code: validCountry || '--',
+        flagEmoji: countryFlagEmoji(validCountry),
+        name: countryNameFa(validCountry),
         city: '',
       },
     };
-    await putCachedJson('metadata-v3', cacheKey, metadata, METADATA_CACHE_TTL);
+    await putCachedJson('metadata-v4', cacheKey, metadata, METADATA_CACHE_TTL);
     return metadata;
   } catch (error) {
     return {
       metadataStatus: 'unavailable',
       isp: { asn: '--', name: 'اطلاعات شبکه در دسترس نیست' },
-      country: { code: '--', name: 'نامشخص', city: '' },
+      country: { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' },
     };
   }
 }
 
 async function enrichRecords(records) {
   const queue = [...records];
-  const workerCount = Math.min(10, queue.length);
+  const workerCount = Math.min(5, queue.length);
   const enrichedMap = new Map();
 
   async function worker() {
