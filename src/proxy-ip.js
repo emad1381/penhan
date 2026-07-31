@@ -239,6 +239,16 @@ async function getIpApiBatch(addresses) {
   }
 }
 
+async function getFreeIpApi(address) {
+  try {
+    const res = await fetchWithTimeout(`https://freeipapi.com/api/json/${address}`, {}, 3000);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 async function getIpMetadataFallback(address) {
   try {
     const originAnswers = await queryTxt(teamCymruOrigin(address));
@@ -283,7 +293,7 @@ async function enrichRecords(records) {
   // Check cache first
   for (const record of records) {
     const cacheKey = record.address.toLowerCase();
-    const cached = await getCachedJson('metadata-v5', cacheKey);
+    const cached = await getCachedJson('metadata-v6', cacheKey);
     if (cached) {
       enrichedMap.set(record.address, { ...record, ...cached });
     } else {
@@ -291,69 +301,42 @@ async function enrichRecords(records) {
     }
   }
 
-  // Batch query remaining IPs with ip-api.com (up to 100 per batch)
-  for (let i = 0; i < toFetch.length; i += 100) {
-    const batchIps = toFetch.slice(i, i + 100);
-    const batchResults = await getIpApiBatch(batchIps);
+  // Fallback to highly concurrent fetch from HTTPS provider since HTTP was blocked
+  const workerCount = Math.min(10, toFetch.length);
+  const queue = [...toFetch];
 
-    if (batchResults && Array.isArray(batchResults)) {
-      for (let j = 0; j < batchIps.length; j++) {
-        const ip = batchIps[j];
-        const data = batchResults[j];
-        if (data && data.status === 'success') {
-          const countryCode = (data.countryCode || '').toUpperCase();
-          const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
-          let asnNum = '--';
-          let orgName = data.isp || data.org || 'نام شبکه در دسترس نیست';
+  async function worker() {
+    while (queue.length) {
+      const ip = queue.shift();
+      let metadata = null;
+      let data = await getFreeIpApi(ip);
 
-          if (data.as && typeof data.as === 'string') {
-            const match = data.as.match(/^AS(\d+)\s+(.*)$/);
-            if (match) {
-              asnNum = `AS${match[1]}`;
-              orgName = match[2];
-            } else if (data.as.startsWith('AS')) {
-              asnNum = data.as.split(' ')[0];
-            }
-          }
-
-          const metadata = {
-            metadataStatus: 'ok',
-            isp: { asn: asnNum, name: orgName },
-            country: {
-              code: validCountry || '--',
-              flagEmoji: countryFlagEmoji(validCountry),
-              name: countryNameFa(validCountry),
-              city: data.city || '',
-            },
-          };
-          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
-          const record = records.find(r => r.address === ip);
-          if (record) enrichedMap.set(ip, { ...record, ...metadata });
-        } else {
-          // If ip-api fails for a specific IP, fallback to Cymru
-          const metadata = await getIpMetadataFallback(ip);
-          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
-          const record = records.find(r => r.address === ip);
-          if (record) enrichedMap.set(ip, { ...record, ...metadata });
-        }
+      if (data && data.countryCode) {
+        const countryCode = data.countryCode.toUpperCase();
+        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+        // FreeIPApi doesn't always provide AS info accurately, so we still ask Team Cymru for ISP
+        const fallback = await getIpMetadataFallback(ip);
+        metadata = {
+          metadataStatus: 'ok',
+          isp: fallback.isp,
+          country: {
+            code: validCountry || '--',
+            flagEmoji: countryFlagEmoji(validCountry),
+            name: countryNameFa(validCountry),
+            city: data.cityName || '',
+          },
+        };
+      } else {
+        metadata = await getIpMetadataFallback(ip);
       }
-    } else {
-      // If batch completely fails (e.g. rate limit), fallback to Cymru with concurrency
-      const queue = [...batchIps];
-      const workerCount = Math.min(10, queue.length);
-      async function fallbackWorker() {
-        while (queue.length) {
-          const ip = queue.shift();
-          const metadata = await getIpMetadataFallback(ip);
-          await putCachedJson('metadata-v5', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
-          const record = records.find(r => r.address === ip);
-          if (record) enrichedMap.set(ip, { ...record, ...metadata });
-        }
-      }
-      await Promise.all(Array.from({ length: workerCount }, fallbackWorker));
+
+      await putCachedJson('metadata-v6', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
+      const record = records.find(r => r.address === ip);
+      if (record) enrichedMap.set(ip, { ...record, ...metadata });
     }
   }
 
+  await Promise.all(Array.from({ length: workerCount }, worker));
   return records.map((record) => enrichedMap.get(record.address) || record);
 }
 
