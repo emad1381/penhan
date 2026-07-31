@@ -202,10 +202,13 @@ async function getSettingD1(env, key) {
 }
 
 async function setSettingD1(env, key, value) {
-  if (!env.DB) return;
+  if (!env.DB) throw new Error('D1 database binding is unavailable');
   try {
     await env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key, value).run();
-  } catch (e) { console.error("Setting save error", e); }
+  } catch (e) {
+    console.error('Setting save error', e);
+    throw e;
+  }
 }
 
 async function getUserFromD1(env, uuid) {

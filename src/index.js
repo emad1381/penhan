@@ -1,6 +1,7 @@
 import { isValidUUID, isAuthed, hashPassword, setupD1Schema, updateUsageD1, sha224_and_224, getSettingD1, setSettingD1 } from './helpers.js';
 import { vlessOverWSHandler } from './vless.js';
 import { trojanOverWSHandler } from './trojan.js';
+import { ProxyIpError, isValidIpAddress, resolveProxyRecords } from './proxy-ip.js';
 import { nginxPage, loginPage, subscriptionPage, panelPage, setupPage } from './templates.js';
 
 const rateLimitMap = new Map();
@@ -202,10 +203,83 @@ export default {
            return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
 
+        if (path === '/api/proxy-ips' && request.method === 'GET') {
+          try {
+            const refresh = url.searchParams.get('refresh') === '1';
+            const discovery = await resolveProxyRecords(request, { refresh });
+            return new Response(JSON.stringify({
+              ok: true,
+              ingress: { colo: discovery.colo, source: 'request.cf.colo' },
+              effectiveProxyIp: currentProxyIP,
+              records: discovery.records,
+              partial: discovery.partial,
+              warnings: discovery.warnings,
+            }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+            });
+          } catch (error) {
+            const knownError = error instanceof ProxyIpError;
+            return new Response(JSON.stringify({
+              ok: false,
+              error: {
+                code: knownError ? error.code : 'PROXY_IP_DISCOVERY_FAILED',
+                message: knownError ? error.message : 'Unable to discover Proxy IP records.',
+              },
+            }), {
+              status: knownError ? error.status : 503,
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+            });
+          }
+        }
+
+        if (path === '/api/proxy-ips/apply' && request.method === 'POST') {
+          try {
+            const contentLength = Number(request.headers.get('Content-Length') || 0);
+            if (contentLength > 1024) {
+              return new Response(JSON.stringify({ ok: false, error: { code: 'INVALID_REQUEST', message: 'Request body is too large.' } }), { status: 413, headers: { 'Content-Type': 'application/json' } });
+            }
+            const body = await request.json();
+            const address = typeof body.address === 'string' ? body.address.trim() : '';
+            if (!isValidIpAddress(address)) {
+              return new Response(JSON.stringify({ ok: false, error: { code: 'INVALID_PROXY_IP', message: 'A valid IPv4 or IPv6 address is required.' } }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            }
+
+            const discovery = await resolveProxyRecords(request, { refresh: true, enrich: false });
+            if (!discovery.records.some((record) => record.address.toLowerCase() === address.toLowerCase())) {
+              return new Response(JSON.stringify({ ok: false, error: { code: 'NOT_IN_CURRENT_DNS_ANSWER', message: 'The selected IP is no longer in the current DNS response. Refresh and try again.' } }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+            }
+
+            if (!env.DB) {
+              throw new ProxyIpError('SETTINGS_UNAVAILABLE', 'The database binding is unavailable.');
+            }
+            await setSettingD1(env, 'proxy_ip', address);
+            return new Response(JSON.stringify({ ok: true, proxyIP: address }), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+          } catch (error) {
+            const knownError = error instanceof ProxyIpError;
+            return new Response(JSON.stringify({
+              ok: false,
+              error: {
+                code: knownError ? error.code : 'PROXY_IP_APPLY_FAILED',
+                message: knownError ? error.message : 'Unable to apply the Proxy IP.',
+              },
+            }), {
+              status: knownError ? error.status : 503,
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+            });
+          }
+        }
+
         // Global settings
         if (path === '/api/settings' && request.method === 'POST') {
           const b = await request.json();
-          if (b.proxyIP !== undefined) await setSettingD1(env, 'proxy_ip', b.proxyIP.trim());
+          if (b.proxyIP !== undefined) {
+            const proxyIP = typeof b.proxyIP === 'string' ? b.proxyIP.trim() : '';
+            if (proxyIP && !isValidIpAddress(proxyIP)) {
+              return new Response(JSON.stringify({ ok: false, error: 'Proxy IP must be a valid IPv4 or IPv6 address.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+            }
+            await setSettingD1(env, 'proxy_ip', proxyIP);
+          }
           if (b.password !== undefined) await setSettingD1(env, 'panel_pass', b.password.trim());
           if (b.uuid !== undefined && isValidUUID(b.uuid.trim())) await setSettingD1(env, 'uuid', b.uuid.trim());
           if (b.cfAccountId !== undefined) await setSettingD1(env, 'cf_account_id', b.cfAccountId.trim());

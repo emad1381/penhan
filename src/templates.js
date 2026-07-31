@@ -661,7 +661,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     /* Sidebar */
     .sidebar { width: 260px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; }
     .brand { padding: 0 24px 20px; font-size: 24px; font-weight: 800; border-bottom: 1px solid var(--border); margin-bottom: 20px; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-item { padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; font-weight: 500; }
+    .nav-item { width: 100%; padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; border: 0; background: transparent; text-align: right; transition: 0.2s; font: inherit; font-weight: 500; }
     .nav-item:hover, .nav-item.active { background: var(--surface-hover); color: var(--primary); border-right: 3px solid var(--primary); }
     .github-link:hover { color: var(--primary) !important; background: var(--surface-hover); }
     .github-link:hover svg { transform: scale(1.1); }
@@ -711,6 +711,94 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .flex-gap { display: flex; gap: 8px; }
     .docs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 32px; }
     pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; font-size: 13px; color: #e2e8f0; margin-top: 10px; border: 1px solid var(--border); }
+
+    /* Proxy IP discovery */
+    .proxy-page { max-width: 1120px; }
+    .proxy-heading { align-items: flex-start; }
+    .proxy-kicker { color: var(--primary); font-size: 12px; font-weight: 800; letter-spacing: .04em; margin-bottom: 6px; }
+    .proxy-subtitle { color: var(--muted); font-size: 13px; line-height: 1.8; max-width: 640px; }
+    .proxy-refresh { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .proxy-refresh[disabled], .proxy-apply[disabled] { cursor: wait; opacity: .62; }
+    .proxy-route { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 14px; position: relative; padding: 24px; margin-bottom: 16px; overflow: hidden; background: linear-gradient(115deg, rgba(168,85,247,.14), rgba(24,24,27,.96) 45%, rgba(236,72,153,.09)); border: 1px solid rgba(168,85,247,.28); border-radius: 16px; }
+    .proxy-route::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 20px 20px; mask-image: linear-gradient(90deg, transparent, black 25%, black 75%, transparent); pointer-events: none; }
+    .proxy-route-node, .proxy-route-line { position: relative; z-index: 1; }
+    .proxy-route-node { min-width: 0; }
+    .proxy-route-node small { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .proxy-route-node strong { font-size: 14px; font-weight: 700; }
+    .proxy-route-node.is-colo { text-align: center; }
+    .proxy-colo { display: inline-block; color: #f5e8ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: .06em; line-height: 1; text-shadow: 0 0 24px rgba(168,85,247,.55); }
+    .proxy-route-node.is-colo small { margin-top: 7px; margin-bottom: 0; }
+    .proxy-route-line { width: 52px; height: 1px; background: linear-gradient(90deg, transparent, rgba(192,132,252,.9)); }
+    .proxy-route-line.reverse { background: linear-gradient(90deg, rgba(236,72,153,.9), transparent); }
+    .proxy-route-end { text-align: left; }
+    .proxy-route-end strong { color: #fce7f3; }
+    .proxy-current { display: flex; align-items: center; justify-content: space-between; gap: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+    .proxy-current-copy { min-width: 0; }
+    .proxy-current-copy h3 { font-size: 14px; margin-bottom: 4px; }
+    .proxy-current-copy p { color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .proxy-current-value { flex: 0 0 auto; color: #ddd6fe; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; direction: ltr; unicode-bidi: plaintext; }
+    .proxy-status { display: none; border: 1px solid transparent; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; }
+    .proxy-status.show { display: block; }
+    .proxy-status.info { background: rgba(168,85,247,.09); border-color: rgba(168,85,247,.25); color: #ddd6fe; }
+    .proxy-status.warn { background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.28); color: #fcd34d; }
+    .proxy-status.error { background: rgba(239,68,68,.09); border-color: rgba(239,68,68,.28); color: #fca5a5; }
+    .proxy-records { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .proxy-records-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid var(--border); }
+    .proxy-records-title h3 { font-size: 15px; }
+    .proxy-records-title span { color: var(--muted); font-size: 12px; }
+    .proxy-records-table th { white-space: nowrap; }
+    .proxy-records-table td { vertical-align: middle; font-size: 13px; }
+    .proxy-radio { appearance: none; width: 18px; height: 18px; margin: 0; border: 1px solid #52525b; border-radius: 50%; background: var(--bg); cursor: pointer; display: grid; place-content: center; }
+    .proxy-radio::before { content: ''; width: 8px; height: 8px; border-radius: 50%; transform: scale(0); background: white; transition: transform .16s ease; }
+    .proxy-radio:checked { background: var(--primary); border-color: var(--primary); }
+    .proxy-radio:checked::before { transform: scale(1); }
+    .proxy-radio:focus-visible { outline: 3px solid rgba(168,85,247,.4); outline-offset: 3px; }
+    .proxy-record-row { cursor: pointer; transition: background .16s ease, box-shadow .16s ease; }
+    .proxy-record-row.selected { background: rgba(168,85,247,.11); box-shadow: inset -3px 0 0 var(--primary); }
+    .proxy-record-row.current .proxy-ip { color: #6ee7b7; }
+    .proxy-ip, .proxy-asn { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .proxy-ip { color: #ddd6fe; font-weight: 700; }
+    .proxy-record-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .proxy-family { display: inline-flex; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.06); color: #d4d4d8; direction: ltr; }
+    .proxy-meta-unavailable { color: #a1a1aa; }
+    .proxy-empty { padding: 44px 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    .proxy-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-top: 1px solid var(--border); }
+    .proxy-actions-note { color: var(--muted); font-size: 12px; line-height: 1.65; max-width: 580px; }
+    .proxy-apply { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+    .proxy-modal-address { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #ddd6fe; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; margin: 14px 0; }
+    .proxy-confirm-copy { color: var(--muted); font-size: 13px; line-height: 1.8; }
+    @media (max-width: 760px) {
+      body { height: auto; min-height: 100vh; overflow: auto; flex-direction: column; }
+      .sidebar { width: 100%; min-height: auto; border-left: 0; border-bottom: 1px solid var(--border); flex-direction: row; flex-wrap: wrap; padding: 12px 0; }
+      .brand { width: 100%; padding: 0 20px 12px; margin-bottom: 6px; }
+      .sidebar .nav-item { padding: 9px 14px; font-size: 12px; }
+      .sidebar > div[style="flex:1"] { display: none; }
+      .github-link { display: none !important; }
+      .main { width: 100%; padding: 20px 14px; overflow: visible; }
+      .header, .proxy-heading { gap: 14px; flex-direction: column; align-items: stretch; margin-bottom: 20px; }
+      .proxy-refresh { justify-content: center; }
+      .proxy-route { grid-template-columns: 1fr; gap: 10px; padding: 20px; text-align: center; }
+      .proxy-route-node, .proxy-route-end { text-align: center; }
+      .proxy-route-line { width: 1px; height: 22px; margin: auto; background: linear-gradient(180deg, transparent, rgba(192,132,252,.9)); }
+      .proxy-route-line.reverse { background: linear-gradient(180deg, rgba(236,72,153,.9), transparent); }
+      .proxy-current, .proxy-actions { align-items: stretch; flex-direction: column; }
+      .proxy-current-value { text-align: right; }
+      .proxy-records { overflow: visible; background: transparent; border: 0; }
+      .proxy-records-title { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; }
+      .proxy-records-table, .proxy-records-table tbody, .proxy-records-table tr, .proxy-records-table td { display: block; width: 100%; }
+      .proxy-records-table thead { display: none; }
+      .proxy-record-row { position: relative; margin-bottom: 10px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+      .proxy-record-row.selected { box-shadow: inset -3px 0 0 var(--primary); }
+      .proxy-records-table td { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; border: 0; text-align: left; }
+      .proxy-records-table td::before { content: attr(data-label); color: var(--muted); font-size: 11px; direction: rtl; text-align: right; }
+      .proxy-records-table td:first-child { position: absolute; top: 13px; left: 14px; width: auto; padding: 0; }
+      .proxy-records-table td:first-child::before { display: none; }
+      .proxy-records-table td:nth-child(2) { padding-left: 34px; }
+      .proxy-actions .btn { width: 100%; justify-content: center; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page, .proxy-record-row, .proxy-radio::before { animation: none; transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -718,9 +806,10 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="brand">نهان</div>
-    <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">👥</span> کاربران</div>
-    <div class="nav-item" onclick="nav('api')"><span class="nav-icon">🔑</span> توکن‌های API</div>
-    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">⚙️</span> تنظیمات سیستم</div>
+    <button type="button" class="nav-item active" onclick="nav('users', this)"><span class="nav-icon">👥</span> کاربران</button>
+    <button type="button" class="nav-item" onclick="nav('api', this)"><span class="nav-icon">🔑</span> توکن‌های API</button>
+    <button type="button" class="nav-item" onclick="nav('proxy-ips', this)"><span class="nav-icon">◈</span> آی‌پی‌های پروکسی</button>
+    <button type="button" class="nav-item" onclick="nav('settings', this)"><span class="nav-icon">⚙️</span> تنظیمات سیستم</button>
     <div style="flex:1"></div>
     <a href="https://github.com/emad1381/penhan" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--muted); text-decoration: none; transition: 0.2s; font-weight: 500;" class="github-link">
       <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="transition: transform 0.2s; vertical-align: middle;">
@@ -728,7 +817,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
       </svg>
       <span>گیت‌هاب پروژه</span>
     </a>
-    <div class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">🚪</span> خروج</div>
+    <button type="button" class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">🚪</span> خروج</button>
   </div>
 
   <!-- Main -->
@@ -825,6 +914,71 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
     </div>
     
+    <!-- Proxy IP Page -->
+    <section id="page-proxy-ips" class="page proxy-page" aria-labelledby="proxy-page-title">
+      <div class="header proxy-heading">
+        <div>
+          <div class="proxy-kicker">ROUTING DISCOVERY</div>
+          <h2 id="proxy-page-title" class="title">آی‌پی‌های پروکسی</h2>
+          <p class="proxy-subtitle">رکوردها بر اساس مرکز ورودی Cloudflare برای همین بازدید پنل دریافت می‌شوند. انتخاب شما فقط مسیر تلاش مجدد اتصال کاربران را تغییر می‌دهد.</p>
+        </div>
+        <button type="button" id="proxy-refresh" class="btn btn-outline proxy-refresh" onclick="loadProxyIps(true)">↻ دریافت رکوردها</button>
+      </div>
+
+      <div id="proxy-route" class="proxy-route" hidden>
+        <div class="proxy-route-node">
+          <small>درخواست پنل</small>
+          <strong>ورودی Cloudflare</strong>
+        </div>
+        <div class="proxy-route-line"></div>
+        <div class="proxy-route-node is-colo">
+          <span id="proxy-colo" class="proxy-colo">---</span>
+          <small>مرکز ورودی فعلی</small>
+        </div>
+        <div class="proxy-route-line reverse"></div>
+        <div class="proxy-route-node proxy-route-end">
+          <small>منبع خودکار</small>
+          <strong id="proxy-source-label">رکوردهای آماده</strong>
+        </div>
+      </div>
+
+      <div class="proxy-current">
+        <div class="proxy-current-copy">
+          <h3>Proxy IP سراسری فعال</h3>
+          <p>این مقدار فقط هنگامی استفاده می‌شود که اتصال مستقیم مقصد ناموفق باشد. تنظیم آن روی همهٔ کاربران اثر می‌گذارد.</p>
+        </div>
+        <div id="proxy-current-value" class="proxy-current-value">${defaultProxyIP || 'تنظیم نشده'}</div>
+      </div>
+
+      <div id="proxy-status" class="proxy-status" role="status" aria-live="polite"></div>
+
+      <div class="proxy-records">
+        <div class="proxy-records-title">
+          <h3>رکوردهای DNS دریافت‌شده</h3>
+          <span id="proxy-record-count">برای شروع، دریافت رکوردها را بزنید</span>
+        </div>
+        <table class="proxy-records-table">
+          <thead>
+            <tr>
+              <th aria-label="انتخاب"></th>
+              <th>آی‌پی</th>
+              <th>نوع</th>
+              <th>شبکه / ISP</th>
+              <th>کشور ثبت ASN</th>
+              <th>TTL</th>
+            </tr>
+          </thead>
+          <tbody id="proxy-records-body">
+            <tr><td colspan="6" class="proxy-empty">دریافت اطلاعات فقط زمانی آغاز می‌شود که این صفحه را باز کنید.</td></tr>
+          </tbody>
+        </table>
+        <div class="proxy-actions">
+          <p class="proxy-actions-note">قبل از اعمال، IP انتخاب‌شده دوباره از DNS منبع بررسی می‌شود تا مقدار منقضی یا تغییرکرده ذخیره نشود.</p>
+          <button type="button" id="proxy-apply" class="btn proxy-apply" onclick="openProxyApplyModal()" disabled>تنظیم به‌عنوان Proxy IP سراسری <span>←</span></button>
+        </div>
+      </div>
+    </section>
+
     <!-- Settings Page -->
     <div id="page-settings" class="page">
       <div class="header">
@@ -917,14 +1071,31 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <div class="modal-overlay" id="proxy-apply-modal" role="dialog" aria-modal="true" aria-labelledby="proxy-apply-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="proxy-apply-title">تأیید Proxy IP سراسری</h3>
+        <button type="button" class="modal-close" aria-label="بستن" onclick="closeModal('proxy-apply-modal')">&times;</button>
+      </div>
+      <p class="proxy-confirm-copy">این مقدار به عنوان مسیر جایگزین اتصال برای همهٔ کاربران ذخیره می‌شود. اتصال مستقیم همیشه اولویت دارد و فقط در صورت خطا از این IP استفاده خواهد شد.</p>
+      <div id="proxy-apply-address" class="proxy-modal-address">—</div>
+      <div style="display:flex; gap:8px; margin-top:18px;">
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="closeModal('proxy-apply-modal')">انصراف</button>
+        <button type="button" id="proxy-confirm-apply" class="btn" style="flex:1" onclick="applySelectedProxyIp()">تأیید و اعمال</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const basePath = '/api';
+    const proxyIpState = { loaded: false, loading: false, selected: null, records: [] };
 
-    function nav(page) {
+    function nav(page, trigger) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
       document.getElementById('page-' + page).classList.add('active');
-      event.currentTarget.classList.add('active');
+      (trigger || event.currentTarget).classList.add('active');
+      if (page === 'proxy-ips' && !proxyIpState.loaded && !proxyIpState.loading) loadProxyIps(false);
     }
 
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -1116,6 +1287,200 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-cleanip').value = cleanIp || '';
       document.getElementById('user-modal-title').textContent = 'ویرایش کاربر';
       openModal('user-modal');
+    }
+
+    function setProxyStatus(message, type = 'info') {
+      const status = document.getElementById('proxy-status');
+      status.textContent = message || '';
+      status.className = message ? 'proxy-status show ' + type : 'proxy-status';
+    }
+
+    function setProxyLoading(loading) {
+      proxyIpState.loading = loading;
+      const refresh = document.getElementById('proxy-refresh');
+      const apply = document.getElementById('proxy-apply');
+      refresh.disabled = loading;
+      refresh.textContent = loading ? 'در حال دریافت...' : '↻ دریافت رکوردها';
+      apply.disabled = loading || !proxyIpState.selected;
+    }
+
+    function renderProxyRecords() {
+      const body = document.getElementById('proxy-records-body');
+      const count = document.getElementById('proxy-record-count');
+      const apply = document.getElementById('proxy-apply');
+      const current = document.getElementById('proxy-current-value').textContent.trim();
+      body.innerHTML = '';
+
+      if (!proxyIpState.records.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 6;
+        cell.className = 'proxy-empty';
+        cell.textContent = 'برای مرکز ورودی فعلی هیچ رکورد A یا AAAA پیدا نشد.';
+        row.appendChild(cell);
+        body.appendChild(row);
+        count.textContent = '۰ رکورد';
+        apply.disabled = true;
+        return;
+      }
+
+      count.textContent = proxyIpState.records.length.toLocaleString('fa-IR') + ' رکورد آمادهٔ انتخاب';
+      proxyIpState.records.forEach((record) => {
+        const row = document.createElement('tr');
+        row.className = 'proxy-record-row' + (proxyIpState.selected === record.address ? ' selected' : '') + (current === record.address ? ' current' : '');
+        row.tabIndex = 0;
+        row.setAttribute('role', 'radio');
+        row.setAttribute('aria-checked', proxyIpState.selected === record.address ? 'true' : 'false');
+        row.addEventListener('click', () => selectProxyRecord(record.address));
+        row.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectProxyRecord(record.address);
+          }
+        });
+
+        const selectCell = document.createElement('td');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'proxy-ip';
+        radio.className = 'proxy-radio';
+        radio.checked = proxyIpState.selected === record.address;
+        radio.setAttribute('aria-label', 'انتخاب ' + record.address);
+        radio.addEventListener('click', (event) => { event.stopPropagation(); selectProxyRecord(record.address); });
+        selectCell.appendChild(radio);
+
+        const addressCell = document.createElement('td');
+        addressCell.dataset.label = 'آی‌پی';
+        const address = document.createElement('div');
+        address.className = 'proxy-ip';
+        address.textContent = record.address;
+        addressCell.appendChild(address);
+        if (current === record.address) {
+          const meta = document.createElement('div');
+          meta.className = 'proxy-record-meta';
+          meta.textContent = 'تنظیم سراسری فعلی';
+          addressCell.appendChild(meta);
+        }
+
+        const familyCell = document.createElement('td');
+        familyCell.dataset.label = 'نوع';
+        const family = document.createElement('span');
+        family.className = 'proxy-family';
+        family.textContent = record.family;
+        familyCell.appendChild(family);
+
+        const ispCell = document.createElement('td');
+        ispCell.dataset.label = 'شبکه / ISP';
+        const asn = document.createElement('div');
+        asn.className = 'proxy-asn';
+        asn.textContent = record.isp && record.isp.asn ? record.isp.asn : '--';
+        const isp = document.createElement('div');
+        isp.className = 'proxy-record-meta' + (record.metadataStatus === 'unavailable' ? ' proxy-meta-unavailable' : '');
+        isp.textContent = record.isp && record.isp.name ? record.isp.name : 'اطلاعات در دسترس نیست';
+        ispCell.append(asn, isp);
+
+        const countryCell = document.createElement('td');
+        countryCell.dataset.label = 'کشور ثبت ASN';
+        const country = document.createElement('span');
+        country.textContent = record.country && record.country.name ? record.country.name : 'نامشخص';
+        const countryCode = document.createElement('div');
+        countryCode.className = 'proxy-record-meta proxy-asn';
+        countryCode.textContent = record.country && record.country.code ? record.country.code : '--';
+        countryCell.append(country, countryCode);
+
+        const ttlCell = document.createElement('td');
+        ttlCell.dataset.label = 'TTL';
+        ttlCell.className = 'proxy-asn';
+        ttlCell.textContent = (record.ttl || 0).toLocaleString('en-US') + 's';
+
+        row.append(selectCell, addressCell, familyCell, ispCell, countryCell, ttlCell);
+        body.appendChild(row);
+      });
+
+      apply.disabled = proxyIpState.loading || !proxyIpState.selected;
+    }
+
+    function selectProxyRecord(address) {
+      proxyIpState.selected = address;
+      renderProxyRecords();
+      setProxyStatus('رکورد انتخاب شد. برای ذخیرهٔ آن به‌عنوان Proxy IP سراسری، دکمهٔ اعمال را بزنید.', 'info');
+    }
+
+    async function loadProxyIps(refresh) {
+      setProxyLoading(true);
+      setProxyStatus(refresh ? 'رکوردها در حال به‌روزرسانی هستند...' : 'رکوردهای Proxy IP در حال دریافت هستند...', 'info');
+      try {
+        const res = await fetch(basePath + '/proxy-ips' + (refresh ? '?refresh=1' : ''), { cache: 'no-store' });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error && data.error.message ? data.error.message : 'دریافت رکوردها ناموفق بود.');
+        }
+
+        proxyIpState.loaded = true;
+        proxyIpState.records = Array.isArray(data.records) ? data.records : [];
+        proxyIpState.selected = proxyIpState.records.some((record) => record.address === proxyIpState.selected) ? proxyIpState.selected : null;
+        document.getElementById('proxy-route').hidden = false;
+        document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
+        document.getElementById('proxy-source-label').textContent = 'منبع خودکار فعال';
+        document.getElementById('proxy-current-value').textContent = data.effectiveProxyIp || 'تنظیم نشده';
+        renderProxyRecords();
+
+        if (!proxyIpState.records.length) {
+          setProxyStatus('برای مرکز ورودی فعلی رکورد A یا AAAA در دسترس نیست. کمی بعد دوباره تلاش کنید.', 'warn');
+        } else if (data.partial) {
+          setProxyStatus('رکوردها دریافت شدند، اما بخشی از اطلاعات شبکه کامل نیست: ' + (data.warnings || []).join(' '), 'warn');
+        } else {
+          setProxyStatus('رکوردها آماده‌اند. کشور نمایش‌داده‌شده، کشور ثبت ASN است و مکان دقیق IP محسوب نمی‌شود.', 'info');
+        }
+      } catch (error) {
+        proxyIpState.loaded = false;
+        proxyIpState.selected = null;
+        renderProxyRecords();
+        setProxyStatus(error.message || 'دریافت رکوردهای Proxy IP ناموفق بود. دوباره تلاش کنید.', 'error');
+      } finally {
+        setProxyLoading(false);
+      }
+    }
+
+    function openProxyApplyModal() {
+      if (!proxyIpState.selected || proxyIpState.loading) return;
+      document.getElementById('proxy-apply-address').textContent = proxyIpState.selected;
+      openModal('proxy-apply-modal');
+    }
+
+    async function applySelectedProxyIp() {
+      if (!proxyIpState.selected) return;
+      const button = document.getElementById('proxy-confirm-apply');
+      button.disabled = true;
+      button.textContent = 'در حال بررسی و ذخیره...';
+      setProxyLoading(true);
+      try {
+        const res = await fetch(basePath + '/proxy-ips/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: proxyIpState.selected }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          const code = data.error && data.error.code;
+          if (code === 'NOT_IN_CURRENT_DNS_ANSWER') {
+            throw new Error('رکورد DNS تغییر کرده است. لیست را تازه‌سازی کنید و دوباره انتخاب کنید.');
+          }
+          throw new Error(data.error && data.error.message ? data.error.message : 'ذخیرهٔ Proxy IP ناموفق بود.');
+        }
+        document.getElementById('proxy-current-value').textContent = data.proxyIP;
+        document.getElementById('st-proxy').value = data.proxyIP;
+        closeModal('proxy-apply-modal');
+        renderProxyRecords();
+        setProxyStatus('Proxy IP سراسری با موفقیت روی ' + data.proxyIP + ' تنظیم شد.', 'info');
+      } catch (error) {
+        closeModal('proxy-apply-modal');
+        setProxyStatus(error.message || 'ذخیرهٔ Proxy IP ناموفق بود.', 'error');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'تأیید و اعمال';
+        setProxyLoading(false);
+      }
     }
 
     async function loadCfMetrics() {

@@ -254,11 +254,12 @@ async function getSettingD1(env, key) {
 }
 async function setSettingD1(env, key, value) {
   if (!env.DB)
-    return;
+    throw new Error("D1 database binding is unavailable");
   try {
     await env.DB.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, value).run();
   } catch (e) {
     console.error("Setting save error", e);
+    throw e;
   }
 }
 async function updateUsageD1(env, uuid, bytes) {
@@ -770,6 +771,298 @@ async function trojanOverWSHandler(request, authenticate, defaultProxyIP, onUsag
     safeCloseWebSocket(webSocket);
   });
   return new Response(null, { status: 101, webSocket: client });
+}
+
+// src/proxy-ip.js
+var DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query";
+var PROXY_IP_DOMAIN_SUFFIX = "proxyip.cmliussss.net";
+var DISCOVERY_CACHE_TTL_MIN = 60;
+var DISCOVERY_CACHE_TTL_MAX = 300;
+var METADATA_CACHE_TTL = 86400;
+var MAX_PROXY_RECORDS = 32;
+var REQUEST_TIMEOUT_MS = 2500;
+var ProxyIpError = class extends Error {
+  constructor(code, message, status = 503) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+};
+function jsonHeaders(maxAge) {
+  return {
+    "Content-Type": "application/json",
+    "Cache-Control": `public, max-age=${maxAge}`
+  };
+}
+function getCache() {
+  return typeof caches !== "undefined" && caches.default ? caches.default : null;
+}
+function cacheRequest(namespace, key) {
+  return new Request(`https://proxy-ip-cache.invalid/${namespace}/${encodeURIComponent(key)}`);
+}
+async function getCachedJson(namespace, key) {
+  const cache = getCache();
+  if (!cache)
+    return null;
+  try {
+    const response = await cache.match(cacheRequest(namespace, key));
+    return response ? await response.json() : null;
+  } catch (error) {
+    return null;
+  }
+}
+async function putCachedJson(namespace, key, value, maxAge) {
+  const cache = getCache();
+  if (!cache)
+    return;
+  try {
+    await cache.put(cacheRequest(namespace, key), new Response(JSON.stringify(value), {
+      headers: jsonHeaders(maxAge)
+    }));
+  } catch (error) {
+    console.warn("Proxy IP cache write failed", error);
+  }
+}
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      throw new ProxyIpError("UPSTREAM_TIMEOUT", "Proxy IP provider did not respond in time.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function isValidIPv4(value) {
+  if (typeof value !== "string" || !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value))
+    return false;
+  return value.split(".").every((segment) => {
+    const parsed = Number(segment);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 255;
+  });
+}
+function isValidIPv6(value) {
+  if (typeof value !== "string" || value.length < 2 || value.length > 45)
+    return false;
+  if (!/^[0-9a-f:]+$/i.test(value) || value.includes(":::"))
+    return false;
+  const compressed = value.split("::");
+  if (compressed.length > 2)
+    return false;
+  const groups = (part) => part ? part.split(":") : [];
+  const left = groups(compressed[0]);
+  const right = compressed.length === 2 ? groups(compressed[1]) : [];
+  const allGroups = left.concat(right);
+  if (!allGroups.every((group) => /^[0-9a-f]{1,4}$/i.test(group)))
+    return false;
+  return compressed.length === 2 ? allGroups.length < 8 : allGroups.length === 8;
+}
+function isValidIpAddress(value) {
+  return isValidIPv4(value) || isValidIPv6(value);
+}
+function normalizeColo(value) {
+  const colo = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{3}$/.test(colo) ? colo : null;
+}
+function getIngressColo(request) {
+  const colo = normalizeColo(request.cf && request.cf.colo);
+  if (!colo) {
+    throw new ProxyIpError("COLO_UNAVAILABLE", "Cloudflare ingress colo is unavailable for this request.");
+  }
+  return colo;
+}
+function buildProxyHostname(colo) {
+  const normalizedColo = normalizeColo(colo);
+  if (!normalizedColo) {
+    throw new ProxyIpError("COLO_UNAVAILABLE", "Cloudflare ingress colo is unavailable for this request.");
+  }
+  return `${normalizedColo.toLowerCase()}.${PROXY_IP_DOMAIN_SUFFIX}`;
+}
+function clampDiscoveryTtl(records) {
+  const ttls = records.map((record) => Number(record.ttl)).filter((ttl2) => Number.isFinite(ttl2) && ttl2 > 0);
+  const ttl = ttls.length ? Math.min(...ttls) : DISCOVERY_CACHE_TTL_MIN;
+  return Math.max(DISCOVERY_CACHE_TTL_MIN, Math.min(DISCOVERY_CACHE_TTL_MAX, ttl));
+}
+async function queryDoh(name, type) {
+  const url = new URL(DOH_ENDPOINT);
+  url.searchParams.set("name", name);
+  url.searchParams.set("type", type);
+  let response;
+  try {
+    response = await fetchWithTimeout(url.toString(), {
+      headers: { Accept: "application/dns-json" }
+    });
+  } catch (error) {
+    if (error instanceof ProxyIpError)
+      throw error;
+    throw new ProxyIpError("DNS_LOOKUP_FAILED", "Unable to resolve Proxy IP records.");
+  }
+  if (!response.ok) {
+    throw new ProxyIpError("DNS_LOOKUP_FAILED", "Unable to resolve Proxy IP records.");
+  }
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new ProxyIpError("DNS_LOOKUP_FAILED", "Unable to resolve Proxy IP records.");
+  }
+}
+async function resolveDnsFamily(hostname, queryType, answerType, family) {
+  const result = await queryDoh(hostname, queryType);
+  if (result.Status !== 0) {
+    return {
+      records: [],
+      warning: `${family} DNS lookup returned status ${result.Status}.`
+    };
+  }
+  const records = [];
+  for (const answer of Array.isArray(result.Answer) ? result.Answer : []) {
+    if (answer.type !== answerType || !isValidIpAddress(answer.data))
+      continue;
+    records.push({
+      address: answer.data,
+      family,
+      ttl: Math.max(0, Number(answer.TTL) || 0)
+    });
+  }
+  return { records, warning: null };
+}
+function deduplicateRecords(records) {
+  const seen = /* @__PURE__ */ new Set();
+  return records.filter((record) => {
+    const key = record.address.toLowerCase();
+    if (seen.has(key))
+      return false;
+    seen.add(key);
+    return true;
+  });
+}
+function expandIPv6(address) {
+  const parts = address.split("::");
+  const left = parts[0] ? parts[0].split(":") : [];
+  const right = parts[1] ? parts[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  const groups = left.concat(Array(Math.max(0, missing)).fill("0"), right);
+  return groups.map((group) => group.padStart(4, "0")).join("");
+}
+function teamCymruOrigin(address) {
+  if (isValidIPv4(address)) {
+    return `${address.split(".").reverse().join(".")}.origin.asn.cymru.com`;
+  }
+  const expanded = expandIPv6(address);
+  return `${expanded.split("").reverse().join(".")}.origin6.asn.cymru.com`;
+}
+function cleanTxtValue(value) {
+  return String(value || "").trim().replace(/^"|"$/g, "").replace(/\\"/g, '"');
+}
+async function queryTxt(name) {
+  const result = await queryDoh(name, "TXT");
+  if (result.Status !== 0)
+    return [];
+  return (Array.isArray(result.Answer) ? result.Answer : []).filter((answer) => answer.type === 16 && typeof answer.data === "string").map((answer) => cleanTxtValue(answer.data)).filter(Boolean);
+}
+function countryNameFa(code) {
+  if (!code || !/^[A-Z]{2}$/.test(code))
+    return "\u0646\u0627\u0645\u0634\u062E\u0635";
+  try {
+    return new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
+  } catch (error) {
+    return code;
+  }
+}
+async function getIpMetadata(address) {
+  const cacheKey = address.toLowerCase();
+  const cached = await getCachedJson("metadata-v1", cacheKey);
+  if (cached)
+    return cached;
+  try {
+    const originAnswers = await queryTxt(teamCymruOrigin(address));
+    const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
+    const asnNumber = originFields[0];
+    const countryCode = (originFields[1] || "").toUpperCase();
+    if (!/^\d+$/.test(asnNumber))
+      throw new Error("Invalid ASN answer");
+    const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
+    const asnFields = (asnAnswers[0] || "").split("|").map((value) => value.trim());
+    const metadata = {
+      metadataStatus: "ok",
+      isp: {
+        asn: `AS${asnNumber}`,
+        name: asnFields[4] || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
+      },
+      country: {
+        code: /^[A-Z]{2}$/.test(countryCode) ? countryCode : "--",
+        name: countryNameFa(countryCode)
+      }
+    };
+    await putCachedJson("metadata-v1", cacheKey, metadata, METADATA_CACHE_TTL);
+    return metadata;
+  } catch (error) {
+    return {
+      metadataStatus: "unavailable",
+      isp: { asn: "--", name: "\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A" },
+      country: { code: "--", name: "\u0646\u0627\u0645\u0634\u062E\u0635" }
+    };
+  }
+}
+async function enrichRecords(records) {
+  const enriched = [];
+  const queue = [...records];
+  const workerCount = Math.min(4, queue.length);
+  async function worker() {
+    while (queue.length) {
+      const record = queue.shift();
+      const metadata = await getIpMetadata(record.address);
+      enriched.push({ ...record, ...metadata });
+    }
+  }
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return records.map((record) => enriched.find((item) => item.address === record.address) || record);
+}
+async function resolveProxyRecords(request, { refresh = false, enrich = true } = {}) {
+  const colo = getIngressColo(request);
+  const hostname = buildProxyHostname(colo);
+  const cacheKey = colo.toLowerCase();
+  if (!refresh) {
+    const cached = await getCachedJson("discovery-v1", cacheKey);
+    if (cached)
+      return cached;
+  }
+  const [ipv4Result, ipv6Result] = await Promise.allSettled([
+    resolveDnsFamily(hostname, "A", 1, "IPv4"),
+    resolveDnsFamily(hostname, "AAAA", 28, "IPv6")
+  ]);
+  if (ipv4Result.status === "rejected" && ipv6Result.status === "rejected") {
+    throw new ProxyIpError("DNS_LOOKUP_FAILED", "Unable to resolve Proxy IP records.");
+  }
+  const warnings = [];
+  const records = [];
+  for (const [family, result] of [["IPv4", ipv4Result], ["IPv6", ipv6Result]]) {
+    if (result.status === "fulfilled") {
+      records.push(...result.value.records);
+      if (result.value.warning)
+        warnings.push(result.value.warning);
+    } else {
+      warnings.push(`${family} records could not be retrieved.`);
+    }
+  }
+  const uniqueRecords = deduplicateRecords(records);
+  if (uniqueRecords.length > MAX_PROXY_RECORDS) {
+    throw new ProxyIpError("TOO_MANY_RECORDS", "The Proxy IP DNS response contains too many records.");
+  }
+  const response = {
+    colo,
+    records: enrich ? await enrichRecords(uniqueRecords) : uniqueRecords,
+    partial: warnings.length > 0,
+    warnings
+  };
+  if (!response.partial) {
+    await putCachedJson("discovery-v1", cacheKey, response, clampDiscoveryTtl(uniqueRecords));
+  }
+  return response;
 }
 
 // src/templates.js
@@ -1444,7 +1737,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     /* Sidebar */
     .sidebar { width: 260px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; }
     .brand { padding: 0 24px 20px; font-size: 24px; font-weight: 800; border-bottom: 1px solid var(--border); margin-bottom: 20px; background: linear-gradient(135deg, #c084fc, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-item { padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; font-weight: 500; }
+    .nav-item { width: 100%; padding: 12px 24px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 12px; border: 0; background: transparent; text-align: right; transition: 0.2s; font: inherit; font-weight: 500; }
     .nav-item:hover, .nav-item.active { background: var(--surface-hover); color: var(--primary); border-right: 3px solid var(--primary); }
     .github-link:hover { color: var(--primary) !important; background: var(--surface-hover); }
     .github-link:hover svg { transform: scale(1.1); }
@@ -1494,6 +1787,94 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
     .flex-gap { display: flex; gap: 8px; }
     .docs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 32px; }
     pre { background: var(--bg); padding: 16px; border-radius: 8px; overflow-x: auto; direction: ltr; font-size: 13px; color: #e2e8f0; margin-top: 10px; border: 1px solid var(--border); }
+
+    /* Proxy IP discovery */
+    .proxy-page { max-width: 1120px; }
+    .proxy-heading { align-items: flex-start; }
+    .proxy-kicker { color: var(--primary); font-size: 12px; font-weight: 800; letter-spacing: .04em; margin-bottom: 6px; }
+    .proxy-subtitle { color: var(--muted); font-size: 13px; line-height: 1.8; max-width: 640px; }
+    .proxy-refresh { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .proxy-refresh[disabled], .proxy-apply[disabled] { cursor: wait; opacity: .62; }
+    .proxy-route { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 14px; position: relative; padding: 24px; margin-bottom: 16px; overflow: hidden; background: linear-gradient(115deg, rgba(168,85,247,.14), rgba(24,24,27,.96) 45%, rgba(236,72,153,.09)); border: 1px solid rgba(168,85,247,.28); border-radius: 16px; }
+    .proxy-route::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 20px 20px; mask-image: linear-gradient(90deg, transparent, black 25%, black 75%, transparent); pointer-events: none; }
+    .proxy-route-node, .proxy-route-line { position: relative; z-index: 1; }
+    .proxy-route-node { min-width: 0; }
+    .proxy-route-node small { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
+    .proxy-route-node strong { font-size: 14px; font-weight: 700; }
+    .proxy-route-node.is-colo { text-align: center; }
+    .proxy-colo { display: inline-block; color: #f5e8ff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: .06em; line-height: 1; text-shadow: 0 0 24px rgba(168,85,247,.55); }
+    .proxy-route-node.is-colo small { margin-top: 7px; margin-bottom: 0; }
+    .proxy-route-line { width: 52px; height: 1px; background: linear-gradient(90deg, transparent, rgba(192,132,252,.9)); }
+    .proxy-route-line.reverse { background: linear-gradient(90deg, rgba(236,72,153,.9), transparent); }
+    .proxy-route-end { text-align: left; }
+    .proxy-route-end strong { color: #fce7f3; }
+    .proxy-current { display: flex; align-items: center; justify-content: space-between; gap: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+    .proxy-current-copy { min-width: 0; }
+    .proxy-current-copy h3 { font-size: 14px; margin-bottom: 4px; }
+    .proxy-current-copy p { color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .proxy-current-value { flex: 0 0 auto; color: #ddd6fe; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; direction: ltr; unicode-bidi: plaintext; }
+    .proxy-status { display: none; border: 1px solid transparent; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; }
+    .proxy-status.show { display: block; }
+    .proxy-status.info { background: rgba(168,85,247,.09); border-color: rgba(168,85,247,.25); color: #ddd6fe; }
+    .proxy-status.warn { background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.28); color: #fcd34d; }
+    .proxy-status.error { background: rgba(239,68,68,.09); border-color: rgba(239,68,68,.28); color: #fca5a5; }
+    .proxy-records { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .proxy-records-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid var(--border); }
+    .proxy-records-title h3 { font-size: 15px; }
+    .proxy-records-title span { color: var(--muted); font-size: 12px; }
+    .proxy-records-table th { white-space: nowrap; }
+    .proxy-records-table td { vertical-align: middle; font-size: 13px; }
+    .proxy-radio { appearance: none; width: 18px; height: 18px; margin: 0; border: 1px solid #52525b; border-radius: 50%; background: var(--bg); cursor: pointer; display: grid; place-content: center; }
+    .proxy-radio::before { content: ''; width: 8px; height: 8px; border-radius: 50%; transform: scale(0); background: white; transition: transform .16s ease; }
+    .proxy-radio:checked { background: var(--primary); border-color: var(--primary); }
+    .proxy-radio:checked::before { transform: scale(1); }
+    .proxy-radio:focus-visible { outline: 3px solid rgba(168,85,247,.4); outline-offset: 3px; }
+    .proxy-record-row { cursor: pointer; transition: background .16s ease, box-shadow .16s ease; }
+    .proxy-record-row.selected { background: rgba(168,85,247,.11); box-shadow: inset -3px 0 0 var(--primary); }
+    .proxy-record-row.current .proxy-ip { color: #6ee7b7; }
+    .proxy-ip, .proxy-asn { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .proxy-ip { color: #ddd6fe; font-weight: 700; }
+    .proxy-record-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .proxy-family { display: inline-flex; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.06); color: #d4d4d8; direction: ltr; }
+    .proxy-meta-unavailable { color: #a1a1aa; }
+    .proxy-empty { padding: 44px 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    .proxy-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-top: 1px solid var(--border); }
+    .proxy-actions-note { color: var(--muted); font-size: 12px; line-height: 1.65; max-width: 580px; }
+    .proxy-apply { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+    .proxy-modal-address { direction: ltr; unicode-bidi: plaintext; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #ddd6fe; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; font-weight: 700; margin: 14px 0; }
+    .proxy-confirm-copy { color: var(--muted); font-size: 13px; line-height: 1.8; }
+    @media (max-width: 760px) {
+      body { height: auto; min-height: 100vh; overflow: auto; flex-direction: column; }
+      .sidebar { width: 100%; min-height: auto; border-left: 0; border-bottom: 1px solid var(--border); flex-direction: row; flex-wrap: wrap; padding: 12px 0; }
+      .brand { width: 100%; padding: 0 20px 12px; margin-bottom: 6px; }
+      .sidebar .nav-item { padding: 9px 14px; font-size: 12px; }
+      .sidebar > div[style="flex:1"] { display: none; }
+      .github-link { display: none !important; }
+      .main { width: 100%; padding: 20px 14px; overflow: visible; }
+      .header, .proxy-heading { gap: 14px; flex-direction: column; align-items: stretch; margin-bottom: 20px; }
+      .proxy-refresh { justify-content: center; }
+      .proxy-route { grid-template-columns: 1fr; gap: 10px; padding: 20px; text-align: center; }
+      .proxy-route-node, .proxy-route-end { text-align: center; }
+      .proxy-route-line { width: 1px; height: 22px; margin: auto; background: linear-gradient(180deg, transparent, rgba(192,132,252,.9)); }
+      .proxy-route-line.reverse { background: linear-gradient(180deg, rgba(236,72,153,.9), transparent); }
+      .proxy-current, .proxy-actions { align-items: stretch; flex-direction: column; }
+      .proxy-current-value { text-align: right; }
+      .proxy-records { overflow: visible; background: transparent; border: 0; }
+      .proxy-records-title { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; }
+      .proxy-records-table, .proxy-records-table tbody, .proxy-records-table tr, .proxy-records-table td { display: block; width: 100%; }
+      .proxy-records-table thead { display: none; }
+      .proxy-record-row { position: relative; margin-bottom: 10px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+      .proxy-record-row.selected { box-shadow: inset -3px 0 0 var(--primary); }
+      .proxy-records-table td { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; border: 0; text-align: left; }
+      .proxy-records-table td::before { content: attr(data-label); color: var(--muted); font-size: 11px; direction: rtl; text-align: right; }
+      .proxy-records-table td:first-child { position: absolute; top: 13px; left: 14px; width: auto; padding: 0; }
+      .proxy-records-table td:first-child::before { display: none; }
+      .proxy-records-table td:nth-child(2) { padding-left: 34px; }
+      .proxy-actions .btn { width: 100%; justify-content: center; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page, .proxy-record-row, .proxy-radio::before { animation: none; transition: none; }
+    }
   </style>
 </head>
 <body>
@@ -1501,9 +1882,10 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="brand">\u0646\u0647\u0627\u0646</div>
-    <div class="nav-item active" onclick="nav('users')"><span class="nav-icon">\u{1F465}</span> \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</div>
-    <div class="nav-item" onclick="nav('api')"><span class="nav-icon">\u{1F511}</span> \u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</div>
-    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">\u2699\uFE0F</span> \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</div>
+    <button type="button" class="nav-item active" onclick="nav('users', this)"><span class="nav-icon">\u{1F465}</span> \u06A9\u0627\u0631\u0628\u0631\u0627\u0646</button>
+    <button type="button" class="nav-item" onclick="nav('api', this)"><span class="nav-icon">\u{1F511}</span> \u062A\u0648\u06A9\u0646\u200C\u0647\u0627\u06CC API</button>
+    <button type="button" class="nav-item" onclick="nav('proxy-ips', this)"><span class="nav-icon">\u25C8</span> \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC</button>
+    <button type="button" class="nav-item" onclick="nav('settings', this)"><span class="nav-icon">\u2699\uFE0F</span> \u062A\u0646\u0638\u06CC\u0645\u0627\u062A \u0633\u06CC\u0633\u062A\u0645</button>
     <div style="flex:1"></div>
     <a href="https://github.com/emad1381/penhan" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px 24px; color: var(--muted); text-decoration: none; transition: 0.2s; font-weight: 500;" class="github-link">
       <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="transition: transform 0.2s; vertical-align: middle;">
@@ -1511,7 +1893,7 @@ function panelPage(hostname, adminUUID, defaultProxyIP, cfAccountId, cfApiToken)
       </svg>
       <span>\u06AF\u06CC\u062A\u200C\u0647\u0627\u0628 \u067E\u0631\u0648\u0698\u0647</span>
     </a>
-    <div class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">\u{1F6AA}</span> \u062E\u0631\u0648\u062C</div>
+    <button type="button" class="nav-item" onclick="window.location.href='/'" style="color:var(--danger)"><span class="nav-icon">\u{1F6AA}</span> \u062E\u0631\u0648\u062C</button>
   </div>
 
   <!-- Main -->
@@ -1605,6 +1987,71 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       </div>
     </div>
     
+    <!-- Proxy IP Page -->
+    <section id="page-proxy-ips" class="page proxy-page" aria-labelledby="proxy-page-title">
+      <div class="header proxy-heading">
+        <div>
+          <div class="proxy-kicker">ROUTING DISCOVERY</div>
+          <h2 id="proxy-page-title" class="title">\u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627\u06CC \u067E\u0631\u0648\u06A9\u0633\u06CC</h2>
+          <p class="proxy-subtitle">\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0628\u0631 \u0627\u0633\u0627\u0633 \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC Cloudflare \u0628\u0631\u0627\u06CC \u0647\u0645\u06CC\u0646 \u0628\u0627\u0632\u062F\u06CC\u062F \u067E\u0646\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A \u0645\u06CC\u200C\u0634\u0648\u0646\u062F. \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u0645\u0627 \u0641\u0642\u0637 \u0645\u0633\u06CC\u0631 \u062A\u0644\u0627\u0634 \u0645\u062C\u062F\u062F \u0627\u062A\u0635\u0627\u0644 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0631\u0627 \u062A\u063A\u06CC\u06CC\u0631 \u0645\u06CC\u200C\u062F\u0647\u062F.</p>
+        </div>
+        <button type="button" id="proxy-refresh" class="btn btn-outline proxy-refresh" onclick="loadProxyIps(true)">\u21BB \u062F\u0631\u06CC\u0627\u0641\u062A \u0631\u06A9\u0648\u0631\u062F\u0647\u0627</button>
+      </div>
+
+      <div id="proxy-route" class="proxy-route" hidden>
+        <div class="proxy-route-node">
+          <small>\u062F\u0631\u062E\u0648\u0627\u0633\u062A \u067E\u0646\u0644</small>
+          <strong>\u0648\u0631\u0648\u062F\u06CC Cloudflare</strong>
+        </div>
+        <div class="proxy-route-line"></div>
+        <div class="proxy-route-node is-colo">
+          <span id="proxy-colo" class="proxy-colo">---</span>
+          <small>\u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC</small>
+        </div>
+        <div class="proxy-route-line reverse"></div>
+        <div class="proxy-route-node proxy-route-end">
+          <small>\u0645\u0646\u0628\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631</small>
+          <strong id="proxy-source-label">\u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC \u0622\u0645\u0627\u062F\u0647</strong>
+        </div>
+      </div>
+
+      <div class="proxy-current">
+        <div class="proxy-current-copy">
+          <h3>Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC \u0641\u0639\u0627\u0644</h3>
+          <p>\u0627\u06CC\u0646 \u0645\u0642\u062F\u0627\u0631 \u0641\u0642\u0637 \u0647\u0646\u06AF\u0627\u0645\u06CC \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u06A9\u0647 \u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645 \u0645\u0642\u0635\u062F \u0646\u0627\u0645\u0648\u0641\u0642 \u0628\u0627\u0634\u062F. \u062A\u0646\u0638\u06CC\u0645 \u0622\u0646 \u0631\u0648\u06CC \u0647\u0645\u0647\u0654 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0627\u062B\u0631 \u0645\u06CC\u200C\u06AF\u0630\u0627\u0631\u062F.</p>
+        </div>
+        <div id="proxy-current-value" class="proxy-current-value">${defaultProxyIP || "\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647"}</div>
+      </div>
+
+      <div id="proxy-status" class="proxy-status" role="status" aria-live="polite"></div>
+
+      <div class="proxy-records">
+        <div class="proxy-records-title">
+          <h3>\u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC DNS \u062F\u0631\u06CC\u0627\u0641\u062A\u200C\u0634\u062F\u0647</h3>
+          <span id="proxy-record-count">\u0628\u0631\u0627\u06CC \u0634\u0631\u0648\u0639\u060C \u062F\u0631\u06CC\u0627\u0641\u062A \u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0631\u0627 \u0628\u0632\u0646\u06CC\u062F</span>
+        </div>
+        <table class="proxy-records-table">
+          <thead>
+            <tr>
+              <th aria-label="\u0627\u0646\u062A\u062E\u0627\u0628"></th>
+              <th>\u0622\u06CC\u200C\u067E\u06CC</th>
+              <th>\u0646\u0648\u0639</th>
+              <th>\u0634\u0628\u06A9\u0647 / ISP</th>
+              <th>\u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN</th>
+              <th>TTL</th>
+            </tr>
+          </thead>
+          <tbody id="proxy-records-body">
+            <tr><td colspan="6" class="proxy-empty">\u062F\u0631\u06CC\u0627\u0641\u062A \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0641\u0642\u0637 \u0632\u0645\u0627\u0646\u06CC \u0622\u063A\u0627\u0632 \u0645\u06CC\u200C\u0634\u0648\u062F \u06A9\u0647 \u0627\u06CC\u0646 \u0635\u0641\u062D\u0647 \u0631\u0627 \u0628\u0627\u0632 \u06A9\u0646\u06CC\u062F.</td></tr>
+          </tbody>
+        </table>
+        <div class="proxy-actions">
+          <p class="proxy-actions-note">\u0642\u0628\u0644 \u0627\u0632 \u0627\u0639\u0645\u0627\u0644\u060C IP \u0627\u0646\u062A\u062E\u0627\u0628\u200C\u0634\u062F\u0647 \u062F\u0648\u0628\u0627\u0631\u0647 \u0627\u0632 DNS \u0645\u0646\u0628\u0639 \u0628\u0631\u0631\u0633\u06CC \u0645\u06CC\u200C\u0634\u0648\u062F \u062A\u0627 \u0645\u0642\u062F\u0627\u0631 \u0645\u0646\u0642\u0636\u06CC \u06CC\u0627 \u062A\u063A\u06CC\u06CC\u0631\u06A9\u0631\u062F\u0647 \u0630\u062E\u06CC\u0631\u0647 \u0646\u0634\u0648\u062F.</p>
+          <button type="button" id="proxy-apply" class="btn proxy-apply" onclick="openProxyApplyModal()" disabled>\u062A\u0646\u0638\u06CC\u0645 \u0628\u0647\u200C\u0639\u0646\u0648\u0627\u0646 Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC <span>\u2190</span></button>
+        </div>
+      </div>
+    </section>
+
     <!-- Settings Page -->
     <div id="page-settings" class="page">
       <div class="header">
@@ -1697,14 +2144,31 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
     </div>
   </div>
 
+  <div class="modal-overlay" id="proxy-apply-modal" role="dialog" aria-modal="true" aria-labelledby="proxy-apply-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="proxy-apply-title">\u062A\u0623\u06CC\u06CC\u062F Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC</h3>
+        <button type="button" class="modal-close" aria-label="\u0628\u0633\u062A\u0646" onclick="closeModal('proxy-apply-modal')">&times;</button>
+      </div>
+      <p class="proxy-confirm-copy">\u0627\u06CC\u0646 \u0645\u0642\u062F\u0627\u0631 \u0628\u0647 \u0639\u0646\u0648\u0627\u0646 \u0645\u0633\u06CC\u0631 \u062C\u0627\u06CC\u06AF\u0632\u06CC\u0646 \u0627\u062A\u0635\u0627\u0644 \u0628\u0631\u0627\u06CC \u0647\u0645\u0647\u0654 \u06A9\u0627\u0631\u0628\u0631\u0627\u0646 \u0630\u062E\u06CC\u0631\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F. \u0627\u062A\u0635\u0627\u0644 \u0645\u0633\u062A\u0642\u06CC\u0645 \u0647\u0645\u06CC\u0634\u0647 \u0627\u0648\u0644\u0648\u06CC\u062A \u062F\u0627\u0631\u062F \u0648 \u0641\u0642\u0637 \u062F\u0631 \u0635\u0648\u0631\u062A \u062E\u0637\u0627 \u0627\u0632 \u0627\u06CC\u0646 IP \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u062E\u0648\u0627\u0647\u062F \u0634\u062F.</p>
+      <div id="proxy-apply-address" class="proxy-modal-address">\u2014</div>
+      <div style="display:flex; gap:8px; margin-top:18px;">
+        <button type="button" class="btn btn-outline" style="flex:1" onclick="closeModal('proxy-apply-modal')">\u0627\u0646\u0635\u0631\u0627\u0641</button>
+        <button type="button" id="proxy-confirm-apply" class="btn" style="flex:1" onclick="applySelectedProxyIp()">\u062A\u0623\u06CC\u06CC\u062F \u0648 \u0627\u0639\u0645\u0627\u0644</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const basePath = '/api';
+    const proxyIpState = { loaded: false, loading: false, selected: null, records: [] };
 
-    function nav(page) {
+    function nav(page, trigger) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(p => p.classList.remove('active'));
       document.getElementById('page-' + page).classList.add('active');
-      event.currentTarget.classList.add('active');
+      (trigger || event.currentTarget).classList.add('active');
+      if (page === 'proxy-ips' && !proxyIpState.loaded && !proxyIpState.loading) loadProxyIps(false);
     }
 
     function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -1896,6 +2360,200 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       document.getElementById('u-cleanip').value = cleanIp || '';
       document.getElementById('user-modal-title').textContent = '\u0648\u06CC\u0631\u0627\u06CC\u0634 \u06A9\u0627\u0631\u0628\u0631';
       openModal('user-modal');
+    }
+
+    function setProxyStatus(message, type = 'info') {
+      const status = document.getElementById('proxy-status');
+      status.textContent = message || '';
+      status.className = message ? 'proxy-status show ' + type : 'proxy-status';
+    }
+
+    function setProxyLoading(loading) {
+      proxyIpState.loading = loading;
+      const refresh = document.getElementById('proxy-refresh');
+      const apply = document.getElementById('proxy-apply');
+      refresh.disabled = loading;
+      refresh.textContent = loading ? '\u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A...' : '\u21BB \u062F\u0631\u06CC\u0627\u0641\u062A \u0631\u06A9\u0648\u0631\u062F\u0647\u0627';
+      apply.disabled = loading || !proxyIpState.selected;
+    }
+
+    function renderProxyRecords() {
+      const body = document.getElementById('proxy-records-body');
+      const count = document.getElementById('proxy-record-count');
+      const apply = document.getElementById('proxy-apply');
+      const current = document.getElementById('proxy-current-value').textContent.trim();
+      body.innerHTML = '';
+
+      if (!proxyIpState.records.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 6;
+        cell.className = 'proxy-empty';
+        cell.textContent = '\u0628\u0631\u0627\u06CC \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC \u0647\u06CC\u0686 \u0631\u06A9\u0648\u0631\u062F A \u06CC\u0627 AAAA \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.';
+        row.appendChild(cell);
+        body.appendChild(row);
+        count.textContent = '\u06F0 \u0631\u06A9\u0648\u0631\u062F';
+        apply.disabled = true;
+        return;
+      }
+
+      count.textContent = proxyIpState.records.length.toLocaleString('fa-IR') + ' \u0631\u06A9\u0648\u0631\u062F \u0622\u0645\u0627\u062F\u0647\u0654 \u0627\u0646\u062A\u062E\u0627\u0628';
+      proxyIpState.records.forEach((record) => {
+        const row = document.createElement('tr');
+        row.className = 'proxy-record-row' + (proxyIpState.selected === record.address ? ' selected' : '') + (current === record.address ? ' current' : '');
+        row.tabIndex = 0;
+        row.setAttribute('role', 'radio');
+        row.setAttribute('aria-checked', proxyIpState.selected === record.address ? 'true' : 'false');
+        row.addEventListener('click', () => selectProxyRecord(record.address));
+        row.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectProxyRecord(record.address);
+          }
+        });
+
+        const selectCell = document.createElement('td');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'proxy-ip';
+        radio.className = 'proxy-radio';
+        radio.checked = proxyIpState.selected === record.address;
+        radio.setAttribute('aria-label', '\u0627\u0646\u062A\u062E\u0627\u0628 ' + record.address);
+        radio.addEventListener('click', (event) => { event.stopPropagation(); selectProxyRecord(record.address); });
+        selectCell.appendChild(radio);
+
+        const addressCell = document.createElement('td');
+        addressCell.dataset.label = '\u0622\u06CC\u200C\u067E\u06CC';
+        const address = document.createElement('div');
+        address.className = 'proxy-ip';
+        address.textContent = record.address;
+        addressCell.appendChild(address);
+        if (current === record.address) {
+          const meta = document.createElement('div');
+          meta.className = 'proxy-record-meta';
+          meta.textContent = '\u062A\u0646\u0638\u06CC\u0645 \u0633\u0631\u0627\u0633\u0631\u06CC \u0641\u0639\u0644\u06CC';
+          addressCell.appendChild(meta);
+        }
+
+        const familyCell = document.createElement('td');
+        familyCell.dataset.label = '\u0646\u0648\u0639';
+        const family = document.createElement('span');
+        family.className = 'proxy-family';
+        family.textContent = record.family;
+        familyCell.appendChild(family);
+
+        const ispCell = document.createElement('td');
+        ispCell.dataset.label = '\u0634\u0628\u06A9\u0647 / ISP';
+        const asn = document.createElement('div');
+        asn.className = 'proxy-asn';
+        asn.textContent = record.isp && record.isp.asn ? record.isp.asn : '--';
+        const isp = document.createElement('div');
+        isp.className = 'proxy-record-meta' + (record.metadataStatus === 'unavailable' ? ' proxy-meta-unavailable' : '');
+        isp.textContent = record.isp && record.isp.name ? record.isp.name : '\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A';
+        ispCell.append(asn, isp);
+
+        const countryCell = document.createElement('td');
+        countryCell.dataset.label = '\u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN';
+        const country = document.createElement('span');
+        country.textContent = record.country && record.country.name ? record.country.name : '\u0646\u0627\u0645\u0634\u062E\u0635';
+        const countryCode = document.createElement('div');
+        countryCode.className = 'proxy-record-meta proxy-asn';
+        countryCode.textContent = record.country && record.country.code ? record.country.code : '--';
+        countryCell.append(country, countryCode);
+
+        const ttlCell = document.createElement('td');
+        ttlCell.dataset.label = 'TTL';
+        ttlCell.className = 'proxy-asn';
+        ttlCell.textContent = (record.ttl || 0).toLocaleString('en-US') + 's';
+
+        row.append(selectCell, addressCell, familyCell, ispCell, countryCell, ttlCell);
+        body.appendChild(row);
+      });
+
+      apply.disabled = proxyIpState.loading || !proxyIpState.selected;
+    }
+
+    function selectProxyRecord(address) {
+      proxyIpState.selected = address;
+      renderProxyRecords();
+      setProxyStatus('\u0631\u06A9\u0648\u0631\u062F \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F. \u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u0654 \u0622\u0646 \u0628\u0647\u200C\u0639\u0646\u0648\u0627\u0646 Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC\u060C \u062F\u06A9\u0645\u0647\u0654 \u0627\u0639\u0645\u0627\u0644 \u0631\u0627 \u0628\u0632\u0646\u06CC\u062F.', 'info');
+    }
+
+    async function loadProxyIps(refresh) {
+      setProxyLoading(true);
+      setProxyStatus(refresh ? '\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u062F\u0631 \u062D\u0627\u0644 \u0628\u0647\u200C\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0633\u062A\u0646\u062F...' : '\u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC Proxy IP \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A \u0647\u0633\u062A\u0646\u062F...', 'info');
+      try {
+        const res = await fetch(basePath + '/proxy-ips' + (refresh ? '?refresh=1' : ''), { cache: 'no-store' });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error && data.error.message ? data.error.message : '\u062F\u0631\u06CC\u0627\u0641\u062A \u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0646\u0627\u0645\u0648\u0641\u0642 \u0628\u0648\u062F.');
+        }
+
+        proxyIpState.loaded = true;
+        proxyIpState.records = Array.isArray(data.records) ? data.records : [];
+        proxyIpState.selected = proxyIpState.records.some((record) => record.address === proxyIpState.selected) ? proxyIpState.selected : null;
+        document.getElementById('proxy-route').hidden = false;
+        document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
+        document.getElementById('proxy-source-label').textContent = '\u0645\u0646\u0628\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0641\u0639\u0627\u0644';
+        document.getElementById('proxy-current-value').textContent = data.effectiveProxyIp || '\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647';
+        renderProxyRecords();
+
+        if (!proxyIpState.records.length) {
+          setProxyStatus('\u0628\u0631\u0627\u06CC \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC \u0631\u06A9\u0648\u0631\u062F A \u06CC\u0627 AAAA \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A. \u06A9\u0645\u06CC \u0628\u0639\u062F \u062F\u0648\u0628\u0627\u0631\u0647 \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F.', 'warn');
+        } else if (data.partial) {
+          setProxyStatus('\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F\u0646\u062F\u060C \u0627\u0645\u0627 \u0628\u062E\u0634\u06CC \u0627\u0632 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u06A9\u0627\u0645\u0644 \u0646\u06CC\u0633\u062A: ' + (data.warnings || []).join(' '), 'warn');
+        } else {
+          setProxyStatus('\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0622\u0645\u0627\u062F\u0647\u200C\u0627\u0646\u062F. \u06A9\u0634\u0648\u0631 \u0646\u0645\u0627\u06CC\u0634\u200C\u062F\u0627\u062F\u0647\u200C\u0634\u062F\u0647\u060C \u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN \u0627\u0633\u062A \u0648 \u0645\u06A9\u0627\u0646 \u062F\u0642\u06CC\u0642 IP \u0645\u062D\u0633\u0648\u0628 \u0646\u0645\u06CC\u200C\u0634\u0648\u062F.', 'info');
+        }
+      } catch (error) {
+        proxyIpState.loaded = false;
+        proxyIpState.selected = null;
+        renderProxyRecords();
+        setProxyStatus(error.message || '\u062F\u0631\u06CC\u0627\u0641\u062A \u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC Proxy IP \u0646\u0627\u0645\u0648\u0641\u0642 \u0628\u0648\u062F. \u062F\u0648\u0628\u0627\u0631\u0647 \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F.', 'error');
+      } finally {
+        setProxyLoading(false);
+      }
+    }
+
+    function openProxyApplyModal() {
+      if (!proxyIpState.selected || proxyIpState.loading) return;
+      document.getElementById('proxy-apply-address').textContent = proxyIpState.selected;
+      openModal('proxy-apply-modal');
+    }
+
+    async function applySelectedProxyIp() {
+      if (!proxyIpState.selected) return;
+      const button = document.getElementById('proxy-confirm-apply');
+      button.disabled = true;
+      button.textContent = '\u062F\u0631 \u062D\u0627\u0644 \u0628\u0631\u0631\u0633\u06CC \u0648 \u0630\u062E\u06CC\u0631\u0647...';
+      setProxyLoading(true);
+      try {
+        const res = await fetch(basePath + '/proxy-ips/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: proxyIpState.selected }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          const code = data.error && data.error.code;
+          if (code === 'NOT_IN_CURRENT_DNS_ANSWER') {
+            throw new Error('\u0631\u06A9\u0648\u0631\u062F DNS \u062A\u063A\u06CC\u06CC\u0631 \u06A9\u0631\u062F\u0647 \u0627\u0633\u062A. \u0644\u06CC\u0633\u062A \u0631\u0627 \u062A\u0627\u0632\u0647\u200C\u0633\u0627\u0632\u06CC \u06A9\u0646\u06CC\u062F \u0648 \u062F\u0648\u0628\u0627\u0631\u0647 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F.');
+          }
+          throw new Error(data.error && data.error.message ? data.error.message : '\u0630\u062E\u06CC\u0631\u0647\u0654 Proxy IP \u0646\u0627\u0645\u0648\u0641\u0642 \u0628\u0648\u062F.');
+        }
+        document.getElementById('proxy-current-value').textContent = data.proxyIP;
+        document.getElementById('st-proxy').value = data.proxyIP;
+        closeModal('proxy-apply-modal');
+        renderProxyRecords();
+        setProxyStatus('Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u0631\u0648\u06CC ' + data.proxyIP + ' \u062A\u0646\u0638\u06CC\u0645 \u0634\u062F.', 'info');
+      } catch (error) {
+        closeModal('proxy-apply-modal');
+        setProxyStatus(error.message || '\u0630\u062E\u06CC\u0631\u0647\u0654 Proxy IP \u0646\u0627\u0645\u0648\u0641\u0642 \u0628\u0648\u062F.', 'error');
+      } finally {
+        button.disabled = false;
+        button.textContent = '\u062A\u0623\u06CC\u06CC\u062F \u0648 \u0627\u0639\u0645\u0627\u0644';
+        setProxyLoading(false);
+      }
     }
 
     async function loadCfMetrics() {
@@ -2133,10 +2791,78 @@ var src_default = {
           await env.DB.prepare("DELETE FROM api_keys WHERE key = ?").bind(key).run();
           return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
         }
+        if (path === "/api/proxy-ips" && request.method === "GET") {
+          try {
+            const refresh = url.searchParams.get("refresh") === "1";
+            const discovery = await resolveProxyRecords(request, { refresh });
+            return new Response(JSON.stringify({
+              ok: true,
+              ingress: { colo: discovery.colo, source: "request.cf.colo" },
+              effectiveProxyIp: currentProxyIP,
+              records: discovery.records,
+              partial: discovery.partial,
+              warnings: discovery.warnings
+            }), {
+              status: 200,
+              headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
+            });
+          } catch (error) {
+            const knownError = error instanceof ProxyIpError;
+            return new Response(JSON.stringify({
+              ok: false,
+              error: {
+                code: knownError ? error.code : "PROXY_IP_DISCOVERY_FAILED",
+                message: knownError ? error.message : "Unable to discover Proxy IP records."
+              }
+            }), {
+              status: knownError ? error.status : 503,
+              headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
+            });
+          }
+        }
+        if (path === "/api/proxy-ips/apply" && request.method === "POST") {
+          try {
+            const contentLength = Number(request.headers.get("Content-Length") || 0);
+            if (contentLength > 1024) {
+              return new Response(JSON.stringify({ ok: false, error: { code: "INVALID_REQUEST", message: "Request body is too large." } }), { status: 413, headers: { "Content-Type": "application/json" } });
+            }
+            const body = await request.json();
+            const address = typeof body.address === "string" ? body.address.trim() : "";
+            if (!isValidIpAddress(address)) {
+              return new Response(JSON.stringify({ ok: false, error: { code: "INVALID_PROXY_IP", message: "A valid IPv4 or IPv6 address is required." } }), { status: 400, headers: { "Content-Type": "application/json" } });
+            }
+            const discovery = await resolveProxyRecords(request, { refresh: true, enrich: false });
+            if (!discovery.records.some((record) => record.address.toLowerCase() === address.toLowerCase())) {
+              return new Response(JSON.stringify({ ok: false, error: { code: "NOT_IN_CURRENT_DNS_ANSWER", message: "The selected IP is no longer in the current DNS response. Refresh and try again." } }), { status: 409, headers: { "Content-Type": "application/json" } });
+            }
+            if (!env.DB) {
+              throw new ProxyIpError("SETTINGS_UNAVAILABLE", "The database binding is unavailable.");
+            }
+            await setSettingD1(env, "proxy_ip", address);
+            return new Response(JSON.stringify({ ok: true, proxyIP: address }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+          } catch (error) {
+            const knownError = error instanceof ProxyIpError;
+            return new Response(JSON.stringify({
+              ok: false,
+              error: {
+                code: knownError ? error.code : "PROXY_IP_APPLY_FAILED",
+                message: knownError ? error.message : "Unable to apply the Proxy IP."
+              }
+            }), {
+              status: knownError ? error.status : 503,
+              headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
+            });
+          }
+        }
         if (path === "/api/settings" && request.method === "POST") {
           const b = await request.json();
-          if (b.proxyIP !== void 0)
-            await setSettingD1(env, "proxy_ip", b.proxyIP.trim());
+          if (b.proxyIP !== void 0) {
+            const proxyIP = typeof b.proxyIP === "string" ? b.proxyIP.trim() : "";
+            if (proxyIP && !isValidIpAddress(proxyIP)) {
+              return new Response(JSON.stringify({ ok: false, error: "Proxy IP must be a valid IPv4 or IPv6 address." }), { status: 400, headers: { "Content-Type": "application/json" } });
+            }
+            await setSettingD1(env, "proxy_ip", proxyIP);
+          }
           if (b.password !== void 0)
             await setSettingD1(env, "panel_pass", b.password.trim());
           if (b.uuid !== void 0 && isValidUUID(b.uuid.trim()))
