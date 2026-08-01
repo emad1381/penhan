@@ -425,6 +425,8 @@ proxies:
     network: ws
     servername: ${randomSNI}
     client-fingerprint: chrome
+    alpn:
+      - http/1.1
     ws-opts:
       path: "${vlessObfuscatedPath}?ed=2048"
       headers:
@@ -439,6 +441,8 @@ proxies:
     network: ws
     sni: ${randomSNI}
     client-fingerprint: chrome
+    alpn:
+      - http/1.1
     ws-opts:
       path: "${trojanObfuscatedPath}"
       headers:
@@ -525,6 +529,7 @@ rules:
                     tls: {
                       enabled: true,
                       server_name: randomSNI,
+                      alpn: ["http/1.1"],
                       utls: { enabled: true, fingerprint: "chrome" }
                     },
                     transport: {
@@ -542,6 +547,7 @@ rules:
                     tls: {
                       enabled: true,
                       server_name: randomSNI,
+                      alpn: ["http/1.1"],
                       utls: { enabled: true, fingerprint: "chrome" }
                     },
                     transport: {
