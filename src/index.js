@@ -203,6 +203,35 @@ export default {
            return new Response(JSON.stringify({ok: true}), {status: 200, headers: {'Content-Type': 'application/json'}});
         }
 
+        if (path === '/api/proxy-ips/enrich' && request.method === 'POST') {
+          try {
+            const body = await request.json();
+            const ips = Array.isArray(body.ips) ? body.ips : [];
+            if (!ips.length || ips.length > 100) {
+              return new Response(JSON.stringify({ ok: false, error: 'Invalid IP list' }), { status: 400 });
+            }
+
+            // Using the Worker to securely fetch ip-api.com/batch (HTTP) avoiding browser CORS
+            const res = await fetch('http://ip-api.com/batch', {
+              method: 'POST',
+              body: JSON.stringify(ips.map(ip => ({ query: ip, fields: 'status,country,countryCode,city,isp,as,org' }))),
+              headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (!res.ok) {
+              return new Response(JSON.stringify({ ok: false, error: 'Upstream failed' }), { status: 502 });
+            }
+
+            const data = await res.json();
+            return new Response(JSON.stringify({ ok: true, data }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          } catch (e) {
+            return new Response(JSON.stringify({ ok: false, error: e.message }), { status: 500 });
+          }
+        }
+
         if (path === '/api/proxy-ips' && request.method === 'GET') {
           try {
             const refresh = url.searchParams.get('refresh') === '1';

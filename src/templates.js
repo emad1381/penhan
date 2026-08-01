@@ -1535,51 +1535,84 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       const recordsToEnrich = proxyIpState.records.filter(r => r.metadataStatus === 'pending_client_enrichment');
       if (!recordsToEnrich.length) return;
 
-      // Process 5 IPs at a time concurrently to avoid browser connection limits
-      for (let i = 0; i < recordsToEnrich.length; i += 5) {
-        const batch = recordsToEnrich.slice(i, i + 5);
+      const ips = recordsToEnrich.map(r => r.address);
+      const batchSize = 100;
 
-        await Promise.all(batch.map(async (record) => {
-          const ip = record.address;
-          try {
-            const res = await fetch('https://freeipapi.com/api/json/' + encodeURIComponent(ip));
-            const data = res.ok ? await res.json() : null;
+      for (let i = 0; i < ips.length; i += batchSize) {
+        const batchIps = ips.slice(i, i + batchSize);
+        try {
+          // Offload batch request to our own API backend to avoid browser CORS and mixed content blocks
+          const res = await fetch(basePath + '/proxy-ips/enrich', {
+            method: 'POST',
+            body: JSON.stringify({ ips: batchIps }),
+            headers: { 'Content-Type': 'application/json' }
+          });
 
-            if (data && data.countryCode) {
-              const countryCode = (data.countryCode || '').toUpperCase();
-              const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+          if (res.ok) {
+            const dataResponse = await res.json();
+            if (dataResponse.ok && Array.isArray(dataResponse.data)) {
+              dataResponse.data.forEach((data, index) => {
+                const ip = batchIps[index];
+                const record = proxyIpState.records.find(r => r.address === ip);
+                if (record && data && data.status === 'success') {
+                  const countryCode = (data.countryCode || '').toUpperCase();
+                  const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+                  let asnNum = '--';
+                  let orgName = data.isp || data.org || 'نام شبکه در دسترس نیست';
 
-              // FreeIPAPI does not return ASN/ISP, so we fetch from DOH
-              const asnData = await fetchAsnFallback(ip);
+                  if (data.as && typeof data.as === 'string') {
+                    const match = data.as.match(/^AS(\d+)\s+(.*)$/);
+                    if (match) {
+                      asnNum = 'AS' + match[1];
+                      orgName = match[2];
+                    } else if (data.as.startsWith('AS')) {
+                      asnNum = data.as.split(' ')[0];
+                    }
+                  }
 
-              let flagEmoji = '🌐';
-              if (validCountry) {
-                const points = [...validCountry].map(c => 127397 + c.charCodeAt(0));
-                flagEmoji = String.fromCodePoint(...points);
-              }
+                  let flagEmoji = '🌐';
+                  if (validCountry) {
+                    const points = [...validCountry].map(c => 127397 + c.charCodeAt(0));
+                    flagEmoji = String.fromCodePoint(...points);
+                  }
 
-              let countryName = 'نامشخص';
-              if (validCountry) {
-                try { countryName = new Intl.DisplayNames(['fa'], { type: 'region' }).of(validCountry) || validCountry; } catch(e) { countryName = validCountry; }
-              }
+                  let countryName = 'نامشخص';
+                  if (validCountry) {
+                    try { countryName = new Intl.DisplayNames(['fa'], { type: 'region' }).of(validCountry) || validCountry; } catch(e) { countryName = validCountry; }
+                  }
 
-              record.metadataStatus = 'ok';
-              record.isp = { asn: asnData.asn, name: asnData.org };
-              record.country = {
-                code: validCountry || '--',
-                flagEmoji: flagEmoji,
-                name: countryName,
-                city: data.cityName || ''
-              };
-            } else {
-              record.metadataStatus = 'unavailable';
-              record.isp = { asn: '--', name: 'اطلاعات در دسترس نیست' };
-              record.country = { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' };
+                  record.metadataStatus = 'ok';
+                  record.isp = { asn: asnNum, name: orgName };
+                  record.country = {
+                    code: validCountry || '--',
+                    flagEmoji: flagEmoji,
+                    name: countryName,
+                    city: data.city || ''
+                  };
+                } else if (record) {
+                  record.metadataStatus = 'unavailable';
+                  record.isp = { asn: '--', name: 'اطلاعات در دسترس نیست' };
+                  record.country = { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' };
+                }
+              });
             }
-          } catch (e) {
-            record.metadataStatus = 'unavailable';
-            record.isp = { asn: '--', name: 'خطا در ارتباط شبکه' };
-            record.country = { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' };
+          }
+        } catch (e) {
+          console.warn('Backend proxy enrichment failed', e);
+        }
+
+        // Final fallback for missing ASNs via Team Cymru DNS (DNS Over HTTPS never has CORS issues)
+        await Promise.all(batchIps.map(async (ip) => {
+          const record = proxyIpState.records.find(r => r.address === ip);
+          if (record && (record.metadataStatus !== 'ok' || record.isp.asn === '--')) {
+            const asnData = await fetchAsnFallback(ip);
+            if (asnData.asn !== '--') {
+               record.metadataStatus = 'ok';
+               record.isp = { asn: asnData.asn, name: asnData.org };
+               if (!record.country.code || record.country.code === '--') {
+                 record.country = { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' };
+               }
+            }
           }
         }));
 
