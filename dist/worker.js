@@ -3122,7 +3122,14 @@ var src_default = {
           const trojanWS = `trojan://${user.id}@${addr}:${port}?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
           const isClashFamily = userAgent.includes("clash") || userAgent.includes("meta") || userAgent.includes("flclash") || userAgent.includes("surfboard");
           if (isClashFamily) {
-            const clashYaml = `proxies:
+            const clashYaml = `port: 7890
+socks-port: 7891
+allow-lan: true
+mode: rule
+log-level: info
+ipv6: false
+
+proxies:
   - name: "VLESS-${user.name}"
     type: vless
     server: ${addr}
@@ -3151,16 +3158,77 @@ var src_default = {
       path: "${trojanObfuscatedPath}"
       headers:
         Host: ${host}
+
+proxy-groups:
+  - name: "\u{1F680} \u0627\u0646\u062A\u062E\u0627\u0628 \u062E\u0648\u062F\u06A9\u0627\u0631"
+    type: url-test
+    proxies:
+      - "VLESS-${user.name}"
+      - "Trojan-${user.name}"
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
+
+  - name: "\u{1F30D} \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627"
+    type: select
+    proxies:
+      - "\u{1F680} \u0627\u0646\u062A\u062E\u0627\u0628 \u062E\u0648\u062F\u06A9\u0627\u0631"
+      - "VLESS-${user.name}"
+      - "Trojan-${user.name}"
+
+rules:
+  - MATCH,\u{1F30D} \u067E\u0631\u0648\u06A9\u0633\u06CC\u200C\u0647\u0627
 `;
             return new Response(clashYaml, {
               status: 200,
-              headers: { "Content-Type": "text/yaml; charset=utf-8" }
+              headers: { "Content-Type": "text/yaml; charset=utf-8", "Content-Disposition": 'inline; filename="penhan.yaml"' }
             });
           }
           const isSingBox = userAgent.includes("sing-box");
           if (isSingBox) {
             const singBoxConfig = {
+              log: {
+                disabled: false,
+                level: "info",
+                timestamp: true
+              },
+              dns: {
+                servers: [
+                  { tag: "google", address: "8.8.8.8" },
+                  { tag: "local", address: "local", detor: "direct" }
+                ],
+                rules: [
+                  { outbound: "any", server: "local" }
+                ],
+                final: "google"
+              },
+              inbounds: [
+                {
+                  type: "tun",
+                  tag: "tun-in",
+                  interface_name: "tun0",
+                  inet4_address: "172.19.0.1/30",
+                  auto_route: true,
+                  strict_route: true,
+                  stack: "system",
+                  sniff: true
+                }
+              ],
               outbounds: [
+                {
+                  type: "selector",
+                  tag: "select",
+                  outbounds: ["auto", `VLESS-${user.name}`, `Trojan-${user.name}`],
+                  default: "auto"
+                },
+                {
+                  type: "urltest",
+                  tag: "auto",
+                  outbounds: [`VLESS-${user.name}`, `Trojan-${user.name}`],
+                  url: "http://www.gstatic.com/generate_204",
+                  interval: "3m",
+                  tolerance: 50
+                },
                 {
                   type: "vless",
                   tag: `VLESS-${user.name}`,
@@ -3194,12 +3262,24 @@ var src_default = {
                     path: trojanObfuscatedPath,
                     headers: { Host: host }
                   }
+                },
+                {
+                  type: "direct",
+                  tag: "direct"
                 }
-              ]
+              ],
+              route: {
+                rules: [
+                  { protocol: "dns", outbound: "dns-out" },
+                  { network: "udp", port: 53, outbound: "dns-out" }
+                ],
+                auto_detect_interface: true,
+                final: "select"
+              }
             };
             return new Response(JSON.stringify(singBoxConfig, null, 2), {
               status: 200,
-              headers: { "Content-Type": "application/json; charset=utf-8" }
+              headers: { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": 'inline; filename="penhan.json"' }
             });
           }
           if (isProxyClient) {
