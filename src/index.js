@@ -390,22 +390,112 @@ export default {
             
             const randomizeCase = (str) => str.split('').map(c => Math.random() > 0.5 ? c.toUpperCase() : c.toLowerCase()).join('');
             const randomSNI = randomizeCase(host);
-            
+
             const junkVal = Math.random().toString(36).substring(2, 10);
             const vlessPathObj = { junk: junkVal, protocol: "vl" };
             const trojanPathObj = { junk: junkVal, protocol: "tr" };
-            
+
             const vlessObfuscatedPath = '/' + btoa(JSON.stringify(vlessPathObj));
             const trojanObfuscatedPath = '/trojan-' + btoa(JSON.stringify(trojanPathObj));
-            
+
             const addr = user.clean_ip || host;
-            
-            const vlessWS = `vless://${user.id}@${addr}:443?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#VLESS-${user.name}`;
-            const trojanWS = `trojan://${user.id}@${addr}:443?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
-            
+            const port = 443;
+
+            const vlessWS = `vless://${user.id}@${addr}:${port}?encryption=none&security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(vlessObfuscatedPath + '?ed=2048')}#VLESS-${user.name}`;
+            const trojanWS = `trojan://${user.id}@${addr}:${port}?security=tls&sni=${randomSNI}&fp=chrome&alpn=http%2F1.1&insecure=0&allowInsecure=0&type=ws&host=${host}&path=${encodeURIComponent(trojanObfuscatedPath)}#Trojan-${user.name}`;
+
+            // 1. Clash / Meta / FlClash Family (YAML Proxy Provider)
+            const isClashFamily = userAgent.includes('clash') || userAgent.includes('meta') || userAgent.includes('flclash') || userAgent.includes('surfboard');
+            if (isClashFamily) {
+              const clashYaml = `proxies:
+  - name: "VLESS-${user.name}"
+    type: vless
+    server: ${addr}
+    port: ${port}
+    uuid: ${user.id}
+    udp: true
+    tls: true
+    network: ws
+    servername: ${randomSNI}
+    client-fingerprint: chrome
+    ws-opts:
+      path: "${vlessObfuscatedPath}?ed=2048"
+      headers:
+        Host: ${host}
+  - name: "Trojan-${user.name}"
+    type: trojan
+    server: ${addr}
+    port: ${port}
+    password: ${user.id}
+    udp: true
+    tls: true
+    network: ws
+    sni: ${randomSNI}
+    client-fingerprint: chrome
+    ws-opts:
+      path: "${trojanObfuscatedPath}"
+      headers:
+        Host: ${host}
+`;
+              return new Response(clashYaml, {
+                status: 200,
+                headers: { 'Content-Type': 'text/yaml; charset=utf-8' }
+              });
+            }
+
+            // 2. Sing-box Family (Native JSON outbounds)
+            const isSingBox = userAgent.includes('sing-box');
+            if (isSingBox) {
+              const singBoxConfig = {
+                outbounds: [
+                  {
+                    type: "vless",
+                    tag: `VLESS-${user.name}`,
+                    server: addr,
+                    server_port: port,
+                    uuid: user.id,
+                    tls: {
+                      enabled: true,
+                      server_name: randomSNI,
+                      utls: { enabled: true, fingerprint: "chrome" }
+                    },
+                    transport: {
+                      type: "ws",
+                      path: `${vlessObfuscatedPath}?ed=2048`,
+                      headers: { Host: host }
+                    }
+                  },
+                  {
+                    type: "trojan",
+                    tag: `Trojan-${user.name}`,
+                    server: addr,
+                    server_port: port,
+                    password: user.id,
+                    tls: {
+                      enabled: true,
+                      server_name: randomSNI,
+                      utls: { enabled: true, fingerprint: "chrome" }
+                    },
+                    transport: {
+                      type: "ws",
+                      path: trojanObfuscatedPath,
+                      headers: { Host: host }
+                    }
+                  }
+                ]
+              };
+              return new Response(JSON.stringify(singBoxConfig, null, 2), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json; charset=utf-8' }
+              });
+            }
+
+            // 3. Generic V2Ray/Shadowrocket (Base64 URIs)
             if (isProxyClient) {
                return new Response(btoa(unescape(encodeURIComponent(vlessWS + '\n' + trojanWS + '\n'))), { status: 200, headers: {'Content-Type': 'text/plain'} });
             }
+
+            // 4. Browsers (HTML Panel)
             return new Response(subscriptionPage(host, user, vlessWS, trojanWS), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
          }
       }
