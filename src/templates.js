@@ -1458,17 +1458,22 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           flagImg.style.objectFit = 'cover';
           flagImg.onerror = function() {
             this.style.display = 'none';
-            if (record.country && record.country.flagEmoji) {
+            if (record.country && record.country.flagEmoji && record.country.flagEmoji !== '🌐') {
               const fallbackEmoji = document.createElement('span');
               fallbackEmoji.textContent = record.country.flagEmoji;
               countryWrap.insertBefore(fallbackEmoji, countryText);
             }
           };
           countryWrap.appendChild(flagImg);
-        } else if (record.country && record.country.flagEmoji) {
+        } else if (record.country && record.country.flagEmoji && record.country.flagEmoji !== '🌐') {
           const emojiSpan = document.createElement('span');
           emojiSpan.textContent = record.country.flagEmoji;
           countryWrap.appendChild(emojiSpan);
+        } else if (record.metadataStatus === 'pending_client_enrichment') {
+          const spinner = document.createElement('span');
+          spinner.textContent = '⏳';
+          spinner.style.fontSize = '12px';
+          countryWrap.appendChild(spinner);
         }
 
         const countryText = document.createElement('span');
@@ -1500,6 +1505,78 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       setProxyStatus('رکورد انتخاب شد. برای ذخیرهٔ آن به‌عنوان Proxy IP سراسری، دکمهٔ اعمال را بزنید.', 'info');
     }
 
+    // ---------- Client-Side GeoIP Enrichment ----------
+    async function enrichProxyRecordsClientSide() {
+      const recordsToEnrich = proxyIpState.records.filter(r => r.metadataStatus === 'pending_client_enrichment');
+      if (!recordsToEnrich.length) return;
+
+      const ips = recordsToEnrich.map(r => r.address);
+      const batchSize = 100;
+
+      for (let i = 0; i < ips.length; i += batchSize) {
+        const batchIps = ips.slice(i, i + batchSize);
+        try {
+          const res = await fetch('http://ip-api.com/batch', {
+            method: 'POST',
+            body: JSON.stringify(batchIps.map(ip => ({ query: ip, fields: 'status,country,countryCode,city,isp,as,org' }))),
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (res.ok) {
+            const dataArr = await res.json();
+            dataArr.forEach((data, index) => {
+              const ip = batchIps[index];
+              const record = proxyIpState.records.find(r => r.address === ip);
+              if (record && data && data.status === 'success') {
+                const countryCode = (data.countryCode || '').toUpperCase();
+                const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+                let asnNum = '--';
+                let orgName = data.isp || data.org || 'نام شبکه در دسترس نیست';
+
+                if (data.as && typeof data.as === 'string') {
+                  const match = data.as.match(/^AS(\d+)\s+(.*)$/);
+                  if (match) {
+                    asnNum = 'AS' + match[1];
+                    orgName = match[2];
+                  } else if (data.as.startsWith('AS')) {
+                    asnNum = data.as.split(' ')[0];
+                  }
+                }
+
+                // Emoji flag generator
+                let flagEmoji = '🌐';
+                if (validCountry) {
+                  const points = [...validCountry].map(c => 127397 + c.charCodeAt(0));
+                  flagEmoji = String.fromCodePoint(...points);
+                }
+
+                // Fa country name generator
+                let countryName = 'نامشخص';
+                if (validCountry) {
+                  try { countryName = new Intl.DisplayNames(['fa'], { type: 'region' }).of(validCountry) || validCountry; } catch(e) { countryName = validCountry; }
+                }
+
+                record.metadataStatus = 'ok';
+                record.isp = { asn: asnNum, name: orgName };
+                record.country = {
+                  code: validCountry || '--',
+                  flagEmoji: flagEmoji,
+                  name: countryName,
+                  city: data.city || ''
+                };
+              }
+            });
+            // Re-render and re-populate after each successful batch
+            populateCountryFilter();
+            renderProxyRecords();
+          }
+        } catch (e) {
+          console.warn('Client-side batch enrichment failed for IPs', e);
+        }
+      }
+    }
+    // ---------------------------------------------------
+
     async function loadProxyIps(refresh) {
       setProxyLoading(true);
       setProxyStatus(refresh ? 'رکوردها در حال به‌روزرسانی هستند...' : 'رکوردهای Proxy IP در حال دریافت هستند...', 'info');
@@ -1518,14 +1595,18 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
         document.getElementById('proxy-source-label').textContent = 'منبع خودکار فعال';
         document.getElementById('proxy-current-value').textContent = data.effectiveProxyIp || 'تنظیم نشده';
+
+        // Initial render with 'Loading' states
         renderProxyRecords();
 
         if (!proxyIpState.records.length) {
           setProxyStatus('برای مرکز ورودی فعلی رکورد A یا AAAA در دسترس نیست. کمی بعد دوباره تلاش کنید.', 'warn');
-        } else if (data.partial) {
-          setProxyStatus('رکوردها دریافت شدند، اما بخشی از اطلاعات شبکه کامل نیست: ' + (data.warnings || []).join(' '), 'warn');
         } else {
-          setProxyStatus('رکوردها آماده‌اند. کشور نمایش‌داده‌شده، کشور ثبت ASN است و مکان دقیق IP محسوب نمی‌شود.', 'info');
+          setProxyStatus('رکوردها دریافت شدند. در حال استخراج موقعیت مکانی...', 'info');
+          // Fire non-blocking client-side enrichment
+          enrichProxyRecordsClientSide().then(() => {
+            setProxyStatus('اطلاعات شبکه‌ای تمام آی‌پی‌ها با موفقیت دریافت شد.', 'info');
+          });
         }
       } catch (error) {
         proxyIpState.loaded = false;

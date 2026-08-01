@@ -225,119 +225,16 @@ function countryNameFa(code) {
   }
 }
 
-async function getIpApiBatch(addresses) {
-  try {
-    const res = await fetchWithTimeout('http://ip-api.com/batch', {
-      method: 'POST',
-      body: JSON.stringify(addresses.map(ip => ({ query: ip, fields: 'status,country,countryCode,city,isp,as,org' }))),
-      headers: { 'Content-Type': 'application/json' },
-    }, 4000);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (error) {
-    return null;
-  }
-}
-
-async function getFreeIpApi(address) {
-  try {
-    const res = await fetchWithTimeout(`https://freeipapi.com/api/json/${address}`, {}, 3000);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (error) {
-    return null;
-  }
-}
-
-async function getIpMetadataFallback(address) {
-  try {
-    const originAnswers = await queryTxt(teamCymruOrigin(address));
-    const originFields = (originAnswers[0] || '').split('|').map((value) => value.trim());
-    const asnNumber = originFields[0];
-    let countryCode = (originFields[2] || '').toUpperCase();
-    if (!/^\d+$/.test(asnNumber)) throw new Error('Invalid ASN answer');
-
-    const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
-    const asnFields = (asnAnswers[0] || '').split('|').map((value) => value.trim());
-    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
-      countryCode = asnFields[1].toUpperCase();
-    }
-
-    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
-    return {
-      metadataStatus: 'ok',
-      isp: {
-        asn: `AS${asnNumber}`,
-        name: asnFields[4] || 'نام شبکه در دسترس نیست',
-      },
-      country: {
-        code: validCountry || '--',
-        flagEmoji: countryFlagEmoji(validCountry),
-        name: countryNameFa(validCountry),
-        city: '',
-      },
-    };
-  } catch (error) {
-    return {
-      metadataStatus: 'unavailable',
-      isp: { asn: '--', name: 'اطلاعات شبکه در دسترس نیست' },
-      country: { code: '--', flagEmoji: '🌐', name: 'نامشخص', city: '' },
-    };
-  }
-}
 
 async function enrichRecords(records) {
-  const enrichedMap = new Map();
-  const toFetch = [];
-
-  // Check cache first
-  for (const record of records) {
-    const cacheKey = record.address.toLowerCase();
-    const cached = await getCachedJson('metadata-v6', cacheKey);
-    if (cached) {
-      enrichedMap.set(record.address, { ...record, ...cached });
-    } else {
-      toFetch.push(record.address);
-    }
-  }
-
-  // Fallback to highly concurrent fetch from HTTPS provider since HTTP was blocked
-  const workerCount = Math.min(10, toFetch.length);
-  const queue = [...toFetch];
-
-  async function worker() {
-    while (queue.length) {
-      const ip = queue.shift();
-      let metadata = null;
-      let data = await getFreeIpApi(ip);
-
-      if (data && data.countryCode) {
-        const countryCode = data.countryCode.toUpperCase();
-        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
-        // FreeIPApi doesn't always provide AS info accurately, so we still ask Team Cymru for ISP
-        const fallback = await getIpMetadataFallback(ip);
-        metadata = {
-          metadataStatus: 'ok',
-          isp: fallback.isp,
-          country: {
-            code: validCountry || '--',
-            flagEmoji: countryFlagEmoji(validCountry),
-            name: countryNameFa(validCountry),
-            city: data.cityName || '',
-          },
-        };
-      } else {
-        metadata = await getIpMetadataFallback(ip);
-      }
-
-      await putCachedJson('metadata-v6', ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
-      const record = records.find(r => r.address === ip);
-      if (record) enrichedMap.set(ip, { ...record, ...metadata });
-    }
-  }
-
-  await Promise.all(Array.from({ length: workerCount }, worker));
-  return records.map((record) => enrichedMap.get(record.address) || record);
+  // Enrichment is now shifted to the Client-Side (Browser)
+  // The worker only returns the raw IPs to prevent Cloudflare Subrequest Limits
+  return records.map((record) => ({
+    ...record,
+    metadataStatus: 'pending_client_enrichment',
+    isp: { asn: '--', name: 'در حال بارگذاری...' },
+    country: { code: '--', flagEmoji: '🌐', name: '...', city: '' }
+  }));
 }
 
 async function resolveProxyRecords(request, { refresh = false, enrich = true } = {}) {

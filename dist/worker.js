@@ -778,7 +778,6 @@ var DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query";
 var PROXY_IP_DOMAIN_SUFFIX = "proxyip.cmliussss.net";
 var DISCOVERY_CACHE_TTL_MIN = 60;
 var DISCOVERY_CACHE_TTL_MAX = 300;
-var METADATA_CACHE_TTL = 86400;
 var MAX_PROXY_RECORDS = 1e3;
 var MAX_ENRICHED_RECORDS = 1e3;
 var REQUEST_TIMEOUT_MS = 2500;
@@ -941,134 +940,13 @@ function deduplicateRecords(records) {
     return true;
   });
 }
-function expandIPv6(address) {
-  const parts = address.split("::");
-  const left = parts[0] ? parts[0].split(":") : [];
-  const right = parts[1] ? parts[1].split(":") : [];
-  const missing = 8 - left.length - right.length;
-  const groups = left.concat(Array(Math.max(0, missing)).fill("0"), right);
-  return groups.map((group) => group.padStart(4, "0")).join("");
-}
-function teamCymruOrigin(address) {
-  if (isValidIPv4(address)) {
-    return `${address.split(".").reverse().join(".")}.origin.asn.cymru.com`;
-  }
-  const expanded = expandIPv6(address);
-  return `${expanded.split("").reverse().join(".")}.origin6.asn.cymru.com`;
-}
-function cleanTxtValue(value) {
-  return String(value || "").trim().replace(/^"|"$/g, "").replace(/\\"/g, '"');
-}
-async function queryTxt(name) {
-  const result = await queryDoh(name, "TXT");
-  if (result.Status !== 0)
-    return [];
-  return (Array.isArray(result.Answer) ? result.Answer : []).filter((answer) => answer.type === 16 && typeof answer.data === "string").map((answer) => cleanTxtValue(answer.data)).filter(Boolean);
-}
-function countryFlagEmoji(code) {
-  if (!code || !/^[A-Z]{2}$/.test(code))
-    return "\u{1F310}";
-  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
-  return String.fromCodePoint(...points);
-}
-function countryNameFa(code) {
-  if (!code || !/^[A-Z]{2}$/.test(code))
-    return "\u0646\u0627\u0645\u0634\u062E\u0635";
-  try {
-    return new Intl.DisplayNames(["fa"], { type: "region" }).of(code) || code;
-  } catch (error) {
-    return code;
-  }
-}
-async function getFreeIpApi(address) {
-  try {
-    const res = await fetchWithTimeout(`https://freeipapi.com/api/json/${address}`, {}, 3e3);
-    if (!res.ok)
-      return null;
-    return await res.json();
-  } catch (error) {
-    return null;
-  }
-}
-async function getIpMetadataFallback(address) {
-  try {
-    const originAnswers = await queryTxt(teamCymruOrigin(address));
-    const originFields = (originAnswers[0] || "").split("|").map((value) => value.trim());
-    const asnNumber = originFields[0];
-    let countryCode = (originFields[2] || "").toUpperCase();
-    if (!/^\d+$/.test(asnNumber))
-      throw new Error("Invalid ASN answer");
-    const asnAnswers = await queryTxt(`AS${asnNumber}.asn.cymru.com`);
-    const asnFields = (asnAnswers[0] || "").split("|").map((value) => value.trim());
-    if (!/^[A-Z]{2}$/.test(countryCode) && asnFields[1]) {
-      countryCode = asnFields[1].toUpperCase();
-    }
-    const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
-    return {
-      metadataStatus: "ok",
-      isp: {
-        asn: `AS${asnNumber}`,
-        name: asnFields[4] || "\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A"
-      },
-      country: {
-        code: validCountry || "--",
-        flagEmoji: countryFlagEmoji(validCountry),
-        name: countryNameFa(validCountry),
-        city: ""
-      }
-    };
-  } catch (error) {
-    return {
-      metadataStatus: "unavailable",
-      isp: { asn: "--", name: "\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A" },
-      country: { code: "--", flagEmoji: "\u{1F310}", name: "\u0646\u0627\u0645\u0634\u062E\u0635", city: "" }
-    };
-  }
-}
 async function enrichRecords(records) {
-  const enrichedMap = /* @__PURE__ */ new Map();
-  const toFetch = [];
-  for (const record of records) {
-    const cacheKey = record.address.toLowerCase();
-    const cached = await getCachedJson("metadata-v6", cacheKey);
-    if (cached) {
-      enrichedMap.set(record.address, { ...record, ...cached });
-    } else {
-      toFetch.push(record.address);
-    }
-  }
-  const workerCount = Math.min(10, toFetch.length);
-  const queue = [...toFetch];
-  async function worker() {
-    while (queue.length) {
-      const ip = queue.shift();
-      let metadata = null;
-      let data = await getFreeIpApi(ip);
-      if (data && data.countryCode) {
-        const countryCode = data.countryCode.toUpperCase();
-        const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : "";
-        const fallback = await getIpMetadataFallback(ip);
-        metadata = {
-          metadataStatus: "ok",
-          isp: fallback.isp,
-          country: {
-            code: validCountry || "--",
-            flagEmoji: countryFlagEmoji(validCountry),
-            name: countryNameFa(validCountry),
-            city: data.cityName || ""
-          }
-        };
-      } else {
-        metadata = await getIpMetadataFallback(ip);
-      }
-      await putCachedJson("metadata-v6", ip.toLowerCase(), metadata, METADATA_CACHE_TTL);
-      const record = records.find((r) => r.address === ip);
-      if (record)
-        enrichedMap.set(ip, { ...record, ...metadata });
-    }
-  }
-  await Promise.all(Array.from({ length: workerCount }, worker));
-  return records.map((record) => enrichedMap.get(record.address) || record);
+  return records.map((record) => ({
+    ...record,
+    metadataStatus: "pending_client_enrichment",
+    isp: { asn: "--", name: "\u062F\u0631 \u062D\u0627\u0644 \u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC..." },
+    country: { code: "--", flagEmoji: "\u{1F310}", name: "...", city: "" }
+  }));
 }
 async function resolveProxyRecords(request, { refresh = false, enrich = true } = {}) {
   const colo = getIngressColo(request);
@@ -2581,17 +2459,22 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
           flagImg.style.objectFit = 'cover';
           flagImg.onerror = function() {
             this.style.display = 'none';
-            if (record.country && record.country.flagEmoji) {
+            if (record.country && record.country.flagEmoji && record.country.flagEmoji !== '\u{1F310}') {
               const fallbackEmoji = document.createElement('span');
               fallbackEmoji.textContent = record.country.flagEmoji;
               countryWrap.insertBefore(fallbackEmoji, countryText);
             }
           };
           countryWrap.appendChild(flagImg);
-        } else if (record.country && record.country.flagEmoji) {
+        } else if (record.country && record.country.flagEmoji && record.country.flagEmoji !== '\u{1F310}') {
           const emojiSpan = document.createElement('span');
           emojiSpan.textContent = record.country.flagEmoji;
           countryWrap.appendChild(emojiSpan);
+        } else if (record.metadataStatus === 'pending_client_enrichment') {
+          const spinner = document.createElement('span');
+          spinner.textContent = '\u23F3';
+          spinner.style.fontSize = '12px';
+          countryWrap.appendChild(spinner);
         }
 
         const countryText = document.createElement('span');
@@ -2623,6 +2506,78 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
       setProxyStatus('\u0631\u06A9\u0648\u0631\u062F \u0627\u0646\u062A\u062E\u0627\u0628 \u0634\u062F. \u0628\u0631\u0627\u06CC \u0630\u062E\u06CC\u0631\u0647\u0654 \u0622\u0646 \u0628\u0647\u200C\u0639\u0646\u0648\u0627\u0646 Proxy IP \u0633\u0631\u0627\u0633\u0631\u06CC\u060C \u062F\u06A9\u0645\u0647\u0654 \u0627\u0639\u0645\u0627\u0644 \u0631\u0627 \u0628\u0632\u0646\u06CC\u062F.', 'info');
     }
 
+    // ---------- Client-Side GeoIP Enrichment ----------
+    async function enrichProxyRecordsClientSide() {
+      const recordsToEnrich = proxyIpState.records.filter(r => r.metadataStatus === 'pending_client_enrichment');
+      if (!recordsToEnrich.length) return;
+
+      const ips = recordsToEnrich.map(r => r.address);
+      const batchSize = 100;
+
+      for (let i = 0; i < ips.length; i += batchSize) {
+        const batchIps = ips.slice(i, i + batchSize);
+        try {
+          const res = await fetch('http://ip-api.com/batch', {
+            method: 'POST',
+            body: JSON.stringify(batchIps.map(ip => ({ query: ip, fields: 'status,country,countryCode,city,isp,as,org' }))),
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          if (res.ok) {
+            const dataArr = await res.json();
+            dataArr.forEach((data, index) => {
+              const ip = batchIps[index];
+              const record = proxyIpState.records.find(r => r.address === ip);
+              if (record && data && data.status === 'success') {
+                const countryCode = (data.countryCode || '').toUpperCase();
+                const validCountry = /^[A-Z]{2}$/.test(countryCode) ? countryCode : '';
+                let asnNum = '--';
+                let orgName = data.isp || data.org || '\u0646\u0627\u0645 \u0634\u0628\u06A9\u0647 \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A';
+
+                if (data.as && typeof data.as === 'string') {
+                  const match = data.as.match(/^AS(d+)s+(.*)$/);
+                  if (match) {
+                    asnNum = 'AS' + match[1];
+                    orgName = match[2];
+                  } else if (data.as.startsWith('AS')) {
+                    asnNum = data.as.split(' ')[0];
+                  }
+                }
+
+                // Emoji flag generator
+                let flagEmoji = '\u{1F310}';
+                if (validCountry) {
+                  const points = [...validCountry].map(c => 127397 + c.charCodeAt(0));
+                  flagEmoji = String.fromCodePoint(...points);
+                }
+
+                // Fa country name generator
+                let countryName = '\u0646\u0627\u0645\u0634\u062E\u0635';
+                if (validCountry) {
+                  try { countryName = new Intl.DisplayNames(['fa'], { type: 'region' }).of(validCountry) || validCountry; } catch(e) { countryName = validCountry; }
+                }
+
+                record.metadataStatus = 'ok';
+                record.isp = { asn: asnNum, name: orgName };
+                record.country = {
+                  code: validCountry || '--',
+                  flagEmoji: flagEmoji,
+                  name: countryName,
+                  city: data.city || ''
+                };
+              }
+            });
+            // Re-render and re-populate after each successful batch
+            populateCountryFilter();
+            renderProxyRecords();
+          }
+        } catch (e) {
+          console.warn('Client-side batch enrichment failed for IPs', e);
+        }
+      }
+    }
+    // ---------------------------------------------------
+
     async function loadProxyIps(refresh) {
       setProxyLoading(true);
       setProxyStatus(refresh ? '\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u062F\u0631 \u062D\u0627\u0644 \u0628\u0647\u200C\u0631\u0648\u0632\u0631\u0633\u0627\u0646\u06CC \u0647\u0633\u062A\u0646\u062F...' : '\u0631\u06A9\u0648\u0631\u062F\u0647\u0627\u06CC Proxy IP \u062F\u0631 \u062D\u0627\u0644 \u062F\u0631\u06CC\u0627\u0641\u062A \u0647\u0633\u062A\u0646\u062F...', 'info');
@@ -2641,14 +2596,18 @@ curl -X GET https://${hostname}/api/users -H "Authorization: Bearer YOUR_TOKEN"
         document.getElementById('proxy-colo').textContent = data.ingress && data.ingress.colo ? data.ingress.colo : '---';
         document.getElementById('proxy-source-label').textContent = '\u0645\u0646\u0628\u0639 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0641\u0639\u0627\u0644';
         document.getElementById('proxy-current-value').textContent = data.effectiveProxyIp || '\u062A\u0646\u0638\u06CC\u0645 \u0646\u0634\u062F\u0647';
+
+        // Initial render with 'Loading' states
         renderProxyRecords();
 
         if (!proxyIpState.records.length) {
           setProxyStatus('\u0628\u0631\u0627\u06CC \u0645\u0631\u06A9\u0632 \u0648\u0631\u0648\u062F\u06CC \u0641\u0639\u0644\u06CC \u0631\u06A9\u0648\u0631\u062F A \u06CC\u0627 AAAA \u062F\u0631 \u062F\u0633\u062A\u0631\u0633 \u0646\u06CC\u0633\u062A. \u06A9\u0645\u06CC \u0628\u0639\u062F \u062F\u0648\u0628\u0627\u0631\u0647 \u062A\u0644\u0627\u0634 \u06A9\u0646\u06CC\u062F.', 'warn');
-        } else if (data.partial) {
-          setProxyStatus('\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F\u0646\u062F\u060C \u0627\u0645\u0627 \u0628\u062E\u0634\u06CC \u0627\u0632 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647 \u06A9\u0627\u0645\u0644 \u0646\u06CC\u0633\u062A: ' + (data.warnings || []).join(' '), 'warn');
         } else {
-          setProxyStatus('\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u0622\u0645\u0627\u062F\u0647\u200C\u0627\u0646\u062F. \u06A9\u0634\u0648\u0631 \u0646\u0645\u0627\u06CC\u0634\u200C\u062F\u0627\u062F\u0647\u200C\u0634\u062F\u0647\u060C \u06A9\u0634\u0648\u0631 \u062B\u0628\u062A ASN \u0627\u0633\u062A \u0648 \u0645\u06A9\u0627\u0646 \u062F\u0642\u06CC\u0642 IP \u0645\u062D\u0633\u0648\u0628 \u0646\u0645\u06CC\u200C\u0634\u0648\u062F.', 'info');
+          setProxyStatus('\u0631\u06A9\u0648\u0631\u062F\u0647\u0627 \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F\u0646\u062F. \u062F\u0631 \u062D\u0627\u0644 \u0627\u0633\u062A\u062E\u0631\u0627\u062C \u0645\u0648\u0642\u0639\u06CC\u062A \u0645\u06A9\u0627\u0646\u06CC...', 'info');
+          // Fire non-blocking client-side enrichment
+          enrichProxyRecordsClientSide().then(() => {
+            setProxyStatus('\u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0634\u0628\u06A9\u0647\u200C\u0627\u06CC \u062A\u0645\u0627\u0645 \u0622\u06CC\u200C\u067E\u06CC\u200C\u0647\u0627 \u0628\u0627 \u0645\u0648\u0641\u0642\u06CC\u062A \u062F\u0631\u06CC\u0627\u0641\u062A \u0634\u062F.', 'info');
+          });
         }
       } catch (error) {
         proxyIpState.loaded = false;
